@@ -753,13 +753,21 @@
       <div class="panel">
         <div class="panel-head"><span>Lender Fees</span><span class="tag" data-fld="g2total"></span></div>
         <div class="panel-body">
-          <div class="field-row"><label>Appraisal</label><input type="text" inputmode="decimal" data-fld="f_appraisal" value="650" oninput="calc(this.closest('.loan-block'))"></div>
           <div class="field-row"><label>Application</label><input type="text" inputmode="decimal" data-fld="f_application" value="595" oninput="calc(this.closest('.loan-block'))"></div>
           <div class="field-row"><label>Processing</label><input type="text" inputmode="decimal" data-fld="f_processing" value="0" oninput="calc(this.closest('.loan-block'))"></div>
           <div class="field-row"><label>Underwriting</label><input type="text" inputmode="decimal" data-fld="f_underwriting" value="0" oninput="calc(this.closest('.loan-block'))"></div>
           <div class="field-row"><label>Commitment</label><input type="text" inputmode="decimal" data-fld="f_commitment" value="995" oninput="calc(this.closest('.loan-block'))"></div>
           <div class="field-row"><label>Points ($)</label><input type="text" inputmode="decimal" data-fld="f_points" value="0" oninput="calc(this.closest('.loan-block'))"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><span>3rd-Party Fees</span><span class="tag" data-fld="g2bTotal"></span></div>
+        <div class="panel-body">
           <div class="field-row"><label>Bank Attorney</label><input type="text" inputmode="decimal" data-fld="f_attorney" value="1200" oninput="calc(this.closest('.loan-block'))"></div>
+          <div class="field-row"><label>Buyer's Attorney</label><input type="text" inputmode="decimal" data-fld="f_buyersAttorney" value="0" oninput="calc(this.closest('.loan-block'))"></div>
+          <div class="field-row"><label>Appraisal</label><input type="text" inputmode="decimal" data-fld="f_appraisal" value="650" oninput="calc(this.closest('.loan-block'))"></div>
+          <div class="field-row"><label>Co-Op Condo Fee</label><input type="text" inputmode="decimal" data-fld="f_coopCondoFee" value="0" oninput="calc(this.closest('.loan-block'))"></div>
         </div>
       </div>
 
@@ -803,6 +811,7 @@
 
           <div class="field-row"><label>Recording Fees</label><input type="text" inputmode="decimal" data-fld="t_recording" value="500" oninput="calc(this.closest('.loan-block'))"></div>
           <div class="field-row"><label>Misc. / Ancillary Title Fees <span class="hint">Search, abstract, closing fee — varies by title co.</span></label><input type="text" inputmode="decimal" data-fld="t_misc" value="1000" oninput="calc(this.closest('.loan-block'))"></div>
+          <div class="field-row"><label>Condo Formation Fee <span class="manual-badge">Manual</span></label><input type="text" inputmode="decimal" data-fld="t_condoFormation" value="0" oninput="calc(this.closest('.loan-block'))"></div>
 
           <div class="field-row">
             <label>Mortgage / Recordation Tax
@@ -889,7 +898,7 @@
         <div class="panel-head"><span>Cash to Close</span></div>
         <div class="panel-body">
           <div class="totals-row"><span>Down Payment</span><span class="amt" data-fld="out_dpEcho"></span></div>
-          <div class="totals-row"><span>Closing Costs (Groups 2+3)</span><span class="amt" data-fld="out_g23"></span></div>
+          <div class="totals-row"><span>Closing Costs (Lender + 3rd-Party + Title/Gov)</span><span class="amt" data-fld="out_g23"></span></div>
           <div class="totals-row"><span>Escrows</span><span class="amt" data-fld="out_g4"></span></div>
           <div class="totals-row"><span>Seller's Concession <span class="manual-badge">Manual</span></span><span class="amt" data-fld="out_sellerConcessionEcho"></span></div>
           <div class="totals-row"><span>Deposit <span class="manual-badge">Manual</span></span><span class="amt" data-fld="out_emdEcho"></span></div>
@@ -2061,9 +2070,14 @@ function calc(container){
   const hoaFee = numVal(container,'hoaFee');
 
   // Lender Fees
-  const g2 = ['f_appraisal','f_application','f_processing','f_underwriting','f_commitment','f_points','f_attorney']
+  const g2 = ['f_application','f_processing','f_underwriting','f_commitment','f_points']
     .reduce((s,id)=> s + numVal(container,id), 0);
   E(container,'g2total').textContent = 'Total: ' + fmt(g2);
+
+  // 3rd-Party Fees
+  const g2b = ['f_attorney','f_buyersAttorney','f_appraisal','f_coopCondoFee']
+    .reduce((s,id)=> s + numVal(container,id), 0);
+  E(container,'g2bTotal').textContent = 'Total: ' + fmt(g2b);
 
   // Title Insurance auto-calc, then government fee auto-calc (Mortgage/Mansion/Transfer tax)
   applyTitleInsurance(container, price, loanAmt);
@@ -2073,6 +2087,7 @@ function calc(container){
   const g3 = numVal(container,'t_title')
     + numVal(container,'t_recording')
     + numVal(container,'t_misc')
+    + numVal(container,'t_condoFormation')
     + numVal(container,'t_mortgagetax')
     + (showMansion ? numVal(container,'t_mansiontax') : 0)
     + (showTransfer ? numVal(container,'t_transfertax') : 0);
@@ -2119,7 +2134,7 @@ function calc(container){
   E(container,'g4total').textContent = 'Total: ' + fmt(g4);
 
   // Cash to Close: Down Payment, Closing Costs, Escrows, Seller's Concession, Deposit, Total Cost
-  const closingCosts = g2 + g3;
+  const closingCosts = g2 + g2b + g3;
   const escrows = g4;
   const emd = numVal(container,'emd');
   const totalCost = downAmt + closingCosts + escrows - sellerConcession - emd;
@@ -2196,19 +2211,25 @@ function calc(container){
     program, price, downAmt, downPct, loanAmt, term, rate: rate*100,
     pointsPct, pointsDeduction, ufmip, totalLoan, sellerConcession, hoaFee, mipAuto,
     fees: {
-      appraisal: numVal(container,'f_appraisal'),
       application: numVal(container,'f_application'),
       processing: numVal(container,'f_processing'),
       underwriting: numVal(container,'f_underwriting'),
       commitment: numVal(container,'f_commitment'),
       points: numVal(container,'f_points'),
-      attorney: numVal(container,'f_attorney'),
       g2total: g2
+    },
+    fees3rdParty: {
+      attorney: numVal(container,'f_attorney'),
+      buyersAttorney: numVal(container,'f_buyersAttorney'),
+      appraisal: numVal(container,'f_appraisal'),
+      coopCondoFee: numVal(container,'f_coopCondoFee'),
+      g2bTotal: g2b
     },
     title: {
       title: numVal(container,'t_title'),
       recording: numVal(container,'t_recording'),
       misc: numVal(container,'t_misc'),
+      condoFormation: numVal(container,'t_condoFormation'),
       mortgagetax: numVal(container,'t_mortgagetax'),
       mansiontax: numVal(container,'t_mansiontax'),
       transfertax: numVal(container,'t_transfertax'),
@@ -2348,14 +2369,20 @@ function renderPdfLoanPage(doc, d, navy, gold, slate, pageW, logoDataUrl){
   gap(8);
 
   sectionHeader('Lender Fees');
-  row('Appraisal', fmt(+d.fees.appraisal));
   row('Application', fmt(+d.fees.application));
   row('Processing', fmt(+d.fees.processing));
   row('Underwriting', fmt(+d.fees.underwriting));
   row('Commitment', fmt(+d.fees.commitment));
   row('Points', fmt(+d.fees.points));
-  row('Bank Attorney', fmt(+d.fees.attorney));
   row('Total', fmt(d.fees.g2total), {bold:true, rule:true});
+  gap(8);
+
+  sectionHeader('3rd-Party Fees');
+  row('Bank Attorney', fmt(+d.fees3rdParty.attorney));
+  row("Buyer's Attorney", fmt(+d.fees3rdParty.buyersAttorney));
+  row('Appraisal', fmt(+d.fees3rdParty.appraisal));
+  row('Co-Op Condo Fee', fmt(+d.fees3rdParty.coopCondoFee));
+  row('Total', fmt(d.fees3rdParty.g2bTotal), {bold:true, rule:true});
   leftY = curY;
 
   // RIGHT COLUMN: Title & Gov Fees, Escrows, Cash to Close, Monthly Payment
@@ -2365,6 +2392,7 @@ function renderPdfLoanPage(doc, d, navy, gold, slate, pageW, logoDataUrl){
   row('Title Insurance', fmt(+d.title.title));
   row('Recording Fees', fmt(+d.title.recording));
   row('Misc. Title Fees', fmt(+d.title.misc));
+  row('Condo Formation Fee', fmt(+d.title.condoFormation));
   row('Mortgage Tax', fmt(+d.title.mortgagetax));
   if (d.title.showMansion) row('Mansion Tax', fmt(+d.title.mansiontax));
   if (d.title.showTransfer) row('Transfer Tax', fmt(+d.title.transfertax));
@@ -2557,14 +2585,20 @@ async function buildXlsxExport(container, dpMode){
   blank();
 
   section('LENDER FEES (inputs)');
-  R.appraisal = push('Appraisal', +d.fees.appraisal);
   R.application = push('Application', +d.fees.application);
   R.processing = push('Processing', +d.fees.processing);
   R.underwriting = push('Underwriting', +d.fees.underwriting);
   R.commitment = push('Commitment', +d.fees.commitment);
   R.feePoints = push('Points ($)', +d.fees.points);
-  R.attorney = push('Bank Attorney', +d.fees.attorney);
   R.g2total = push('Lender Fees Total', null);
+  blank();
+
+  section('3RD-PARTY FEES (inputs)');
+  R.attorney = push('Bank Attorney', +d.fees3rdParty.attorney);
+  R.buyersAttorney = push("Buyer's Attorney", +d.fees3rdParty.buyersAttorney);
+  R.appraisal = push('Appraisal', +d.fees3rdParty.appraisal);
+  R.coopCondoFee = push('Co-Op Condo Fee', +d.fees3rdParty.coopCondoFee);
+  R.g2bTotal = push('3rd-Party Fees Total', null);
   blank();
 
   const stateCode = E(container,'state').value;
@@ -2575,6 +2609,7 @@ async function buildXlsxExport(container, dpMode){
   section('TITLE & GOVERNMENT FEES (' + stateCode + (countyName ? ', ' + countyName : '') + ' — live formulas below)');
   R.recording = push('Recording Fees', +d.title.recording);
   R.misc = push('Misc. / Ancillary Title Fees', +d.title.misc);
+  R.condoFormation = push('Condo Formation Fee', +d.title.condoFormation);
   R.titleIns = push('Title Insurance', 0, container._sourceNotes.title);
   R.mortgageTax = push('Mortgage / Recordation Tax', 0, container._sourceNotes.govFees);
   R.mansionTax = push('Mansion / Supplemental Tax', 0);
@@ -2828,7 +2863,8 @@ async function buildXlsxExport(container, dpMode){
   F[R.pointsDeduction] = 'B' + R.loanBeforePoints + '*B' + R.pointsPct;
   F[R.totalLoan] = 'B' + R.loanBeforePoints + '-B' + R.pointsDeduction;
 
-  F[R.g2total] = 'SUM(B' + R.appraisal + ':B' + R.attorney + ')';
+  F[R.g2total] = 'SUM(B' + R.application + ':B' + R.feePoints + ')';
+  F[R.g2bTotal] = 'SUM(B' + R.attorney + ':B' + R.coopCondoFee + ')';
   F[R.g3total] = 'SUM(B' + R.recording + ':B' + R.transferTax + ')';
 
   F[R.perdiem] = 'B' + R.loanAmt + '*B' + R.rate + '/365*B' + R.perdiemDays;
@@ -2837,7 +2873,7 @@ async function buildXlsxExport(container, dpMode){
   F[R.escrowTotal] = 'SUM(B' + R.perdiem + ':B' + R.taxEscrow + ')';
 
   F[R.ctcDown] = 'B' + R.downAmt;
-  F[R.ctcClosing] = 'B' + R.g2total + '+B' + R.g3total;
+  F[R.ctcClosing] = 'B' + R.g2total + '+B' + R.g2bTotal + '+B' + R.g3total;
   F[R.ctcEscrows] = 'B' + R.escrowTotal;
   F[R.ctcSeller] = '-B' + R.sellerConcession;
   F[R.ctcEmd] = '-B' + R.emd;
@@ -2979,13 +3015,20 @@ async function buildXlsxExport(container, dpMode){
   fblank();
 
   fsection('LENDER FEES');
-  fref('Appraisal', R.appraisal); fref('Application', R.application); fref('Processing', R.processing);
+  fref('Application', R.application); fref('Processing', R.processing);
   fref('Underwriting', R.underwriting); fref('Commitment', R.commitment); fref('Points ($)', R.feePoints);
-  fref('Bank Attorney', R.attorney); fref('Total', R.g2total, { alwaysShow:true, bold:true });
+  fref('Total', R.g2total, { alwaysShow:true, bold:true });
+  fblank();
+
+  fsection('3RD-PARTY FEES');
+  fref('Bank Attorney', R.attorney); fref("Buyer's Attorney", R.buyersAttorney);
+  fref('Appraisal', R.appraisal); fref('Co-Op Condo Fee', R.coopCondoFee);
+  fref('Total', R.g2bTotal, { alwaysShow:true, bold:true });
   fblank();
 
   fsection('TITLE & GOVERNMENT FEES');
   fref('Title Insurance', R.titleIns); fref('Recording Fees', R.recording); fref('Misc. / Ancillary Title Fees', R.misc);
+  fref('Condo Formation Fee', R.condoFormation);
   fref('Mortgage Tax', R.mortgageTax); fref('Mansion Tax', R.mansionTax); fref('Transfer Tax', R.transferTax);
   fref('Total', R.g3total, { alwaysShow:true, bold:true });
   fblank();
@@ -3200,19 +3243,25 @@ function buildDocxLoanSection(d){
    [["Seller's Concession", '-' + fmt(d.sellerConcession)]]);
 
   body += docxGroupSection('Lender Fees', [
-    ['Appraisal', fmt(+d.fees.appraisal)],
     ['Application', fmt(+d.fees.application)],
     ['Processing', fmt(+d.fees.processing)],
     ['Underwriting', fmt(+d.fees.underwriting)],
     ['Commitment', fmt(+d.fees.commitment)],
-    ['Points', fmt(+d.fees.points)],
-    ['Bank Attorney', fmt(+d.fees.attorney)]
+    ['Points', fmt(+d.fees.points)]
   ], 'Total', fmt(d.fees.g2total));
+
+  body += docxGroupSection('3rd-Party Fees', [
+    ['Bank Attorney', fmt(+d.fees3rdParty.attorney)],
+    ["Buyer's Attorney", fmt(+d.fees3rdParty.buyersAttorney)],
+    ['Appraisal', fmt(+d.fees3rdParty.appraisal)],
+    ['Co-Op Condo Fee', fmt(+d.fees3rdParty.coopCondoFee)]
+  ], 'Total', fmt(d.fees3rdParty.g2bTotal));
 
   body += docxGroupSection('Title & Government Fees', [
     ['Title Insurance', fmt(+d.title.title)],
     ['Recording Fees', fmt(+d.title.recording)],
     ['Misc. / Ancillary Title Fees', fmt(+d.title.misc)],
+    ['Condo Formation Fee', fmt(+d.title.condoFormation)],
     ['Mortgage / Recordation Tax', fmt(+d.title.mortgagetax)],
     ['Mansion / Supplemental Tax', fmt(+d.title.mansiontax)],
     ['Transfer / Excise Tax', fmt(+d.title.transfertax)]
@@ -3490,6 +3539,9 @@ function renderLoanSummaryHtml(d){
 
   h += section('Lender Fees');
   h += row('Total', fmt(d.fees.g2total), true);
+
+  h += section('3rd-Party Fees');
+  h += row('Total', fmt(d.fees3rdParty.g2bTotal), true);
 
   h += section('Title & Government Fees');
   h += row('Total', fmt(d.title.g3total), true);
