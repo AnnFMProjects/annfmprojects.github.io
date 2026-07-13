@@ -713,15 +713,39 @@
             <input type="number" step="0.01" data-fld="ratePoints" value="0" oninput="calc(this.closest('.loan-block'))">
           </div>
 
-          <div class="field-row"><label>Upfront MIP <span class="calc-badge">Auto</span> <span class="hint" data-fld="ufmipHint"></span></label><span class="summary-value" data-fld="out_ufmip"></span></div>
+          <div class="field-row" data-fld="row_ufmip">
+            <label>Upfront MIP <span class="calc-badge" data-fld="badge_ufmip">Auto</span> <span class="hint" data-fld="ufmipHint"></span></label>
+            <input type="text" inputmode="decimal" data-fld="ufmip" value="0" oninput="calc(this.closest('.loan-block'))">
+          </div>
           <div class="field-row"><label>Total Loan Amount <span class="calc-badge">Auto</span> <span class="hint" data-fld="pointsHint"></span></label><span class="summary-value" data-fld="out_totalLoan"></span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><span>Loan Specifics</span></div>
+        <div class="panel-body">
           <div class="field-row">
             <label>Seller's Concession ($) <span class="manual-badge">Manual</span></label>
             <input type="text" inputmode="decimal" data-fld="sellerConcession" value="0" oninput="calc(this.closest('.loan-block'))">
           </div>
           <div class="field-row">
-            <label>HOA / Monthly Fee ($) <span class="manual-badge">Manual</span> <span class="hint">Included in Monthly Payment below</span></label>
+            <label>HOA / Monthly Fee ($) <span class="manual-badge">Manual</span> <span class="hint">Included in Monthly Payment</span></label>
             <input type="text" inputmode="decimal" data-fld="hoaFee" value="0" oninput="calc(this.closest('.loan-block'))">
+          </div>
+          <div class="field-row" style="justify-content:flex-start; gap:6px;" data-fld="row_mipautochk">
+            <label class="radio-opt" style="font-size:12px; font-weight:700; color:var(--navy);"><input type="checkbox" data-fld="chk_mipauto" checked onchange="calc(this.closest('.loan-block'))"> Auto-calculate MI</label>
+          </div>
+          <div class="field-row" data-fld="row_mi_specifics">
+            <label>MI (Mortgage Insurance) <span class="calc-badge" data-fld="badge_mi">Auto</span> <span class="hint" data-fld="miHint"></span></label>
+            <input type="text" inputmode="decimal" data-fld="mi" value="0" oninput="calc(this.closest('.loan-block'))">
+          </div>
+          <div class="field-row" data-fld="row_pmi_specifics" style="display:none;">
+            <label>PMI (Private Mortgage Insurance) <span class="manual-badge">Manual</span></label>
+            <input type="text" inputmode="decimal" data-fld="pmi" value="0" oninput="calc(this.closest('.loan-block'))">
+          </div>
+          <div class="field-row">
+            <label>Deposit ($) <span class="manual-badge">Manual</span> <span class="hint">Earnest Money Deposit already paid — reduces funds needed to close</span></label>
+            <input type="text" inputmode="decimal" data-fld="emd" value="0" oninput="calc(this.closest('.loan-block'))">
           </div>
         </div>
       </div>
@@ -816,8 +840,39 @@
       <div class="panel">
         <div class="panel-head"><span>Monthly Escrow Inputs</span></div>
         <div class="panel-body">
-          <div class="field-row"><label>Monthly Property Taxes <span class="manual-badge">Manual</span></label><input type="text" inputmode="decimal" data-fld="m_taxes" value="0" oninput="calc(this.closest('.loan-block'))"></div>
-          <div class="field-row"><label>Monthly Homeowners Insurance <span class="manual-badge">Manual</span></label><input type="text" inputmode="decimal" data-fld="m_insurance" value="0" oninput="calc(this.closest('.loan-block'))"></div>
+          <div class="hint" style="margin-bottom:8px;">Property Taxes &amp; Homeowners Insurance: enter either the yearly total or the monthly payment — whichever you type drives the other, divided by the months figure (default 12, editable).</div>
+
+          <div class="field-row" style="padding-bottom:2px; border-bottom:none;">
+            <label style="font-size:12px; color:var(--slate);">Property Taxes input mode</label>
+            <div style="display:flex; gap:12px;">
+              <label class="radio-opt" style="font-size:12px;"><input type="radio" data-fld="taxMode_yearly" onchange="calc(this.closest('.loan-block'))"> Yearly Total</label>
+              <label class="radio-opt" style="font-size:12px;"><input type="radio" data-fld="taxMode_monthly" checked onchange="calc(this.closest('.loan-block'))"> Monthly Payment</label>
+            </div>
+          </div>
+          <div class="field-row">
+            <label>Yearly Property Taxes ÷ <input type="text" inputmode="decimal" data-fld="taxDivisorMonths" value="12" class="inline-num" oninput="calc(this.closest('.loan-block'))"> mo</label>
+            <input type="text" inputmode="decimal" data-fld="y_taxes" value="0" oninput="calc(this.closest('.loan-block'))">
+          </div>
+          <div class="field-row">
+            <label>Monthly Property Taxes <span class="manual-badge">Manual</span></label>
+            <input type="text" inputmode="decimal" data-fld="m_taxes" value="0" oninput="calc(this.closest('.loan-block'))">
+          </div>
+
+          <div class="field-row" style="padding-bottom:2px; border-bottom:none; margin-top:8px;">
+            <label style="font-size:12px; color:var(--slate);">Homeowners Insurance input mode</label>
+            <div style="display:flex; gap:12px;">
+              <label class="radio-opt" style="font-size:12px;"><input type="radio" data-fld="insMode_yearly" onchange="calc(this.closest('.loan-block'))"> Yearly Total</label>
+              <label class="radio-opt" style="font-size:12px;"><input type="radio" data-fld="insMode_monthly" checked onchange="calc(this.closest('.loan-block'))"> Monthly Payment</label>
+            </div>
+          </div>
+          <div class="field-row">
+            <label>Yearly Homeowners Insurance ÷ <input type="text" inputmode="decimal" data-fld="insDivisorMonths" value="12" class="inline-num" oninput="calc(this.closest('.loan-block'))"> mo</label>
+            <input type="text" inputmode="decimal" data-fld="y_insurance" value="0" oninput="calc(this.closest('.loan-block'))">
+          </div>
+          <div class="field-row">
+            <label>Monthly Homeowners Insurance <span class="manual-badge">Manual</span></label>
+            <input type="text" inputmode="decimal" data-fld="m_insurance" value="0" oninput="calc(this.closest('.loan-block'))">
+          </div>
         </div>
       </div>
 
@@ -837,6 +892,7 @@
           <div class="totals-row"><span>Closing Costs (Groups 2+3)</span><span class="amt" data-fld="out_g23"></span></div>
           <div class="totals-row"><span>Escrows</span><span class="amt" data-fld="out_g4"></span></div>
           <div class="totals-row"><span>Seller's Concession <span class="manual-badge">Manual</span></span><span class="amt" data-fld="out_sellerConcessionEcho"></span></div>
+          <div class="totals-row"><span>Deposit <span class="manual-badge">Manual</span></span><span class="amt" data-fld="out_emdEcho"></span></div>
           <div class="totals-row grand"><span>Total Cost</span><span class="amt" data-fld="out_totalCost"></span></div>
         </div>
       </div>
@@ -851,7 +907,8 @@
           <div class="totals-row"><span>Principal &amp; Interest <span class="calc-badge">Auto</span></span><span class="amt" data-fld="out_pi"></span></div>
           <div class="totals-row"><span>Property Taxes</span><span class="amt" data-fld="out_taxesEcho"></span></div>
           <div class="totals-row"><span>Homeowners Insurance</span><span class="amt" data-fld="out_insEcho"></span></div>
-          <div class="totals-row"><span>Mortgage Insurance <span class="calc-badge">Auto</span> <span class="hint" data-fld="miHint"></span></span><span class="amt" data-fld="out_mi"></span></div>
+          <div class="totals-row" data-fld="row_mi"><span>MI (Mortgage Insurance)</span><span class="amt" data-fld="out_mi"></span></div>
+          <div class="totals-row" data-fld="row_pmi" style="display:none;"><span>PMI (Private Mortgage Insurance)</span><span class="amt" data-fld="out_pmiEcho"></span></div>
           <div class="totals-row"><span>HOA / Monthly Fee</span><span class="amt" data-fld="out_hoaEcho"></span></div>
         </div>
       </div>
@@ -1962,14 +2019,41 @@ function calc(container){
   const program = E(container,'loanProgram').value;
   const pointsPct = parseFloat(E(container,'ratePoints').value) || 0;
 
-  const isFHA = program === 'FHA';
-  const ufmip = isFHA ? loanAmt * 0.0175 : 0;
+  // Upfront MIP (FHA/USDA/VA financed fee) and MI (their monthly equivalent)
+  // apply to these three programs only; Conventional uses PMI instead
+  // (manual only — no universal formula exists for it).
+  const hasMipMi = program === 'FHA' || program === 'USDA' || program === 'VA';
+  const mipAuto = E(container,'chk_mipauto').checked;
+  E(container,'row_mipautochk').style.display = hasMipMi ? '' : 'none';
+  E(container,'row_ufmip').style.display = hasMipMi ? '' : 'none';
+
+  let ufmip;
+  if (!hasMipMi){
+    ufmip = 0;
+    E(container,'ufmip').value = '0.00';
+    E(container,'ufmip').disabled = true;
+    E(container,'badge_ufmip').textContent = 'N/A';
+    E(container,'badge_ufmip').className = 'manual-badge';
+    E(container,'ufmipHint').textContent = '(n/a for ' + program + ' — see PMI in Monthly Payment)';
+  } else if (mipAuto){
+    ufmip = loanAmt * 0.0175;
+    E(container,'ufmip').value = ufmip.toFixed(2);
+    E(container,'ufmip').disabled = true;
+    E(container,'badge_ufmip').textContent = 'Auto';
+    E(container,'badge_ufmip').className = 'calc-badge';
+    E(container,'ufmipHint').textContent = '(1.75% of base loan)';
+  } else {
+    ufmip = numVal(container,'ufmip');
+    E(container,'ufmip').disabled = false;
+    E(container,'badge_ufmip').textContent = 'Manual';
+    E(container,'badge_ufmip').className = 'manual-badge';
+    E(container,'ufmipHint').textContent = '';
+  }
+
   const loanBeforePoints = loanAmt + ufmip;
   const pointsDeduction = loanBeforePoints * (pointsPct/100);
   const totalLoan = loanBeforePoints - pointsDeduction;
 
-  E(container,'out_ufmip').textContent = fmt(ufmip);
-  E(container,'ufmipHint').textContent = isFHA ? '(1.75% of base loan)' : '(n/a for ' + program + ')';
   E(container,'out_totalLoan').textContent = fmt(totalLoan);
   E(container,'pointsHint').textContent = pointsPct ? ('(after ' + pointsPct + '% points: -' + fmt(pointsDeduction) + ')') : '';
 
@@ -1994,9 +2078,33 @@ function calc(container){
     + (showTransfer ? numVal(container,'t_transfertax') : 0);
   E(container,'g3total').textContent = 'Total: ' + fmt(g3);
 
-  // Escrows
-  const mTaxes = numVal(container,'m_taxes');
-  const mIns = numVal(container,'m_insurance');
+  // Escrows — Monthly is the primary figure used everywhere downstream;
+  // Yearly Total is just an alternate way to populate it (like the Down
+  // Payment $/%/Loan Amount toggle), reflected through an editable divisor.
+  const taxDivisorMonths = numVal(container,'taxDivisorMonths') || 12;
+  const taxMode = E(container,'taxMode_yearly').checked ? 'yearly' : 'monthly';
+  let yearlyTaxes = numVal(container,'y_taxes');
+  let mTaxes = numVal(container,'m_taxes');
+  if (taxMode === 'yearly'){
+    mTaxes = taxDivisorMonths ? yearlyTaxes / taxDivisorMonths : 0;
+    E(container,'m_taxes').value = fmtNum(mTaxes);
+  } else {
+    yearlyTaxes = mTaxes * taxDivisorMonths;
+    E(container,'y_taxes').value = fmtNum(yearlyTaxes);
+  }
+
+  const insDivisorMonths = numVal(container,'insDivisorMonths') || 12;
+  const insMode = E(container,'insMode_yearly').checked ? 'yearly' : 'monthly';
+  let yearlyIns = numVal(container,'y_insurance');
+  let mIns = numVal(container,'m_insurance');
+  if (insMode === 'yearly'){
+    mIns = insDivisorMonths ? yearlyIns / insDivisorMonths : 0;
+    E(container,'m_insurance').value = fmtNum(mIns);
+  } else {
+    yearlyIns = mIns * insDivisorMonths;
+    E(container,'y_insurance').value = fmtNum(yearlyIns);
+  }
+
   const perdiemDays = numVal(container,'perdiemDays') || 30;
   const insEscrowMonths = numVal(container,'insEscrowMonths') || 15;
   const taxEscrowMonths = numVal(container,'taxEscrowMonths') || 12;
@@ -2010,15 +2118,17 @@ function calc(container){
   E(container,'out_taxEscrow').textContent = fmt(taxEscrow);
   E(container,'g4total').textContent = 'Total: ' + fmt(g4);
 
-  // Cash to Close: Down Payment, Closing Costs, Escrows, Seller's Concession, Total Cost
+  // Cash to Close: Down Payment, Closing Costs, Escrows, Seller's Concession, Deposit, Total Cost
   const closingCosts = g2 + g3;
   const escrows = g4;
-  const totalCost = downAmt + closingCosts + escrows - sellerConcession;
+  const emd = numVal(container,'emd');
+  const totalCost = downAmt + closingCosts + escrows - sellerConcession - emd;
 
   E(container,'out_dpEcho').textContent = fmt(downAmt);
   E(container,'out_g23').textContent = fmt(closingCosts);
   E(container,'out_g4').textContent = fmt(escrows);
   E(container,'out_sellerConcessionEcho').textContent = '-' + fmt(sellerConcession);
+  E(container,'out_emdEcho').textContent = '-' + fmt(emd);
   E(container,'out_totalCost').textContent = fmt(totalCost);
 
   // Monthly payment
@@ -2032,22 +2142,40 @@ function calc(container){
   }
 
   const ltv = price ? (loanAmt/price*100) : 0;
-  let mi = 0;
+  let mi = 0, pmi = 0;
   let miRateLabel = '';
-  if (isFHA){
-    const miRate = ltv > 90 ? 0.0055 : 0.0050;
-    mi = miRate/12 * loanAmt;
-    miRateLabel = '(' + (miRate*100).toFixed(2) + '%/yr, LTV ' + ltv.toFixed(1) + '%)';
+  E(container,'row_mi').style.display = hasMipMi ? '' : 'none';
+  E(container,'row_pmi').style.display = hasMipMi ? 'none' : '';
+  E(container,'row_mi_specifics').style.display = hasMipMi ? '' : 'none';
+  E(container,'row_pmi_specifics').style.display = hasMipMi ? 'none' : '';
+
+  if (hasMipMi){
+    if (mipAuto){
+      const miRate = ltv > 90 ? 0.0055 : 0.0050;
+      mi = miRate/12 * loanAmt;
+      E(container,'mi').value = mi.toFixed(2);
+      E(container,'mi').disabled = true;
+      E(container,'badge_mi').textContent = 'Auto';
+      E(container,'badge_mi').className = 'calc-badge';
+      miRateLabel = '(' + (miRate*100).toFixed(2) + '%/yr, LTV ' + ltv.toFixed(1) + '%)';
+    } else {
+      mi = numVal(container,'mi');
+      E(container,'mi').disabled = false;
+      E(container,'badge_mi').textContent = 'Manual';
+      E(container,'badge_mi').className = 'manual-badge';
+      miRateLabel = '';
+    }
   } else {
-    miRateLabel = '(n/a for ' + program + ')';
+    pmi = numVal(container,'pmi');
   }
 
-  const monthlyTotal = pi + mTaxes + mIns + mi + hoaFee;
+  const monthlyTotal = pi + mTaxes + mIns + mi + pmi + hoaFee;
 
   E(container,'out_pi').textContent = fmt(pi);
   E(container,'out_taxesEcho').textContent = fmt(mTaxes);
   E(container,'out_insEcho').textContent = fmt(mIns);
   E(container,'out_mi').textContent = fmt(mi);
+  E(container,'out_pmiEcho').textContent = fmt(pmi);
   E(container,'miHint').textContent = miRateLabel;
   E(container,'out_hoaEcho').textContent = fmt(hoaFee);
   E(container,'out_monthlyTotal').textContent = fmt(monthlyTotal);
@@ -2066,7 +2194,7 @@ function calc(container){
     address: E(container,'propertyAddress').value,
     county: (countyName ? countyName + ', ' : '') + (STATE_NAMES[stateCode] || stateCode),
     program, price, downAmt, downPct, loanAmt, term, rate: rate*100,
-    pointsPct, pointsDeduction, ufmip, totalLoan, sellerConcession, hoaFee,
+    pointsPct, pointsDeduction, ufmip, totalLoan, sellerConcession, hoaFee, mipAuto,
     fees: {
       appraisal: numVal(container,'f_appraisal'),
       application: numVal(container,'f_application'),
@@ -2087,9 +2215,9 @@ function calc(container){
       showMansion, showTransfer,
       g3total: g3
     },
-    escrow: { perdiem, insEscrow, taxEscrow, g4total: g4, perdiemDays, insEscrowMonths, taxEscrowMonths },
-    closingCosts, escrows, totalCost,
-    monthly: { pi, mTaxes, mIns, mi, hoaFee, monthlyTotal, miRateLabel }
+    escrow: { perdiem, insEscrow, taxEscrow, g4total: g4, perdiemDays, insEscrowMonths, taxEscrowMonths, yearlyTaxes, taxDivisorMonths, yearlyIns, insDivisorMonths },
+    closingCosts, escrows, totalCost, emd,
+    monthly: { pi, mTaxes, mIns, mi, pmi, hasMipMi, hoaFee, monthlyTotal, miRateLabel }
   };
 }
 
@@ -2213,7 +2341,7 @@ function renderPdfLoanPage(doc, d, navy, gold, slate, pageW, logoDataUrl){
   row('Down Payment', fmt(d.downAmt) + ' (' + d.downPct.toFixed(2) + '%)');
   row('Base Loan Amount', fmt(d.loanAmt));
   row('Rate / Term', d.rate.toFixed(3) + '% / ' + d.term + ' yrs');
-  row('Upfront MIP', fmt(d.ufmip));
+  if (d.monthly.hasMipMi) row('Upfront MIP', fmt(d.ufmip));
   if (d.pointsPct) row('Points Deduction (' + d.pointsPct + '%)', '-' + fmt(d.pointsDeduction));
   row('Total Loan Amount', fmt(d.totalLoan), {bold:true, rule:true});
   row("Seller's Concession", '-' + fmt(d.sellerConcession));
@@ -2255,6 +2383,7 @@ function renderPdfLoanPage(doc, d, navy, gold, slate, pageW, logoDataUrl){
   row('Closing Costs', fmt(d.closingCosts));
   row('Escrows', fmt(d.escrows));
   row("Seller's Concession", '-' + fmt(d.sellerConcession));
+  row('Deposit', '-' + fmt(d.emd));
   row('Total Funds', fmt(d.totalCost), {bold:true, rule:true});
   gap(8);
 
@@ -2272,7 +2401,8 @@ function renderPdfLoanPage(doc, d, navy, gold, slate, pageW, logoDataUrl){
   row('Principal & Interest', fmt(d.monthly.pi));
   row('Property Taxes', fmt(d.monthly.mTaxes));
   row('Homeowners Insurance', fmt(d.monthly.mIns));
-  row('Mortgage Insurance', fmt(d.monthly.mi));
+  if (d.monthly.hasMipMi) row('MI (Mortgage Insurance)', fmt(d.monthly.mi));
+  else row('PMI (Private Mortgage Insurance)', fmt(d.monthly.pmi));
   if (d.hoaFee) row('HOA / Monthly Fee', fmt(d.monthly.hoaFee));
   row('Total', fmt(d.monthly.monthlyTotal), {bold:true, rule:true});
   rightY = curY;
@@ -2416,6 +2546,7 @@ async function buildXlsxExport(container, dpMode){
   R.program = push('Loan Program', d.program);
   R.sellerConcession = push("Seller's Concession ($)", d.sellerConcession);
   R.hoaFee = push('HOA / Monthly Fee ($)', d.hoaFee);
+  R.emd = push('Deposit ($)', d.emd);
   blank();
 
   section('CALCULATED — LOAN BASICS');
@@ -2662,6 +2793,7 @@ async function buildXlsxExport(container, dpMode){
   R.ctcClosing = push('Closing Costs', null);
   R.ctcEscrows = push('Escrows', null);
   R.ctcSeller = push("Seller's Concession", null);
+  R.ctcEmd = push('Deposit', null);
   R.ctcTotal = push('Total Cost', null);
   blank();
 
@@ -2669,7 +2801,8 @@ async function buildXlsxExport(container, dpMode){
   R.pi = push('Principal & Interest', null);
   R.ltv = push('LTV', null);
   R.miRate = push('Mortgage Insurance Rate (annual)', null);
-  R.mi = push('Mortgage Insurance', null);
+  R.mi = push('MI (Mortgage Insurance — FHA/USDA/VA)', d.monthly.mi);
+  R.pmi = push('PMI (Private Mortgage Insurance — Conventional, manual)', d.monthly.pmi);
   R.monthlyTotal = push('Total Monthly Payment', null);
 
   // ---- Patch in formulas now that every row number is known ----
@@ -2683,7 +2816,14 @@ async function buildXlsxExport(container, dpMode){
     F[R.downAmt] = 'B' + R.price + '-B' + R.loanAmt;
     F[R.downPct] = 'B' + R.downAmt + '/B' + R.price;
   }
-  F[R.ufmip] = 'IF(B' + R.program + '="FHA",B' + R.loanAmt + '*0.0175,0)';
+  // Upfront MIP: live formula for FHA/USDA/VA, unless the web tool had it
+  // manually overridden at export time (auto-calculate MIP/MI unchecked),
+  // in which case the manual figure is exported as-is instead.
+  if (d.monthly.hasMipMi && !d.mipAuto){
+    // leave as the raw manual value already placed by push() above — no formula
+  } else {
+    F[R.ufmip] = 'IF(OR(B' + R.program + '="FHA",B' + R.program + '="USDA",B' + R.program + '="VA"),B' + R.loanAmt + '*0.0175,0)';
+  }
   F[R.loanBeforePoints] = 'B' + R.loanAmt + '+B' + R.ufmip;
   F[R.pointsDeduction] = 'B' + R.loanBeforePoints + '*B' + R.pointsPct;
   F[R.totalLoan] = 'B' + R.loanBeforePoints + '-B' + R.pointsDeduction;
@@ -2700,13 +2840,18 @@ async function buildXlsxExport(container, dpMode){
   F[R.ctcClosing] = 'B' + R.g2total + '+B' + R.g3total;
   F[R.ctcEscrows] = 'B' + R.escrowTotal;
   F[R.ctcSeller] = '-B' + R.sellerConcession;
-  F[R.ctcTotal] = 'SUM(B' + R.ctcDown + ':B' + R.ctcSeller + ')';
+  F[R.ctcEmd] = '-B' + R.emd;
+  F[R.ctcTotal] = 'SUM(B' + R.ctcDown + ':B' + R.ctcEmd + ')';
 
   F[R.pi] = '-PMT(B' + R.rate + '/12,B' + R.term + '*12,B' + R.loanAmt + ')';
   F[R.ltv] = 'B' + R.loanAmt + '/B' + R.price;
-  F[R.miRate] = 'IF(B' + R.program + '="FHA",IF(B' + R.ltv + '>0.9,0.0055,0.005),0)';
-  F[R.mi] = 'B' + R.miRate + '/12*B' + R.loanAmt;
-  F[R.monthlyTotal] = 'B' + R.pi + '+B' + R.mTaxes + '+B' + R.mIns + '+B' + R.mi + '+B' + R.hoaFee;
+  F[R.miRate] = 'IF(OR(B' + R.program + '="FHA",B' + R.program + '="USDA",B' + R.program + '="VA"),IF(B' + R.ltv + '>0.9,0.0055,0.005),0)';
+  if (d.monthly.hasMipMi && !d.mipAuto){
+    // leave as the raw manual value already placed by push() above — no formula
+  } else {
+    F[R.mi] = 'B' + R.miRate + '/12*B' + R.loanAmt;
+  }
+  F[R.monthlyTotal] = 'B' + R.pi + '+B' + R.mTaxes + '+B' + R.mIns + '+B' + R.mi + '+B' + R.pmi + '+B' + R.hoaFee;
 
   // ---- Build the Math tab as plain cell data (addr -> {value/formula/style}) ----
   // Written directly as OOXML via JSZip below — no ExcelJS dependency. ExcelJS's
@@ -2852,7 +2997,7 @@ async function buildXlsxExport(container, dpMode){
 
   fsection('FUNDS NEEDED TO CLOSE');
   fref('Down Payment', R.ctcDown, { alwaysShow:true }); fref('Closing Costs', R.ctcClosing, { alwaysShow:true });
-  fref('Escrows', R.ctcEscrows, { alwaysShow:true }); fref("Seller's Concession", R.ctcSeller);
+  fref('Escrows', R.ctcEscrows, { alwaysShow:true }); fref("Seller's Concession", R.ctcSeller); fref('Deposit', R.ctcEmd);
   fref('Total Funds', R.ctcTotal, { alwaysShow:true, bold:true });
   fblank();
 
@@ -2860,7 +3005,8 @@ async function buildXlsxExport(container, dpMode){
   fref('Principal & Interest', R.pi, { alwaysShow:true, bold:true });
   fref('Property Taxes', R.mTaxes, { alwaysShow:true, bold:true });
   fref('Homeowners Insurance', R.mIns, { alwaysShow:true, bold:true });
-  fref('Mortgage Insurance', R.mi, { bold:true });
+  fref('MI (Mortgage Insurance)', R.mi, { bold:true });
+  fref('PMI (Private Mortgage Insurance)', R.pmi, { bold:true });
   fref('HOA / Monthly Fee', R.hoaFee, { bold:true });
   fref('Total Monthly Payment', R.monthlyTotal, { alwaysShow:true, bold:true });
 
@@ -3047,9 +3193,9 @@ function buildDocxLoanSection(d){
     ['Purchase Price', fmt(d.price)],
     ['Down Payment', fmt(d.downAmt) + ' (' + d.downPct.toFixed(2) + '%)'],
     ['Base Loan Amount', fmt(d.loanAmt)],
-    ['Rate / Term', d.rate.toFixed(3) + '% / ' + d.term + ' yrs'],
-    ['Upfront MIP', fmt(d.ufmip)]
-  ].concat(d.pointsPct ? [['Points Deduction (' + d.pointsPct + '%)', '-' + fmt(d.pointsDeduction)]] : []),
+    ['Rate / Term', d.rate.toFixed(3) + '% / ' + d.term + ' yrs']
+  ].concat(d.monthly.hasMipMi ? [['Upfront MIP', fmt(d.ufmip)]] : [])
+   .concat(d.pointsPct ? [['Points Deduction (' + d.pointsPct + '%)', '-' + fmt(d.pointsDeduction)]] : []),
    'Total Loan Amount', fmt(d.totalLoan),
    [["Seller's Concession", '-' + fmt(d.sellerConcession)]]);
 
@@ -3082,14 +3228,15 @@ function buildDocxLoanSection(d){
     ['Down Payment', fmt(d.downAmt)],
     ['Closing Costs', fmt(d.closingCosts)],
     ['Escrows', fmt(d.escrows)],
-    ["Seller's Concession", '-' + fmt(d.sellerConcession)]
+    ["Seller's Concession", '-' + fmt(d.sellerConcession)],
+    ['Deposit', '-' + fmt(d.emd)]
   ], 'Total Funds', fmt(d.totalCost));
 
   body += docxGroupSection('Monthly Payment Detail', [
     ['Principal & Interest', fmt(d.monthly.pi)],
     ['Property Taxes', fmt(d.monthly.mTaxes)],
     ['Homeowners Insurance', fmt(d.monthly.mIns)],
-    ['Mortgage Insurance', fmt(d.monthly.mi)]
+    d.monthly.hasMipMi ? ['MI (Mortgage Insurance)', fmt(d.monthly.mi)] : ['PMI (Private Mortgage Insurance)', fmt(d.monthly.pmi)]
   ].concat(d.hoaFee ? [['HOA / Monthly Fee', fmt(d.monthly.hoaFee)]] : []), 'Total Monthly Payment', fmt(d.monthly.monthlyTotal));
 
   body += docxPara('This estimate is for planning purposes and is not a Loan Estimate or Closing Disclosure.', { size:8, color:'5B6472' });
@@ -3355,13 +3502,14 @@ function renderLoanSummaryHtml(d){
   h += row('Closing Costs', fmt(d.closingCosts));
   h += row('Escrows', fmt(d.escrows));
   h += row("Seller's Concession", '-'+fmt(d.sellerConcession));
+  h += row('Deposit', '-'+fmt(d.emd));
   h += row('Total Funds', fmt(d.totalCost), true);
 
   h += section('Monthly Payment');
   h += row('Principal & Interest', fmt(d.monthly.pi));
   h += row('Property Taxes', fmt(d.monthly.mTaxes));
   h += row('Homeowners Insurance', fmt(d.monthly.mIns));
-  h += row('Mortgage Insurance', fmt(d.monthly.mi));
+  h += d.monthly.hasMipMi ? row('MI (Mortgage Insurance)', fmt(d.monthly.mi)) : row('PMI (Private Mortgage Insurance)', fmt(d.monthly.pmi));
   if (d.hoaFee) h += row('HOA / Monthly Fee', fmt(d.monthly.hoaFee));
   h += row('Total Monthly Payment', fmt(d.monthly.monthlyTotal), true);
 
