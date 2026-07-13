@@ -594,6 +594,24 @@
         </div>
       </div>
 
+      <!-- EXPORT DISCREPANCIES MODAL -->
+      <div id="discrepancyModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+        <div style="background:#fff; border-radius:10px; max-width:560px; width:100%; max-height:90vh; overflow-y:auto; padding:24px; font-family:Calibri, Arial, sans-serif;">
+          <h3 style="margin-top:0; color:var(--navy);">Export Discrepancies</h3>
+          <p style="font-size:12px; color:var(--slate); line-height:1.5;">Compares the auto-calculated numbers (from right before you turned Auto-Calculate off) against whatever you've entered manually — for the developer to investigate.</p>
+          <div id="discrepancyTable" style="margin:14px 0;"></div>
+          <label style="font-size:12px; color:var(--slate); display:block; margin-bottom:6px;">Notes (optional)</label>
+          <textarea id="discrepancyNotes" placeholder="e.g. Madison Title showed $X for Mansion Tax on a $Y purchase in Rockland..." style="width:100%; height:80px; padding:8px; border:1px solid var(--line); border-radius:5px; font-size:13px; box-sizing:border-box; font-family:Calibri, Arial, sans-serif;"></textarea>
+          <div style="margin-top:16px; display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
+            <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="closeDiscrepancyModal()">Cancel</button>
+            <button class="export-btn" onclick="saveDiscrepancyJson()">Save JSON</button>
+            <button class="export-btn" onclick="saveDiscrepancyPdf()">Save PDF</button>
+            <button class="export-btn" style="background:var(--navy); color:#fff;" onclick="emailDiscrepancy()">Email Developer</button>
+          </div>
+          <div style="margin-top:8px; font-size:10.5px; color:var(--slate);">Email opens your device's default mail app, addressed to marketingfmhomeloans@gmail.com. No default mail app set up? <a href="#" onclick="emailDiscrepancyViaGmail(); return false;" style="color:#8A6A1F;">Use Gmail instead</a>.</div>
+        </div>
+      </div>
+
 
   <div class="cce-footer-wrap">
       <div class="footer-note">
@@ -738,6 +756,8 @@
           <div class="field-row" style="justify-content:flex-start; gap:10px; flex-wrap:wrap;">
             <label class="radio-opt" style="font-size:12px; font-weight:700; color:var(--navy);"><input type="checkbox" data-fld="chk_govauto" checked onchange="onGovAutoChange(this.closest('.loan-block'))"> Auto-calculate government fees &amp; title insurance</label>
             <button class="export-btn" style="padding:5px 10px; font-size:11px;" onclick="openMadisonTitleCalculator(this.closest('.loan-block'))"><svg class="dl-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 14a4 4 0 005 .4l3-3a4 4 0 00-5.66-5.66l-1.2 1.2M14 10a4 4 0 00-5-.4l-3 3a4 4 0 005.66 5.66l1.2-1.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Open Madison Title Calculator (cross-check)</button>
+            <button class="export-btn" style="padding:5px 10px; font-size:11px;" onclick="openStewartRateCalculator(this.closest('.loan-block'))"><svg class="dl-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 14a4 4 0 005 .4l3-3a4 4 0 00-5.66-5.66l-1.2 1.2M14 10a4 4 0 00-5-.4l-3 3a4 4 0 005.66 5.66l1.2-1.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Open Stewart Rate Calculator (cross-check)</button>
+            <button class="export-btn" data-fld="exportDiscrepanciesBtn" style="padding:5px 10px; font-size:11px; background:#B3261E; color:#fff; display:none;" onclick="openDiscrepancyModal(this.closest('.loan-block'))">⚠ Export Discrepancies</button>
           </div>
           <div class="hint" data-fld="madisonNote" style="margin-bottom:6px;"></div>
 
@@ -2297,8 +2317,26 @@ function renderPdfLegalPage(doc, navy, gold, slate, pageW, pageH, logoDataUrl){
 // XLSX EXPORT — editable spreadsheet mirroring the original Group 1-7 layout
 // ===========================================================================
 function onGovAutoChange(container){
-  if (E(container,'chk_govauto').checked){
+  const isOn = E(container,'chk_govauto').checked;
+  const discBtn = E(container,'exportDiscrepanciesBtn');
+  if (isOn){
     E(container,'madisonNote').textContent = '';
+    discBtn.style.display = 'none';
+  } else {
+    // Snapshot whatever the auto-calculated values currently show, before
+    // calc() unlocks the fields for manual editing and overwrites them —
+    // this is what "Export Discrepancies" later compares the manual
+    // entries against.
+    container._autoSnapshot = {
+      titleOwner: E(container,'t_titleOwner').value,
+      titleLoan: E(container,'t_titleLoan').value,
+      titleTotal: E(container,'t_title').value,
+      mortgageTax: E(container,'t_mortgagetax').value,
+      mansionTax: E(container,'t_mansiontax').value,
+      transferTax: E(container,'t_transfertax').value,
+      capturedAt: new Date().toISOString()
+    };
+    discBtn.style.display = '';
   }
   calc(container);
 }
@@ -2310,12 +2348,22 @@ function openMadisonTitleCalculator(container){
   // won't get silently overwritten on the next recalculation.
   const govAuto = E(container,'chk_govauto');
   govAuto.checked = false;
-  calc(container);
+  onGovAutoChange(container);
 
   const url = 'https://madisontitle.com/Title.Site/Frontend/Calculators/TitleCalculator.aspx?state=' + stateCode;
   window.open(url, '_blank');
 
   E(container,'madisonNote').textContent = 'Auto-calculate turned off — enter Madison Title\'s numbers directly into the fields below.';
+}
+
+function openStewartRateCalculator(container){
+  const govAuto = E(container,'chk_govauto');
+  govAuto.checked = false;
+  onGovAutoChange(container);
+
+  window.open('https://www.stewartratecalculator.com/Quote/LoanEstimate?&branded=true&quotetype=3', '_blank');
+
+  E(container,'madisonNote').textContent = 'Auto-calculate turned off — enter Stewart\'s numbers directly into the fields below.';
 }
 
 function closeXlsxModal(){
@@ -3382,6 +3430,149 @@ function emailExportPreview(){
   const subject = encodeURIComponent(buildEmailSubject());
   const body = encodeURIComponent('The ' + _exportKind.toUpperCase() + ' was just downloaded to your device \u2014 attach it here before sending.');
   window.location.href = 'mailto:?subject=' + subject + '&body=' + body;
+}
+
+// ===========================================================================
+// EXPORT DISCREPANCIES — captures what auto-calculate produced right before
+// it was turned off, versus whatever gets typed in manually afterward, so
+// mismatches (e.g. against Madison Title or Stewart) can be sent along for
+// the calculator's rates to actually get fixed.
+// ===========================================================================
+let _discrepancyContainer = null;
+
+function openDiscrepancyModal(container){
+  _discrepancyContainer = container;
+  calc(container);
+  const snap = container._autoSnapshot || {};
+
+  const rows = [
+    ["Owner's Policy Premium", snap.titleOwner, E(container,'t_titleOwner').value],
+    ['Loan Policy Premium', snap.titleLoan, E(container,'t_titleLoan').value],
+    ['Title Insurance Total', snap.titleTotal, E(container,'t_title').value],
+    ['Mortgage Tax', snap.mortgageTax, E(container,'t_mortgagetax').value],
+    ['Mansion Tax', snap.mansionTax, E(container,'t_mansiontax').value],
+    ['Transfer Tax', snap.transferTax, E(container,'t_transfertax').value]
+  ];
+
+  const tableEl = document.getElementById('discrepancyTable');
+  tableEl.innerHTML = '<table style="width:100%; border-collapse:collapse; font-size:12.5px;">' +
+    '<tr style="background:var(--slate-light);"><th style="text-align:left; padding:6px;">Field</th><th style="text-align:right; padding:6px;">Auto (before)</th><th style="text-align:right; padding:6px;">Manual (now)</th></tr>' +
+    rows.map(r => {
+      const autoNum = parseFloat(r[1]) || 0, manualNum = parseFloat(r[2]) || 0;
+      const differs = Math.abs(autoNum - manualNum) > 0.001;
+      return '<tr style="border-bottom:1px solid #EEE;' + (differs ? ' background:#FDECEC;' : '') + '">' +
+        '<td style="padding:6px;">'+xmlEsc(r[0])+'</td>' +
+        '<td style="padding:6px; text-align:right;">'+xmlEsc(fmt(autoNum))+'</td>' +
+        '<td style="padding:6px; text-align:right; font-weight:'+(differs?'700':'400')+';">'+xmlEsc(fmt(manualNum))+'</td>' +
+      '</tr>';
+    }).join('') + '</table>';
+
+  document.getElementById('discrepancyNotes').value = '';
+  document.getElementById('discrepancyModalOverlay').style.display = 'flex';
+}
+function closeDiscrepancyModal(){
+  document.getElementById('discrepancyModalOverlay').style.display = 'none';
+}
+
+function buildDiscrepancyData(){
+  const container = _discrepancyContainer;
+  const d = container._cceData;
+  const snap = container._autoSnapshot || {};
+  return {
+    exportedAt: new Date().toISOString(),
+    loanType: container.dataset.loanType || 'Loan',
+    state: E(container,'state').value,
+    county: E(container,'county').value,
+    purchasePrice: d.price,
+    program: d.program,
+    notes: document.getElementById('discrepancyNotes').value,
+    fields: {
+      ownersPolicyPremium: { auto: +snap.titleOwner||0, manual: +E(container,'t_titleOwner').value||0 },
+      loanPolicyPremium: { auto: +snap.titleLoan||0, manual: +E(container,'t_titleLoan').value||0 },
+      titleInsuranceTotal: { auto: +snap.titleTotal||0, manual: +E(container,'t_title').value||0 },
+      mortgageTax: { auto: +snap.mortgageTax||0, manual: +E(container,'t_mortgagetax').value||0 },
+      mansionTax: { auto: +snap.mansionTax||0, manual: +E(container,'t_mansiontax').value||0 },
+      transferTax: { auto: +snap.transferTax||0, manual: +E(container,'t_transfertax').value||0 }
+    }
+  };
+}
+
+function buildDiscrepancySummaryText(data){
+  const lines = [];
+  lines.push('CCE Discrepancy Report');
+  lines.push('Loan Type: ' + data.loanType + '  |  State/County: ' + data.state + ', ' + data.county);
+  lines.push('Purchase Price: ' + fmt(data.purchasePrice) + '  |  Program: ' + data.program);
+  lines.push('');
+  Object.entries(data.fields).forEach(([key, val]) => {
+    lines.push(key + ': Auto=' + fmt(val.auto) + '  Manual=' + fmt(val.manual));
+  });
+  if (data.notes){
+    lines.push('');
+    lines.push('Notes: ' + data.notes);
+  }
+  return lines.join('\n');
+}
+
+function saveDiscrepancyJson(){
+  const data = buildDiscrepancyData();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type:'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'CCE_Discrepancy_' + sanitizeFilenamePart(data.state) + '_' + new Date().toISOString().slice(0,10) + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function saveDiscrepancyPdf(){
+  const data = buildDiscrepancyData();
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'letter' });
+  const navy = [27,42,74];
+  doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(...navy);
+  doc.text('CCE Discrepancy Report', 40, 40);
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(30,36,48);
+  let y = 62;
+  doc.text('Loan Type: ' + data.loanType + '   State/County: ' + data.state + ', ' + data.county, 40, y); y += 16;
+  doc.text('Purchase Price: ' + fmt(data.purchasePrice) + '   Program: ' + data.program, 40, y); y += 24;
+
+  doc.setFont('helvetica','bold');
+  doc.text('Field', 40, y); doc.text('Auto (before)', 300, y); doc.text('Manual (now)', 420, y);
+  y += 6;
+  doc.setDrawColor(200,200,200); doc.line(40, y, 520, y); y += 14;
+  doc.setFont('helvetica','normal');
+  Object.entries(data.fields).forEach(([key, val]) => {
+    doc.text(key, 40, y);
+    doc.text(fmt(val.auto), 300, y);
+    doc.text(fmt(val.manual), 420, y);
+    y += 16;
+  });
+  if (data.notes){
+    y += 16;
+    doc.setFont('helvetica','bold'); doc.text('Notes:', 40, y); y += 14;
+    doc.setFont('helvetica','normal');
+    const lines = doc.splitTextToSize(data.notes, 460);
+    doc.text(lines, 40, y);
+  }
+  doc.save('CCE_Discrepancy_' + sanitizeFilenamePart(data.state) + '_' + new Date().toISOString().slice(0,10) + '.pdf');
+}
+
+// Browsers can't auto-detect whether a default mail app is configured, so
+// this offers the mailto: attempt as the primary action and an explicit
+// Gmail-web fallback link alongside it, rather than guessing.
+function emailDiscrepancy(){
+  const data = buildDiscrepancyData();
+  const subject = encodeURIComponent('CCE Discrepancy Report - ' + data.state + ' - ' + data.loanType);
+  const body = encodeURIComponent(buildDiscrepancySummaryText(data));
+  window.location.href = 'mailto:marketingfmhomeloans@gmail.com?subject=' + subject + '&body=' + body;
+}
+function emailDiscrepancyViaGmail(){
+  const data = buildDiscrepancyData();
+  const subject = encodeURIComponent('CCE Discrepancy Report - ' + data.state + ' - ' + data.loanType);
+  const body = encodeURIComponent(buildDiscrepancySummaryText(data));
+  window.open('https://mail.google.com/mail/?view=cm&fs=1&to=marketingfmhomeloans@gmail.com&su=' + subject + '&body=' + body, '_blank');
 }
 
 populateDateBar();
