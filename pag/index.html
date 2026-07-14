@@ -103,7 +103,10 @@
     letter-spacing:.7px;
     color:var(--navy);
     border-bottom:1px solid var(--line);
+    display:flex; justify-content:space-between; align-items:center;
   }
+  .tile-toggle-hint{ font-size:9.5px; font-weight:500; text-transform:none; letter-spacing:0; color:var(--slate); }
+  .field-row label input[type="checkbox"]{ accent-color:var(--navy); margin-right:4px; vertical-align:-2px; }
   .panel-body{ padding:12px 14px 14px 14px; }
 
   /* LEFT PANEL — template thumbnails + saved letters */
@@ -190,20 +193,23 @@
   .letter-brand{ display:flex; align-items:center; gap:10px; }
   .letter-brand img{ height:26px; }
   .letter-logo-icon{ flex-shrink:0; }
-  .letter-logo-text{ color:var(--tile-c); line-height:1; }
-  .letter-logo-text .l1{ font-weight:800; font-size:16px; }
-  .letter-logo-text .l2{ font-weight:700; font-size:8.5px; letter-spacing:.5px; margin-top:2px; }
+  .letter-logo-text{ display:flex; align-items:center; gap:6px; color:var(--tile-c); line-height:1; }
+  .letter-logo-text .l1{ font-weight:800; font-size:21px; font-family:Arial, sans-serif; }
+  .letter-logo-text .l2-wrap{ display:flex; flex-direction:column; font-weight:700; font-size:8.5px; letter-spacing:.4px; line-height:1.25; font-family:Arial, sans-serif; }
   .letter-firm-info{ font-size:10.5px; color:var(--slate); margin-top:4px; line-height:1.5; }
-  .letter-seal{
-    width:96px; height:96px; border-radius:50%; background:var(--seal-c);
-    display:flex; align-items:center; justify-content:center;
-    box-shadow:0 0 0 5px #fff, 0 0 0 7px var(--seal-c); flex-shrink:0;
+  .letter-seal{ position:relative; width:112px; height:112px; flex-shrink:0; }
+  .letter-seal-svg{ width:100%; height:100%; display:block; }
+  .letter-seal-content{
+    position:absolute; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:3px; text-align:center;
   }
-  .letter-seal-inner{
-    width:74px; height:74px; border-radius:50%; background:var(--gold); border:2px dashed var(--seal-c);
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    font-size:8px; font-weight:800; color:var(--navy-deep); text-align:center; line-height:1.3;
+  .seal-pill{
+    border:1.3px solid var(--navy-deep); border-radius:9px; padding:1.5px 7px;
+    font-size:7px; font-weight:800; color:var(--navy-deep); letter-spacing:.3px;
   }
+  .seal-key{ display:flex; align-items:center; gap:2px; margin-top:1px; }
+  .seal-key-label{ font-size:6.5px; font-weight:800; color:var(--navy-deep); letter-spacing:.2px; }
+  .seal-buyer{ font-size:12px; font-weight:800; color:var(--navy-deep); letter-spacing:.3px; margin-top:1px; }
   .letter-title{ text-align:center; font-family:Cambria, Georgia, serif; font-size:19px; margin:20px 0 18px 0; text-decoration:underline; color:var(--ink); }
   .letter-row{ font-size:12.5px; margin-bottom:6px; display:flex; align-items:baseline; gap:6px; }
   .letter-label{ font-weight:700; min-width:64px; display:inline-block; }
@@ -349,27 +355,45 @@
       <div id="letterPreview" class="letter-card color-red">
         <div class="letter-top">
           <div class="letter-brand">
-            <svg class="letter-logo-icon" width="30" height="30" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-              <rect width="40" height="40" rx="8" fill="var(--tile-c)"/>
-              <path d="M20 7 L33 17 H7 Z" fill="#fff"/>
-              <rect x="9" y="19" width="3.5" height="11" fill="#fff"/>
-              <rect x="16" y="19" width="3.5" height="11" fill="#fff"/>
-              <rect x="23" y="19" width="3.5" height="11" fill="#fff"/>
-              <rect x="30" y="19" width="3.5" height="11" fill="#fff"/>
-              <rect x="7" y="32" width="26" height="3" fill="#fff"/>
-            </svg>
             <div>
-              <div class="letter-logo-text"><span class="l1">FM</span><br><span class="l2">HOME LOANS</span></div>
+              <div class="letter-logo-text">
+                <svg class="letter-logo-icon" width="32" height="32" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="40" height="40" rx="9" fill="var(--tile-c)"/>
+                  <path d="M8 19 L20 8 L32 19" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+                  <rect x="9" y="21" width="4" height="10" rx="1" fill="#fff"/>
+                  <rect x="17" y="21" width="4" height="10" rx="1" fill="#fff"/>
+                  <rect x="25" y="21" width="4" height="10" rx="1" fill="#fff"/>
+                </svg>
+                <span class="l1">FM</span>
+                <span class="l2-wrap"><span>HOME</span><span>LOANS</span></span>
+              </div>
               <div class="letter-firm-info">NMLS#: 2212<br>New City 56 Congers Rd, New City, NY 10956</div>
             </div>
           </div>
-          <div class="letter-seal"><div class="letter-seal-inner">PRE&#8209;APPROVED<br>FM APPROVED<br>BUYER</div></div>
+          <div class="letter-seal">
+            <svg class="letter-seal-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+              <path id="sealRosettePath" fill="var(--seal-c)"/>
+              <circle cx="50" cy="50" r="34" fill="var(--gold)"/>
+            </svg>
+            <div class="letter-seal-content">
+              <div class="seal-pill">PREAPPROVED</div>
+              <div class="seal-key">
+                <svg width="52" height="14" viewBox="0 0 52 14" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="7" cy="7" r="5.2" fill="none" stroke="var(--navy-deep)" stroke-width="1.5"/>
+                  <rect x="12" y="6.2" width="26" height="1.6" fill="var(--navy-deep)"/>
+                  <rect x="35" y="3.5" width="1.6" height="4" fill="var(--navy-deep)"/>
+                  <rect x="38.5" y="3.5" width="1.6" height="5.5" fill="var(--navy-deep)"/>
+                </svg>
+                <span class="seal-key-label">FM APPROVED</span>
+              </div>
+              <div class="seal-buyer">BUYER</div>
+            </div>
+          </div>
         </div>
         <div class="letter-title">Mortgage Loan Pre-Approval Letter</div>
         <div class="letter-row"><span class="letter-label">Date:</span> <span id="pv_date">[MM/DD/YYYY]</span> <button class="pen-btn" onclick="focusField('date')">&#9998;</button></div>
         <div class="letter-row"><span class="letter-label">Borrower:</span> <span id="pv_fullName">[Full Name]</span> <button class="pen-btn" onclick="focusField('fullName')">&#9998;</button></div>
         <div class="letter-row" style="align-items:flex-start;"><span class="letter-label">Address:</span> <span id="pv_address">[Property Address]</span> <button class="pen-btn" onclick="focusField('address')">&#9998;</button></div>
-        <div class="letter-row"><span class="letter-label">Lender:</span> FM Home Loans, LLC. — NMLS#: 2212</div>
 
         <div class="letter-dear">Dear <span id="pv_firstName">[First Name]</span>,</div>
         <p class="letter-para">Congratulations! Your application for a loan to purchase property is conditionally approved on the terms and conditions that are set forth in this letter. The Lender has reviewed the following:</p>
@@ -377,14 +401,7 @@
         <div class="letter-checklist" id="pv_checklist"></div>
 
         <div class="letter-a-label">[A] Loan Details: Based on this information you have been preapproved for a loan up to the terms indicated below:</div>
-        <div class="letter-tiles">
-          <div class="tile"><div class="tile-label">Purchase Price</div><div class="tile-value" id="pv_purchasePrice">$0</div><button class="pen-btn" onclick="focusField('purchasePrice')">&#9998;</button></div>
-          <div class="tile"><div class="tile-label">Type of Loan</div><div class="tile-value" id="pv_loanType">&mdash;</div><button class="pen-btn" onclick="focusField('loanType')">&#9998;</button></div>
-          <div class="tile"><div class="tile-label">Down Payment</div><div class="tile-value" id="pv_downPayment">0%</div><button class="pen-btn" onclick="focusField('downPayment')">&#9998;</button></div>
-          <div class="tile"><div class="tile-label">Taxes and Insurance</div><div class="tile-value" id="pv_taxesInsurance">$0</div><button class="pen-btn" onclick="focusField('taxesInsurance')">&#9998;</button></div>
-          <div class="tile"><div class="tile-label">Loan Amount</div><div class="tile-value" id="pv_loanAmount">$0</div><button class="pen-btn" onclick="focusField('loanAmount')">&#9998;</button></div>
-          <div class="tile"><div class="tile-label">Expiration Date</div><div class="tile-value" id="pv_expirationDate">&mdash;</div><button class="pen-btn" onclick="focusField('expirationDate')">&#9998;</button></div>
-        </div>
+        <div class="letter-tiles" id="pv_tiles"></div>
 
         <div class="letter-legal">
           <b>[B] Conditions of Approval:</b> Based on the information the prospective applicant(s) have provided, FM Home Loans, has determined that the prospective applicants(s) is eligible and qualified to meet the financial requirements of the loan. This is not a loan approval or a commitment to lend on the terms described in the loan details section.
@@ -430,28 +447,39 @@
         </div>
 
         <div class="panel">
-          <div class="panel-head">Purchase &amp; Loan</div>
+          <div class="panel-head">Purchase &amp; Loan <span class="tile-toggle-hint">checkbox = included in letter</span></div>
           <div class="panel-body">
             <div class="field-row">
-              <label>Purchase Price</label>
+              <label><input type="checkbox" id="inc_purchasePrice" checked onchange="onFormFieldChange()"> Purchase Price</label>
               <input type="number" id="pagPurchasePrice" placeholder="0" oninput="onMoneyFieldChange('price')">
             </div>
             <div class="field-row">
-              <label>Down Payment %</label>
-              <input type="number" id="pagDownPayment" placeholder="0" oninput="onMoneyFieldChange('down')">
+              <label><input type="checkbox" id="inc_downPayment" checked onchange="onFormFieldChange()"> Down Payment %</label>
+              <input type="number" id="pagDownPaymentPct" placeholder="0" oninput="onMoneyFieldChange('dpPercent')">
             </div>
             <div class="field-row">
-              <label>Loan Amount</label>
-              <input type="number" id="pagLoanAmount" placeholder="0" oninput="onMoneyFieldChange('loan')">
+              <label>Down Payment $</label>
+              <input type="number" id="pagDownPaymentDollar" placeholder="0" oninput="onMoneyFieldChange('dpDollar')">
+            </div>
+            <div class="field-row">
+              <label><input type="checkbox" id="inc_loanAmount" checked onchange="onFormFieldChange()"> Loan Amount</label>
+              <input type="number" id="pagLoanAmount" placeholder="0" oninput="onMoneyFieldChange('loanAmount')">
+            </div>
+            <div class="field-row" style="align-items:flex-start;">
+              <label style="padding-top:6px;"><input type="checkbox" id="inc_propertyType" onchange="onFormFieldChange()"> Property Type</label>
+              <div class="addr-wrap">
+                <input type="text" id="pagPropertyType" placeholder="e.g. 1-2 Family Home" oninput="onPropertyTypeInput()" onfocus="onPropertyTypeInput()" autocomplete="off" style="max-width:none; width:100%;">
+                <div id="propertyTypeSuggestions" class="addr-suggestions" style="display:none;"></div>
+              </div>
             </div>
           </div>
         </div>
 
         <div class="panel">
-          <div class="panel-head">Loan Terms</div>
+          <div class="panel-head">Loan Terms <span class="tile-toggle-hint">checkbox = included in letter</span></div>
           <div class="panel-body">
             <div class="field-row">
-              <label>Type of Loan</label>
+              <label><input type="checkbox" id="inc_loanType" checked onchange="onFormFieldChange()"> Type of Loan</label>
               <select id="pagLoanType" onchange="onFormFieldChange()">
                 <option value="FHA">FHA</option>
                 <option value="Conventional">Conventional</option>
@@ -460,11 +488,11 @@
               </select>
             </div>
             <div class="field-row">
-              <label>Taxes and Insurance</label>
+              <label><input type="checkbox" id="inc_taxesInsurance" checked onchange="onFormFieldChange()"> Taxes and Insurance</label>
               <input type="number" id="pagTaxesInsurance" placeholder="0" oninput="onFormFieldChange()">
             </div>
             <div class="field-row">
-              <label>Expiration Date</label>
+              <label><input type="checkbox" id="inc_expirationDate" checked onchange="onFormFieldChange()"> Expiration Date</label>
               <input type="date" id="pagExpirationDate" oninput="onFormFieldChange()">
             </div>
           </div>
@@ -717,38 +745,102 @@ function selectAddress(i){
   document.getElementById('addrSuggestions').style.display = 'none';
   onFormFieldChange();
 }
+
+// ===========================================================================
+// PROPERTY TYPE — type-ahead combobox over a small persisted option list
+// (default: "1-2 Family Home", "Investment"). Typing a value that doesn't
+// match anything existing offers a "+ Add" row that saves it to localStorage
+// for every future session, same tool, same browser. Not included in the
+// letter by default (see PAG_TILE_FIELDS' propertyType entry).
+// ===========================================================================
+const PAG_PROPERTY_TYPE_KEY = 'pag_property_types';
+const PAG_PROPERTY_TYPE_DEFAULTS = ['1-2 Family Home', 'Investment'];
+function getPropertyTypeOptions(){
+  try {
+    const raw = localStorage.getItem(PAG_PROPERTY_TYPE_KEY);
+    const stored = raw ? JSON.parse(raw) : [];
+    const combined = PAG_PROPERTY_TYPE_DEFAULTS.concat(stored.filter(o => !PAG_PROPERTY_TYPE_DEFAULTS.includes(o)));
+    return combined;
+  } catch (e) {
+    return PAG_PROPERTY_TYPE_DEFAULTS.slice();
+  }
+}
+function saveCustomPropertyType(value){
+  try {
+    const raw = localStorage.getItem(PAG_PROPERTY_TYPE_KEY);
+    const stored = raw ? JSON.parse(raw) : [];
+    if (!stored.includes(value)) stored.push(value);
+    localStorage.setItem(PAG_PROPERTY_TYPE_KEY, JSON.stringify(stored));
+  } catch (e) { /* localStorage unavailable — option just won't persist */ }
+}
+function onPropertyTypeInput(){
+  const box = document.getElementById('propertyTypeSuggestions');
+  const q = document.getElementById('pagPropertyType').value.trim();
+  const options = getPropertyTypeOptions();
+  const filtered = q ? options.filter(o => o.toLowerCase().includes(q.toLowerCase())) : options;
+  const exactMatch = options.some(o => o.toLowerCase() === q.toLowerCase());
+
+  let html = filtered.map((o, i) => '<div class="addr-suggestion" onclick="selectPropertyType(' + i + ')">' + o.replace(/</g,'&lt;') + '</div>').join('');
+  window._pagPropertyTypeResults = filtered;
+  if (q && !exactMatch){
+    html += '<div class="addr-suggestion" style="font-weight:700; color:var(--navy);" onclick="addAndSelectPropertyType()">+ Add &quot;' + q.replace(/</g,'&lt;') + '&quot;</div>';
+  }
+  box.innerHTML = html || '<div class="addr-suggestion-empty">No matches</div>';
+  box.style.display = 'block';
+}
+function selectPropertyType(i){
+  document.getElementById('pagPropertyType').value = window._pagPropertyTypeResults[i];
+  document.getElementById('propertyTypeSuggestions').style.display = 'none';
+  onFormFieldChange();
+}
+function addAndSelectPropertyType(){
+  const q = document.getElementById('pagPropertyType').value.trim();
+  if (!q) return;
+  saveCustomPropertyType(q);
+  document.getElementById('propertyTypeSuggestions').style.display = 'none';
+  onFormFieldChange();
+}
+
 document.addEventListener('click', function(e){
-  const box = document.getElementById('addrSuggestions');
-  if (box && !e.target.closest('.addr-wrap')) box.style.display = 'none';
+  document.querySelectorAll('.addr-suggestions').forEach(box => {
+    if (!e.target.closest('.addr-wrap')) box.style.display = 'none';
+  });
 });
 
 // ===========================================================================
-// FORM STATE — Purchase Price / Down Payment % / Loan Amount two-way calc.
-// `activeMoneyField` tracks which of down/loan the user last hand-edited;
-// changing Purchase Price recomputes the OTHER one from that source of truth.
+// FORM STATE — Purchase Price / Down Payment % / Down Payment $ / Loan Amount
+// three-way calc. `activeMoneyField` tracks which of dpPercent/dpDollar/
+// loanAmount the user last hand-edited; changing any of the three (or
+// Purchase Price) recomputes the other two from that source of truth.
 // ===========================================================================
-let activeMoneyField = 'down'; // 'down' | 'loan'
+let activeMoneyField = 'dpPercent'; // 'dpPercent' | 'dpDollar' | 'loanAmount'
 let templateColor = 'red';
+
+function recomputeMoneyFields(price){
+  const dpPctEl = document.getElementById('pagDownPaymentPct');
+  const dpDollarEl = document.getElementById('pagDownPaymentDollar');
+  const loanEl = document.getElementById('pagLoanAmount');
+  if (activeMoneyField === 'dpPercent'){
+    const pct = parseFloat(dpPctEl.value) || 0;
+    const dollar = price * pct / 100;
+    dpDollarEl.value = price > 0 ? dollar.toFixed(2) : '';
+    loanEl.value = price > 0 ? (price - dollar).toFixed(2) : '';
+  } else if (activeMoneyField === 'dpDollar'){
+    const dollar = parseFloat(dpDollarEl.value) || 0;
+    dpPctEl.value = price > 0 ? ((dollar / price) * 100).toFixed(2) : '';
+    loanEl.value = price > 0 ? (price - dollar).toFixed(2) : '';
+  } else if (activeMoneyField === 'loanAmount'){
+    const loan = parseFloat(loanEl.value) || 0;
+    const dollar = price - loan;
+    dpDollarEl.value = price > 0 ? dollar.toFixed(2) : '';
+    dpPctEl.value = price > 0 ? ((dollar / price) * 100).toFixed(2) : '';
+  }
+}
 
 function onMoneyFieldChange(which){
   const price = parseFloat(document.getElementById('pagPurchasePrice').value) || 0;
-  if (which === 'down'){
-    activeMoneyField = 'down';
-    const pct = parseFloat(document.getElementById('pagDownPayment').value) || 0;
-    document.getElementById('pagLoanAmount').value = price > 0 ? (price * (1 - pct / 100)).toFixed(2) : '';
-  } else if (which === 'loan'){
-    activeMoneyField = 'loan';
-    const loan = parseFloat(document.getElementById('pagLoanAmount').value) || 0;
-    document.getElementById('pagDownPayment').value = price > 0 ? (((price - loan) / price) * 100).toFixed(2) : '';
-  } else if (which === 'price'){
-    if (activeMoneyField === 'down'){
-      const pct = parseFloat(document.getElementById('pagDownPayment').value) || 0;
-      document.getElementById('pagLoanAmount').value = price > 0 ? (price * (1 - pct / 100)).toFixed(2) : '';
-    } else {
-      const loan = parseFloat(document.getElementById('pagLoanAmount').value) || 0;
-      document.getElementById('pagDownPayment').value = price > 0 ? (((price - loan) / price) * 100).toFixed(2) : '';
-    }
-  }
+  if (which !== 'price') activeMoneyField = which;
+  recomputeMoneyFields(price);
   onFormFieldChange();
 }
 
@@ -782,7 +874,7 @@ function buildChecklistUI(){
       '<div class="checklist-row-label">' + item.label + '</div>' +
       '<div class="checklist-opts">' +
         ['Yes','No','Not Applicable'].map(opt =>
-          '<label class="checklist-opt"><input type="radio" name="chk_' + item.key + '" value="' + opt + '" onchange="onFormFieldChange()">' + opt + '</label>'
+          '<label class="checklist-opt"><input type="radio" name="chk_' + item.key + '" value="' + opt + '"' + (opt === 'Yes' ? ' checked' : '') + ' onchange="onFormFieldChange()">' + opt + '</label>'
         ).join('') +
       '</div>' +
     '</div>'
@@ -824,11 +916,12 @@ const FIELD_MAP = {
   fullName: { id:'pagFullName', screen:'blocks' },
   address: { id:'pagAddress', screen:'blocks' },
   purchasePrice: { id:'pagPurchasePrice', screen:'blocks' },
-  downPayment: { id:'pagDownPayment', screen:'blocks' },
+  downPayment: { id:'pagDownPaymentPct', screen:'blocks' },
   loanAmount: { id:'pagLoanAmount', screen:'blocks' },
   loanType: { id:'pagLoanType', screen:'blocks' },
   taxesInsurance: { id:'pagTaxesInsurance', screen:'blocks' },
   expirationDate: { id:'pagExpirationDate', screen:'blocks' },
+  propertyType: { id:'pagPropertyType', screen:'blocks' },
   creditReport: { id:'chkRow_creditReport', screen:'checklist' },
   income: { id:'chkRow_income', screen:'checklist' },
   assets: { id:'chkRow_assets', screen:'checklist' },
@@ -860,25 +953,64 @@ function fmtDate(v){
   const [y,m,d] = v.split('-');
   return m + '/' + d + '/' + y;
 }
+// ===========================================================================
+// SECTION [A] TILES — config-driven so include/exclude toggles, the live
+// preview, PDF export, and DOCX export all read from one source of truth
+// instead of three separately-hardcoded tile lists.
+// ===========================================================================
+const PAG_TILE_FIELDS = [
+  { key:'purchasePrice', label:'Purchase Price' },
+  { key:'loanType', label:'Type of Loan' },
+  { key:'downPayment', label:'Down Payment' },
+  { key:'taxesInsurance', label:'Taxes and Insurance' },
+  { key:'loanAmount', label:'Loan Amount' },
+  { key:'expirationDate', label:'Expiration Date' },
+  { key:'propertyType', label:'Property Type' },
+];
+function isFieldIncluded(key){
+  const el = document.getElementById('inc_' + key);
+  return el ? el.checked : true;
+}
+function getTileDisplayValue(key){
+  switch (key){
+    case 'purchasePrice': return fmtMoney(document.getElementById('pagPurchasePrice').value);
+    case 'loanType': return document.getElementById('pagLoanType').value;
+    case 'downPayment': {
+      const dollar = document.getElementById('pagDownPaymentDollar').value;
+      const pct = parseFloat(document.getElementById('pagDownPaymentPct').value) || 0;
+      return fmtMoney(dollar) + ' (' + pct.toFixed(1) + '%)';
+    }
+    case 'taxesInsurance': return fmtMoney(document.getElementById('pagTaxesInsurance').value);
+    case 'loanAmount': return fmtMoney(document.getElementById('pagLoanAmount').value);
+    case 'expirationDate': {
+      const v = document.getElementById('pagExpirationDate').value;
+      return v ? fmtDate(v) : '—';
+    }
+    case 'propertyType': return document.getElementById('pagPropertyType').value.trim() || '—';
+    default: return '';
+  }
+}
+function getIncludedTiles(){
+  return PAG_TILE_FIELDS.filter(f => isFieldIncluded(f.key));
+}
+
 function renderPreview(){
   const fullName = document.getElementById('pagFullName').value.trim();
   document.getElementById('pv_date').textContent = fmtDate(document.getElementById('pagDate').value);
   document.getElementById('pv_fullName').textContent = fullName || '[Full Name]';
   document.getElementById('pv_firstName').textContent = fullName ? fullName.split(' ')[0] : '[First Name]';
   document.getElementById('pv_address').textContent = document.getElementById('pagAddress').value.trim() || '[Property Address]';
-  document.getElementById('pv_purchasePrice').textContent = fmtMoney(document.getElementById('pagPurchasePrice').value);
-  document.getElementById('pv_loanAmount').textContent = fmtMoney(document.getElementById('pagLoanAmount').value);
-  document.getElementById('pv_downPayment').textContent = (parseFloat(document.getElementById('pagDownPayment').value) || 0).toFixed(1) + '%';
-  document.getElementById('pv_taxesInsurance').textContent = fmtMoney(document.getElementById('pagTaxesInsurance').value);
-  document.getElementById('pv_loanType').textContent = document.getElementById('pagLoanType').value;
-  document.getElementById('pv_expirationDate').textContent = fmtDate(document.getElementById('pagExpirationDate').value);
+
+  document.getElementById('pv_tiles').innerHTML = getIncludedTiles().map(f =>
+    '<div class="tile"><div class="tile-label">' + f.label + '</div><div class="tile-value">' + getTileDisplayValue(f.key) + '</div><button class="pen-btn" onclick="focusField(\'' + f.key + '\')">&#9998;</button></div>'
+  ).join('');
 
   const checklist = getChecklistValues();
   document.getElementById('pv_checklist').innerHTML = CHECKLIST_ITEMS.map(item =>
     '<div class="letter-check-row"><span>' + item.label + '</span><span><b>' + (checklist[item.key] || '&mdash;') + '</b> <button class="pen-btn" onclick="focusField(\'' + item.key + '\')">&#9998;</button></span></div>'
   ).join('');
 
-  document.getElementById('pv_signature').textContent = 'Ann Zeilingold | FM Home Loans, LLC. | P: 845-354-9700';
+  document.getElementById('pv_signature').textContent = 'Ann Zeilingold | NMLS ID: 41850 | P: 845-354-9700';
 }
 
 // ===========================================================================
@@ -886,17 +1018,34 @@ function renderPreview(){
 // ===========================================================================
 let currentRecordId = null;
 
+function getIncludedFieldsState(){
+  const out = {};
+  PAG_TILE_FIELDS.forEach(f => { out[f.key] = isFieldIncluded(f.key); });
+  return out;
+}
+function setIncludedFieldsState(state){
+  state = state || {};
+  PAG_TILE_FIELDS.forEach(f => {
+    const el = document.getElementById('inc_' + f.key);
+    if (!el) return;
+    el.checked = state[f.key] !== undefined ? !!state[f.key] : (f.key !== 'propertyType');
+  });
+}
+
 function collectLetterPayload(){
   return {
     date: document.getElementById('pagDate').value,
     fullName: document.getElementById('pagFullName').value.trim(),
     address: document.getElementById('pagAddress').value.trim(),
     purchasePrice: document.getElementById('pagPurchasePrice').value,
-    downPaymentPercent: document.getElementById('pagDownPayment').value,
+    downPaymentPercent: document.getElementById('pagDownPaymentPct').value,
+    downPaymentDollar: document.getElementById('pagDownPaymentDollar').value,
     loanAmount: document.getElementById('pagLoanAmount').value,
     loanType: document.getElementById('pagLoanType').value,
     taxesAndInsurance: document.getElementById('pagTaxesInsurance').value,
     expirationDate: document.getElementById('pagExpirationDate').value,
+    propertyType: document.getElementById('pagPropertyType').value.trim(),
+    includedFields: getIncludedFieldsState(),
     checklist: getChecklistValues(),
     templateColor: templateColor,
   };
@@ -907,14 +1056,17 @@ function applyLetterPayload(letter){
   document.getElementById('pagFullName').value = letter.fullName || '';
   document.getElementById('pagAddress').value = letter.address || '';
   document.getElementById('pagPurchasePrice').value = letter.purchasePrice || '';
-  document.getElementById('pagDownPayment').value = letter.downPaymentPercent || '';
+  document.getElementById('pagDownPaymentPct').value = letter.downPaymentPercent || '';
+  document.getElementById('pagDownPaymentDollar').value = letter.downPaymentDollar || '';
   document.getElementById('pagLoanAmount').value = letter.loanAmount || '';
   document.getElementById('pagLoanType').value = letter.loanType || 'FHA';
   document.getElementById('pagTaxesInsurance').value = letter.taxesAndInsurance || '';
   document.getElementById('pagExpirationDate').value = letter.expirationDate || '';
+  document.getElementById('pagPropertyType').value = letter.propertyType || '';
+  setIncludedFieldsState(letter.includedFields);
   setChecklistValues(letter.checklist);
   selectTemplateColor(letter.templateColor || 'red');
-  activeMoneyField = 'down';
+  activeMoneyField = 'dpPercent';
   renderPreview();
 }
 
@@ -1029,33 +1181,45 @@ function buildPagPdf(){
   let y = 40;
   const left = 40;
 
-  // Vector-drawn logo (colored square + bank icon + wordmark) so it recolors
-  // with the selected theme — a raster image can't do that cleanly.
+  // Vector-drawn logo (colored square + roofline/column icon + wordmark) so
+  // it recolors with the selected theme — a raster image can't do that.
   doc.setFillColor(...seal);
-  doc.roundedRect(left, y - 20, 26, 26, 4, 4, 'F');
+  doc.roundedRect(left, y - 20, 26, 26, 5, 5, 'F');
+  doc.setDrawColor(255,255,255); doc.setLineWidth(2.2);
+  doc.lines([[6.5,-7],[6.5,7]], left + 5, y - 6, [1,1], 'S', false);
   doc.setFillColor(255,255,255);
-  doc.triangle(left + 13, y - 18, left + 4, y - 10, left + 22, y - 10, 'F');
-  [4, 9, 14, 19].forEach(dx => doc.rect(left + dx, y - 9, 2.2, 7, 'F'));
-  doc.rect(left + 2, y, 22, 2, 'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(...seal);
-  doc.text('FM', left + 32, y - 10);
-  doc.setFontSize(7);
-  doc.text('HOME LOANS', left + 32, y - 2);
+  [6, 11.5, 17].forEach(dx => doc.roundedRect(left + dx, y - 5, 2.6, 6.5, 0.6, 0.6, 'F'));
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(...seal);
+  doc.text('FM', left + 32, y - 8);
+  doc.setFontSize(6.5);
+  doc.text('HOME', left + 47, y - 11);
+  doc.text('LOANS', left + 47, y - 5);
 
   doc.setFont('helvetica','normal'); doc.setFontSize(9);
   doc.setTextColor(...navy);
   doc.text('NMLS#: 2212', left, y + 20);
   doc.text('New City 56 Congers Rd, New City, NY 10956', left, y + 32);
 
-  // Seal — outer ribbon ring in the theme color, inner medallion always gold.
-  doc.setFillColor(...seal);
-  doc.circle(pageW - 90, y + 10, 42, 'F');
+  // Seal — scalloped ribbon rosette in the theme color, inner medallion
+  // always gold, matching the live-preview seal (same rosette geometry).
+  const sx = pageW - 90, sy = y + 10;
+  drawPagRosettePdf(doc, sx, sy, 44, 35, 16, seal);
   doc.setFillColor(...PAG_GOLD_RGB);
-  doc.circle(pageW - 90, y + 10, 32, 'F');
-  doc.setFontSize(7); doc.setTextColor(27,42,74);
-  doc.text('PRE-APPROVED', pageW - 90, y + 4, { align:'center' });
-  doc.text('FM APPROVED', pageW - 90, y + 12, { align:'center' });
-  doc.text('BUYER', pageW - 90, y + 20, { align:'center' });
+  doc.circle(sx, sy, 32, 'F');
+
+  doc.setDrawColor(27,42,74); doc.setLineWidth(0.7);
+  doc.roundedRect(sx - 22, sy - 15, 44, 9, 3, 3, 'S');
+  doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(27,42,74);
+  doc.text('PREAPPROVED', sx, sy - 9, { align:'center' });
+
+  doc.setLineWidth(1);
+  doc.circle(sx - 19, sy, 3, 'S');
+  doc.line(sx - 15.5, sy, sx - 3, sy);
+  doc.setFontSize(6);
+  doc.text('FM APPROVED', sx, sy + 1.5, { align:'center' });
+
+  doc.setFontSize(11);
+  doc.text('BUYER', sx, sy + 14, { align:'center' });
 
   y += 60;
   doc.setFont('times','bold'); doc.setFontSize(16); doc.setTextColor(30,36,48);
@@ -1067,7 +1231,6 @@ function buildPagPdf(){
     ['Date:', letter.date ? fmtDate(letter.date) : '[MM/DD/YYYY]'],
     ['Borrower:', letter.fullName || '[Full Name]'],
     ['Address:', letter.address || '[Property Address]'],
-    ['Lender:', 'FM Home Loans, LLC. — NMLS#: 2212'],
   ];
   rows.forEach(r => {
     doc.setFont('helvetica','bold'); doc.text(r[0], left, y);
@@ -1101,26 +1264,24 @@ function buildPagPdf(){
   doc.setFont('helvetica','normal');
   y += 8;
 
-  const tiles = [
-    ['Purchase Price', fmtMoney(letter.purchasePrice), 'Type of Loan', letter.loanType],
-    ['Down Payment', (parseFloat(letter.downPaymentPercent)||0).toFixed(1) + '%', 'Taxes and Insurance', fmtMoney(letter.taxesAndInsurance)],
-    ['Loan Amount', fmtMoney(letter.loanAmount), 'Expiration Date', letter.expirationDate ? fmtDate(letter.expirationDate) : '—'],
-  ];
+  const includedTiles = getIncludedTiles();
   const colW = (pageW - 80 - 10) / 2;
-  tiles.forEach(row => {
-    [0,1].forEach(col => {
+  for (let i = 0; i < includedTiles.length; i += 2){
+    const rowTiles = [includedTiles[i], includedTiles[i + 1]];
+    rowTiles.forEach((tile, col) => {
+      if (!tile) return;
       const x = left + col * (colW + 10);
       doc.setFillColor(...seal);
       doc.rect(x, y - 10, colW * 0.42, 20, 'F');
       doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(8.5);
-      doc.text(row[col*2], x + 4, y + 3);
+      doc.text(tile.label, x + 4, y + 3);
       doc.setFillColor(240,240,240);
       doc.rect(x + colW * 0.42, y - 10, colW * 0.58, 20, 'F');
       doc.setTextColor(30,36,48); doc.setFont('helvetica','normal'); doc.setFontSize(9);
-      doc.text(String(row[col*2+1] || ''), x + colW - 4, y + 3, { align:'right' });
+      doc.text(getTileDisplayValue(tile.key), x + colW - 4, y + 3, { align:'right' });
     });
     y += 26;
-  });
+  }
   y += 6;
 
   doc.setFontSize(8); doc.setTextColor(91,100,114);
@@ -1145,7 +1306,7 @@ function buildPagPdf(){
 
   y += 10;
   doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(30,36,48);
-  doc.text('Ann Zeilingold | FM Home Loans, LLC. | P: 845-354-9700', pageW / 2, y, { align:'center' });
+  doc.text('Ann Zeilingold | NMLS ID: 41850 | P: 845-354-9700', pageW / 2, y, { align:'center' });
 
   return { blob: doc.output('blob'), doc: doc };
 }
@@ -1206,7 +1367,6 @@ async function buildPagDocx(){
     ['Date', letter.date ? fmtDate(letter.date) : '[MM/DD/YYYY]'],
     ['Borrower', letter.fullName || '[Full Name]'],
     ['Address', letter.address || '[Property Address]'],
-    ['Lender', 'FM Home Loans, LLC. — NMLS#: 2212'],
   ]);
   body += docxPara('', { spaceAfter:160 });
   body += docxPara('Dear ' + firstName + ',', { spaceAfter:100 });
@@ -1220,14 +1380,7 @@ async function buildPagDocx(){
   ]);
   body += docxPara('', { spaceAfter:160 });
   body += docxPara('[A] Loan Details: Based on this information you have been preapproved for a loan up to the terms indicated below:', { bold:true, size:10, spaceAfter:100 });
-  body += docxTable([
-    ['Purchase Price', fmtMoney(letter.purchasePrice)],
-    ['Down Payment', (parseFloat(letter.downPaymentPercent)||0).toFixed(1) + '%'],
-    ['Loan Amount', fmtMoney(letter.loanAmount)],
-    ['Type of Loan', letter.loanType],
-    ['Taxes and Insurance', fmtMoney(letter.taxesAndInsurance)],
-    ['Expiration Date', letter.expirationDate ? fmtDate(letter.expirationDate) : '—'],
-  ]);
+  body += docxTable(getIncludedTiles().map(tile => [tile.label, getTileDisplayValue(tile.key)]));
   body += docxPara('', { spaceAfter:200 });
   body += docxPara('[B] Conditions of Approval: Based on the information the prospective applicant(s) have provided, FM Home Loans, has determined that the prospective applicants(s) is eligible and qualified to meet the financial requirements of the loan. This is not a loan approval or a commitment to lend on the terms described in the loan details section.', { size:9, spaceAfter:120 });
   body += docxPara('The information stated in the loan application shall be true and correct at the time of the closing.', { size:9, spaceAfter:160 });
@@ -1240,7 +1393,7 @@ async function buildPagDocx(){
     'The prospective all applicant(s) to execute all documents the lender requires.',
   ].forEach((line, i) => { body += docxPara((i+1) + ') ' + line, { size:9, spaceAfter:60 }); });
   body += docxPara('I look forward to working with you. Please contact me should you have any questions.', { size:9, spaceAfter:200 });
-  body += docxPara('Ann Zeilingold | FM Home Loans, LLC. | P: 845-354-9700', { bold:true, size:10 });
+  body += docxPara('Ann Zeilingold | NMLS ID: 41850 | P: 845-354-9700', { bold:true, size:10 });
 
   const documentXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
@@ -1277,12 +1430,47 @@ async function downloadDocx(){
 }
 
 // ===========================================================================
+// SEAL ROSETTE GEOMETRY — a scalloped/petal ring (like the real seal's
+// ribbon rosette) computed once as a set of points alternating outer/inner
+// radius. Shared by the live-preview SVG path and the jsPDF export so the
+// two never drift out of sync with each other.
+// ===========================================================================
+function pagRosettePoints(cx, cy, rOuter, rInner, spikes){
+  const pts = [];
+  const step = Math.PI / spikes;
+  for (let i = 0; i < spikes * 2; i++){
+    const r = (i % 2 === 0) ? rOuter : rInner;
+    const angle = i * step - Math.PI / 2;
+    pts.push([cx + r * Math.cos(angle), cy + r * Math.sin(angle)]);
+  }
+  return pts;
+}
+function pagRosetteSvgPath(cx, cy, rOuter, rInner, spikes){
+  const pts = pagRosettePoints(cx, cy, rOuter, rInner, spikes);
+  return 'M ' + pts.map(p => p[0].toFixed(2) + ',' + p[1].toFixed(2)).join(' L ') + ' Z';
+}
+function drawPagRosettePdf(doc, cx, cy, rOuter, rInner, spikes, rgb){
+  const pts = pagRosettePoints(cx, cy, rOuter, rInner, spikes);
+  const deltas = [];
+  for (let i = 1; i < pts.length; i++) deltas.push([pts[i][0] - pts[i-1][0], pts[i][1] - pts[i-1][1]]);
+  deltas.push([pts[0][0] - pts[pts.length-1][0], pts[0][1] - pts[pts.length-1][1]]);
+  doc.setFillColor(...rgb);
+  doc.lines(deltas, pts[0][0], pts[0][1], [1,1], 'F', true);
+}
+function initSealRosette(){
+  const el = document.getElementById('sealRosettePath');
+  if (el) el.setAttribute('d', pagRosetteSvgPath(50, 50, 49, 40, 16));
+}
+
+// ===========================================================================
 // INIT
 // ===========================================================================
 window.addEventListener('DOMContentLoaded', function(){
   document.getElementById('pagDate').value = new Date().toISOString().slice(0,10);
   buildChecklistUI();
+  initSealRosette();
   renderPreview();
   initSession();
 });
 </script>
+
