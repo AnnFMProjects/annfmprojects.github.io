@@ -419,6 +419,1076 @@ const DAYS = ['Mon','Tues','Wed','Thurs','Fri','Weekend'];
 
 const SECTIONS = [
   { id:'face_to_face', label:'Face to Face', sub:'REALTORS® & Leads — up to 2 people', mode:'counta', startRows:4, growable:true, target:'15' },
+  { id:'break_bread', label:'Break Bread', sub:'', mode:'counta', startRows:2, growable:true, target:'4' },
+  { id:'great_phone_calls', label:'Great Phone Calls', sub:'Leads / RLTRS® / Past Clients / Current Clients / VIPs / Whales — must ask for business or 1 referral', mode:'counta', startRows:13, growable:true, target:'75' },
+  { id:'events', label:'Events', sub:'Attend or host, 3+ people', mode:'counta', startRows:2, growable:true, target:'2 per month' },
+  { id:'videos', label:'Videos', sub:'1000 people', mode:'sum', startRows:2, growable:true, target:'3 videos per week' },
+  { id:'thank_you_cards', label:'Thank You Cards', sub:'10 can be birthday cards', mode:'sum', startRows:4, growable:true, target:'20' },
+  { id:'leads_non_internet', label:'Leads', sub:'Non-internet', mode:'sum', startRows:1, growable:false, target:'10-20' },
+  { id:'deals', label:'Deals', sub:'D:', mode:'sum', startRows:1, growable:false, target:'' },
+  { id:'pre_apps', label:'Pre-Apps', sub:'P: — *1003 + credit pull, docs reviewed, qualified', mode:'sum', startRows:1, growable:false, target:'' },
+];
+
+const THEME_DAY_ITEMS = [
+  { id:'called30Realtors', label:'Called 30 REALTORS®' },
+  { id:'calledStatusUpdates', label:'Called Status Updates' },
+  { id:'calledPreApprovals', label:'Called Pre-Approvals' },
+  { id:'calledPastClients', label:'Called Past Clients' },
+  { id:'calledTop40Vips', label:'Called 10 of Top 40 VIPs' },
+];
+
+function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function mondayOf(date){
+  const d = new Date(date);
+  const day = d.getDay(); // 0 Sun .. 6 Sat
+  const diff = (day === 0 ? -6 : 1) - day;
+  d.setDate(d.getDate() + diff);
+  d.setHours(0,0,0,0);
+  return d.toISOString().slice(0,10);
+}
+function dayLabelFor(date){
+  const map = {1:'Mon',2:'Tues',3:'Wed',4:'Thurs',5:'Fri',0:'Weekend',6:'Weekend'};
+  return map[date.getDay()];
+}
+
+function blankGrid(weekOf){
+  const sections = {};
+  SECTIONS.forEach(s => { sections[s.id] = Array.from({length:s.startRows}, () => DAYS.map(()=>null)); });
+  const themeDayCalls = {};
+  THEME_DAY_ITEMS.forEach(t => themeDayCalls[t.id] = null);
+  return { weekOf: weekOf, sections: sections, themeDayCalls: themeDayCalls };
+}
+function isGridEmpty(grid){
+  return SECTIONS.every(s => (grid.sections[s.id]||[]).every(row => row.every(c => c == null)))
+    && THEME_DAY_ITEMS.every(t => grid.themeDayCalls[t.id] == null);
+}
+
+let gridState = null;
+let currentRecordId = null;
+
+const DRAFT_PREFIX = 'gt_draft_week_';
+function draftKeyFor(weekOf){ return DRAFT_PREFIX + weekOf; }
+function persistDraftLocal(){
+  try {
+    localStorage.setItem(draftKeyFor(gridState.weekOf), JSON.stringify({ recordId: currentRecordId, grid: gridState }));
+    localStorage.setItem('gt_current_week_key', gridState.weekOf);
+  } catch(err){ /* localStorage unavailable — not fatal, backend save still works */ }
+}
+function loadDraftFor(weekOf){
+  try {
+    const raw = localStorage.getItem(draftKeyFor(weekOf));
+    return raw ? JSON.parse(raw) : null;
+  } catch(err){ return null; }
+}
+
+async function initWeek(){
+  const thisMonday = mondayOf(new Date());
+  const lastKey = localStorage.getItem('gt_current_week_key');
+  if (lastKey && lastKey !== thisMonday){
+    const staleDraft = loadDraftFor(lastKey);
+    if (staleDraft && staleDraft.grid && !isGridEmpty(staleDraft.grid)){
+      GT_API.saveWeek({
+        recordId: staleDraft.recordId || undefined,
+        weekOf: staleDraft.grid.weekOf,
+        status: 'final',
+        grid: staleDraft.grid,
+      }).then(({ recordId }) => {
+        staleDraft.recordId = recordId;
+        try { localStorage.setItem(draftKeyFor(lastKey), JSON.stringify(staleDraft)); } catch(err){}
+      }).catch(() => { /* best effort — the week's data is still in localStorage either way */ });
+      openWeekRolloverPrompt(lastKey);
+    }
+  }
+  const existing = loadDraftFor(thisMonday);
+  if (existing){
+    gridState = existing.grid;
+    currentRecordId = existing.recordId || null;
+  } else {
+    gridState = blankGrid(thisMonday);
+    currentRecordId = null;
+  }
+  persistDraftLocal();
+  renderGrid();
+  renderThemeDayCalls();
+}
+
+function openWeekRolloverPrompt(staleWeekOf){
+  document.getElementById('rolloverWeekLabel').textContent = staleWeekOf;
+  document.getElementById('rolloverModalOverlay').dataset.weekOf = staleWeekOf;
+  document.getElementById('rolloverModalOverlay').classList.add('open');
+}
+function closeWeekRolloverPrompt(){ document.getElementById('rolloverModalOverlay').classList.remove('open'); }
+async function exportStaleWeek(kind){
+  const weekOf = document.getElementById('rolloverModalOverlay').dataset.weekOf;
+  const draft = loadDraftFor(weekOf);
+  closeWeekRolloverPrompt();
+  if (!draft) return;
+  const savedGrid = gridState, savedRecordId = currentRecordId;
+  gridState = draft.grid; currentRecordId = draft.recordId;
+  try {
+    if (kind === 'pdf') await exportPdf();
+    else await exportXlsx();
+  } finally {
+    gridState = savedGrid; currentRecordId = savedRecordId;
+  }
+}
+
+// ===========================================================================
+// GRID RENDERING + editing + the "bleed" (down, then grow) fill algorithm.
+// ===========================================================================
+function sectionTotal(sectionDef){
+  const rows = gridState.sections[sectionDef.id];
+  let total = 0;
+  rows.forEach(row => row.forEach(cell => {
+    if (sectionDef.mode === 'counta'){ if (cell != null && cell !== '') total++; }
+    else { total += Number(cell) || 0; }
+  }));
+  return total;
+}
+function shrinkSections(){
+  SECTIONS.forEach(sectionDef => {
+    if (!sectionDef.growable) return;
+    const rows = gridState.sections[sectionDef.id];
+    while (rows.length > sectionDef.startRows && rows[rows.length-1].every(c => c == null)){
+      rows.pop();
+    }
+  });
+}
+function addSectionRow(sectionId){
+  gridState.sections[sectionId].push(DAYS.map(()=>null));
+  renderGrid();
+}
+function renderGrid(){
+  document.getElementById('gtWeekOfLabel').textContent = gridState.weekOf;
+  const container = document.getElementById('gtGridBody');
+  let html = '';
+  SECTIONS.forEach(sectionDef => {
+    const rows = gridState.sections[sectionDef.id];
+    rows.forEach((row, ri) => {
+      html += '<tr>';
+      if (ri === 0){
+        html += '<td class="gt-label" rowspan="'+rows.length+'"><div class="gt-label-main">'+escapeHtml(sectionDef.label)+'</div>'+(sectionDef.sub?'<div class="gt-label-sub">'+escapeHtml(sectionDef.sub)+'</div>':'')+'</td>';
+      }
+      DAYS.forEach((day, di) => {
+        const val = row[di];
+        html += '<td class="gt-cell"><input type="text" inputmode="numeric" class="gt-cell-input" data-section="'+sectionDef.id+'" data-row="'+ri+'" data-day="'+di+'" value="'+(val==null?'':escapeHtml(String(val)))+'"></td>';
+      });
+      if (ri === 0){
+        const total = sectionTotal(sectionDef);
+        html += '<td class="gt-total" rowspan="'+rows.length+'">'+
+          '<div class="gt-total-value">'+total+'</div>'+
+          (sectionDef.target?'<div class="gt-total-target">Target: '+escapeHtml(sectionDef.target)+'</div>':'')+
+          (sectionDef.growable?'<button type="button" class="gt-add-row" onclick="addSectionRow(\''+sectionDef.id+'\')">+ row</button>':'')+
+        '</td>';
+      }
+      html += '</tr>';
+    });
+  });
+  container.innerHTML = html;
+}
+function onCellChange(e){
+  const t = e.target;
+  if (!t.classList || !t.classList.contains('gt-cell-input')) return;
+  const sectionId = t.dataset.section, ri = +t.dataset.row, di = +t.dataset.day;
+  const raw = t.value.trim();
+  gridState.sections[sectionId][ri][di] = raw === '' ? null : (isNaN(Number(raw)) ? raw : Number(raw));
+  shrinkSections();
+  renderGrid();
+  persistDraftLocal();
+}
+function renderThemeDayCalls(){
+  const wrap = document.getElementById('gtThemeDayCalls');
+  wrap.innerHTML = THEME_DAY_ITEMS.map(item => {
+    const val = gridState.themeDayCalls[item.id];
+    return '<div class="gt-theme-item">'+
+      '<span>'+escapeHtml(item.label)+'</span>'+
+      '<label><input type="radio" name="tdc_'+item.id+'" '+(val===true?'checked':'')+' onchange="setThemeDayCall(\''+item.id+'\', true)"> Yes</label>'+
+      '<label><input type="radio" name="tdc_'+item.id+'" '+(val===false?'checked':'')+' onchange="setThemeDayCall(\''+item.id+'\', false)"> No</label>'+
+    '</div>';
+  }).join('');
+}
+function setThemeDayCall(id, val){
+  gridState.themeDayCalls[id] = val;
+  persistDraftLocal();
+}
+
+// Applies a { updates:[{section,day,count,note?}], theme_day_calls?:{} } payload
+// — the single code path both the rule-based parser and the pasted-back
+// Claude reply feed through, so grid mutation logic never needs a second copy.
+function applyPayload(payload){
+  const messages = [];
+  (payload.updates || []).forEach(u => {
+    const sectionDef = SECTIONS.find(s => s.id === u.section);
+    if (!sectionDef) return;
+    let dayIdx = DAYS.indexOf(u.day);
+    if (dayIdx === -1) dayIdx = DAYS.indexOf(dayLabelFor(new Date()));
+    const count = Math.max(1, parseInt(u.count, 10) || 1);
+    const rows = gridState.sections[sectionDef.id];
+    if (sectionDef.mode === 'counta'){
+      let placed = 0;
+      while (placed < count){
+        let row = rows.find(r => r[dayIdx] == null);
+        if (!row){ row = DAYS.map(()=>null); rows.push(row); }
+        row[dayIdx] = u.note || 1;
+        placed++;
+      }
+    } else {
+      rows[0][dayIdx] = (Number(rows[0][dayIdx]) || 0) + count;
+    }
+    messages.push(count + ' ' + sectionDef.label + ' — ' + DAYS[dayIdx]);
+  });
+  const tdc = payload.theme_day_calls || payload.themeDayCalls;
+  if (tdc){
+    Object.keys(tdc).forEach(k => { if (k in gridState.themeDayCalls) gridState.themeDayCalls[k] = !!tdc[k]; });
+  }
+  shrinkSections();
+  renderGrid();
+  renderThemeDayCalls();
+  persistDraftLocal();
+  return messages;
+}
+
+// ===========================================================================
+// RULE-BASED PARSER — free, client-side, no API/network. Splits on "and"/
+// commas so one message can log several activities, matches each clause
+// against a keyword dictionary, extracts a count and a day. If nothing
+// matches at all, the caller opens the Ask Claude modal instead.
+// ===========================================================================
+const NUMBER_WORDS = { a:1, an:1, one:1, couple:2, two:2, few:3, three:3, four:4, five:5, six:6, seven:7,
+  eight:8, nine:9, ten:10, eleven:11, twelve:12, thirteen:13, fourteen:14, fifteen:15, sixteen:16,
+  seventeen:17, eighteen:18, nineteen:19, twenty:20 };
+
+const SECTION_RULES = [
+  { id:'pre_apps', re:/pre[- ]?app|pre[- ]?approv/i },
+  { id:'deals', re:/\bdeal(s)?\b|\bfunded\b|closed a deal/i },
+  { id:'thank_you_cards', re:/thank[- ]?you card|birthday card|sent a card/i },
+  { id:'videos', re:/\bvideo(s)?\b/i },
+  { id:'events', re:/\bevent(s)?\b|\bhosted\b|\battended\b/i },
+  { id:'break_bread', re:/\blunch\b|\bdinner\b|\bbreakfast\b|coffee with|break bread|grabbed (food|a bite)/i },
+  { id:'great_phone_calls', re:/\bcall(ed|s)?\b|phone call|spoke with|rang up/i },
+  { id:'face_to_face', re:/face[- ]to[- ]face|met with|in[- ]person|sat down with/i },
+  { id:'leads_non_internet', re:/\blead(s)?\b/i },
+];
+const DAY_WORDS = { monday:'Mon', mon:'Mon', tuesday:'Tues', tues:'Tues', tue:'Tues', wednesday:'Wed', wed:'Wed',
+  thursday:'Thurs', thurs:'Thurs', thu:'Thurs', friday:'Fri', fri:'Fri', saturday:'Weekend', sat:'Weekend',
+  sunday:'Weekend', sun:'Weekend' };
+
+function extractCount(text){
+  const digitMatch = text.match(/\b(\d{1,3})\b/);
+  if (digitMatch) return parseInt(digitMatch[1], 10);
+  const words = text.toLowerCase().split(/\W+/);
+  for (const w of words){ if (NUMBER_WORDS[w] !== undefined) return NUMBER_WORDS[w]; }
+  return null;
+}
+function extractDay(text){
+  const t = text.toLowerCase();
+  if (/\byesterday\b/.test(t)){
+    const d = new Date(); d.setDate(d.getDate() - 1); return dayLabelFor(d);
+  }
+  for (const k in DAY_WORDS){ if (new RegExp('\\b'+k+'\\b','i').test(t)) return DAY_WORDS[k]; }
+  return dayLabelFor(new Date());
+}
+function parseLogText(text){
+  const clauses = text.split(/\band\b|[,;]/i).map(c => c.trim()).filter(Boolean);
+  if (!clauses.length) clauses.push(text);
+  const updates = [];
+  clauses.forEach(clause => {
+    const rule = SECTION_RULES.find(r => r.re.test(clause));
+    if (!rule) return;
+    updates.push({ section: rule.id, day: extractDay(clause.length > 3 ? clause : text), count: extractCount(clause) || 1 });
+  });
+  return { updates: updates, unresolved: updates.length === 0 };
+}
+function handleLogSubmit(){
+  const input = document.getElementById('gtLogInput');
+  const text = input.value.trim();
+  if (!text) return;
+  const statusEl = document.getElementById('gtLogStatus');
+  const parsed = parseLogText(text);
+  if (parsed.unresolved){
+    statusEl.textContent = '';
+    openAskClaudeModal(text);
+    return;
+  }
+  const messages = applyPayload({ updates: parsed.updates });
+  statusEl.textContent = messages.length ? ('Logged: ' + messages.join(', ')) : '';
+  input.value = '';
+}
+
+// ===========================================================================
+// ASK CLAUDE — manual escape hatch + auto-triggered when the rule parser
+// can't resolve a message. No API key, no server call: this just composes a
+// prompt to copy into a normal claude.ai chat, and applies whatever JSON
+// comes back through the exact same applyPayload() the parser uses.
+// ===========================================================================
+function composeClaudePrompt(text){
+  const currentTally = {};
+  SECTIONS.forEach(s => { currentTally[s.id] = sectionTotal(s); });
+  const schemaBlock = {
+    updates: [ { section: 'great_phone_calls', day: 'Wed', count: 3, note: 'optional label' } ],
+    theme_day_calls: { called30Realtors: true }
+  };
+  return [
+    'You are helping fill in a weekly "Greatness Tracker" activity log for a mortgage loan officer.',
+    'Given her raw note below, reply with ONLY a JSON object (no prose, no markdown fences) matching this exact shape:',
+    JSON.stringify(schemaBlock, null, 2),
+    '',
+    'Section id meanings:',
+    '- face_to_face: in-person meetings with REALTORS/leads (up to 2 people)',
+    '- break_bread: a meal shared with a contact',
+    '- great_phone_calls: phone calls to leads/realtors/past or current clients/VIPs/whales where she asks for business or a referral',
+    '- events: attending/hosting an event with 3+ people',
+    '- videos: videos made, reaching about 1000 people',
+    '- thank_you_cards: thank-you or birthday cards sent',
+    '- leads_non_internet: a non-internet-sourced lead',
+    '- deals: a closed deal',
+    '- pre_apps: a completed pre-approval (1003 + credit pull, docs reviewed, qualified)',
+    '',
+    '"day" must be one of: Mon, Tues, Wed, Thurs, Fri, Weekend (Weekend covers both Sat and Sun).',
+    'If she doesn\'t say which day, assume today, which is: ' + dayLabelFor(new Date()) + '.',
+    '',
+    'This week\'s tally so far (context only — do not repeat it back, just use it to help disambiguate):',
+    JSON.stringify(currentTally),
+    '',
+    'Her note: "' + text.replace(/"/g, '\\"') + '"'
+  ].join('\n');
+}
+function openAskClaudeModal(prefText){
+  const text = prefText || document.getElementById('gtLogInput').value.trim();
+  document.getElementById('askClaudePromptBox').value = composeClaudePrompt(text);
+  document.getElementById('askClaudeReply').value = '';
+  document.getElementById('askClaudeStatus').textContent = '';
+  document.getElementById('askClaudeModalOverlay').classList.add('open');
+}
+function closeAskClaudeModal(){ document.getElementById('askClaudeModalOverlay').classList.remove('open'); }
+async function copyClaudePrompt(){
+  const text = document.getElementById('askClaudePromptBox').value;
+  try {
+    await navigator.clipboard.writeText(text);
+    document.getElementById('askClaudeStatus').textContent = 'Copied — click Open Claude, start any new chat, paste, and send.';
+  } catch (err) {
+    document.getElementById('askClaudeStatus').textContent = 'Could not copy automatically — select the text above and copy manually.';
+  }
+}
+function openClaudeSite(){ window.open('https://claude.ai/new', '_blank'); }
+function applyClaudeReply(){
+  const raw = document.getElementById('askClaudeReply').value.trim();
+  const statusEl = document.getElementById('askClaudeStatus');
+  if (!raw){ statusEl.textContent = "Paste the JSON Claude replied with first."; return; }
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch (err) { statusEl.textContent = "That doesn't look like valid JSON — copy Claude's whole reply and try again."; return; }
+  const messages = applyPayload(parsed);
+  statusEl.textContent = messages.length ? ('Logged: ' + messages.join(', ')) : 'Nothing recognized in that reply.';
+  if (messages.length){
+    document.getElementById('gtLogInput').value = '';
+    setTimeout(closeAskClaudeModal, 900);
+  }
+}
+
+// ===========================================================================
+// SAVE / LOAD / DELETE — same shape as PAG's saved-letters flow.
+// ===========================================================================
+function blobToBase64(blob){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+async function saveWeek(){
+  const statusEl = document.getElementById('gtSaveStatus');
+  statusEl.className = 'save-status';
+  statusEl.textContent = 'Saving…';
+  try {
+    let pdfBase64 = null;
+    try { const { blob } = await buildGtPdfBlob(); pdfBase64 = await blobToBase64(blob); } catch (err) { /* PDF snapshot is best-effort */ }
+    const { recordId } = await GT_API.saveWeek({
+      recordId: currentRecordId || undefined,
+      weekOf: gridState.weekOf,
+      status: 'final',
+      grid: gridState,
+      pdfBase64: pdfBase64,
+    });
+    currentRecordId = recordId;
+    persistDraftLocal();
+    statusEl.className = 'save-status ok';
+    statusEl.textContent = 'Saved.';
+  } catch (err) {
+    statusEl.className = 'save-status err';
+    statusEl.textContent = err.message;
+  }
+}
+function openSavedModal(){
+  document.getElementById('savedModalOverlay').classList.add('open');
+  loadSavedList();
+}
+function closeSavedModal(){ document.getElementById('savedModalOverlay').classList.remove('open'); }
+async function loadSavedList(){
+  const body = document.getElementById('savedListBody');
+  body.innerHTML = '<div style="font-size:12px; color:var(--slate);">Loading…</div>';
+  try {
+    const records = await GT_API.listWeeks({});
+    if (!records.length){
+      body.innerHTML = '<div style="font-size:12px; color:var(--slate);">No saved weeks yet.</div>';
+      return;
+    }
+    body.innerHTML = records.map(r =>
+      '<div class="saved-row">' +
+        '<div><b>Week of ' + escapeHtml(r.WeekOf || '?') + '</b><br><span style="color:var(--slate); font-size:11px;">' + escapeHtml(r.ProcessorNameSnapshot || '') + ' · ' + escapeHtml((r.UpdatedAt || r.CreatedAt || '').slice(0,10)) + '</span></div>' +
+        '<div class="saved-row-actions">' +
+          '<button class="export-btn" style="padding:5px 9px; font-size:11px;" onclick="loadSavedRecord(\'' + r.RecordID + '\')">Load</button>' +
+          '<button class="export-btn" style="padding:5px 9px; font-size:11px; background:var(--slate-light); color:var(--navy);" onclick="deleteSavedRecord(\'' + r.RecordID + '\')">Delete</button>' +
+        '</div>' +
+      '</div>'
+    ).join('');
+  } catch (err) {
+    body.innerHTML = '<div style="font-size:12px; color:#B3261E;">' + escapeHtml(err.message) + '</div>';
+  }
+}
+async function loadSavedRecord(recordId){
+  try {
+    const data = await GT_API.getWeek(recordId);
+    currentRecordId = recordId;
+    gridState = data.grid;
+    persistDraftLocal();
+    renderGrid();
+    renderThemeDayCalls();
+    closeSavedModal();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+async function deleteSavedRecord(recordId){
+  if (!confirm('Delete this saved week? This cannot be undone.')) return;
+  try {
+    await GT_API.deleteWeek(recordId);
+    loadSavedList();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+// ===========================================================================
+// EXPORT — PDF (jsPDF) and XLSX (hand-rolled OOXML via JSZip, same approach
+// as cce_calculator.html — no ExcelJS, no sharedStrings, inlineStr cells).
+// ===========================================================================
+function sanitizeFilenamePart(s){ return String(s||'').replace(/[\/\\:*?"<>|]/g, '').trim(); }
+function buildExportFilename(ext){ return 'GT_' + sanitizeFilenamePart(gridState.weekOf) + '.' + ext; }
+
+async function buildGtPdfBlob(){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'letter' });
+  const navy = [27,42,74];
+  const pageWidth = doc.internal.pageSize.getWidth();
+  let y = 40;
+  doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(navy[0],navy[1],navy[2]);
+  doc.text('Greatness Tracker', 40, y);
+  y += 18;
+  doc.setFont('helvetica','normal'); doc.setFontSize(11); doc.setTextColor(80,80,80);
+  doc.text('Week of ' + gridState.weekOf, 40, y);
+  y += 22;
+
+  const dayColX = [220, 275, 330, 385, 440, 495];
+  const totalColX = 545;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(0,0,0);
+  DAYS.forEach((d, i) => doc.text(d, dayColX[i], y));
+  doc.text('Total', totalColX, y);
+  y += 10;
+  doc.setDrawColor(200,200,200);
+  doc.line(40, y, pageWidth-40, y);
+  y += 14;
+
+  SECTIONS.forEach(sectionDef => {
+    if (y > 700){ doc.addPage(); y = 40; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(navy[0],navy[1],navy[2]);
+    doc.text(sectionDef.label, 40, y);
+    const total = sectionTotal(sectionDef);
+    doc.text(String(total), totalColX, y);
+    if (sectionDef.target){
+      doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120,120,120);
+      doc.text('Target: ' + sectionDef.target, 40, y + 11);
+    }
+    const rows = gridState.sections[sectionDef.id];
+    rows.forEach((row, ri) => {
+      const ry = y + (ri * 12);
+      doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(30,30,30);
+      DAYS.forEach((d, di) => {
+        const v = row[di];
+        if (v != null && v !== '') doc.text(String(v), dayColX[di], ry);
+      });
+    });
+    y += Math.max(rows.length * 12, 22) + 10;
+  });
+
+  if (y > 680){ doc.addPage(); y = 40; }
+  doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(navy[0],navy[1],navy[2]);
+  doc.text('Theme Day Calls', 40, y);
+  y += 14;
+  THEME_DAY_ITEMS.forEach(item => {
+    const val = gridState.themeDayCalls[item.id];
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(30,30,30);
+    doc.text(item.label + ': ' + (val === true ? 'Yes' : val === false ? 'No' : '—'), 40, y);
+    y += 13;
+  });
+
+  return { blob: doc.output('blob'), doc: doc };
+}
+
+async function buildGtXlsxBlob(){
+  function xmlEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;'); }
+  function colLetter(n){ let s=''; while(n>0){ const rem=(n-1)%26; s=String.fromCharCode(65+rem)+s; n=Math.floor((n-1)/26);} return s; }
+
+  const cells = {};
+  function setCell(addr, opts){ cells[addr] = Object.assign({ s:0 }, opts); }
+
+  let row = 1;
+  setCell('A'+row, { t:'inlineStr', v:'GREATNESS TRACKER', s:1 });
+  row++;
+  setCell('A'+row, { t:'inlineStr', v:'Week of ' + gridState.weekOf });
+  row += 2;
+
+  const headerRow = row;
+  DAYS.forEach((d,i) => setCell(colLetter(2+i)+headerRow, { t:'inlineStr', v:d, s:1 }));
+  setCell(colLetter(2+DAYS.length)+headerRow, { t:'inlineStr', v:'Total', s:1 });
+  setCell(colLetter(3+DAYS.length)+headerRow, { t:'inlineStr', v:'Target', s:1 });
+  row++;
+
+  SECTIONS.forEach(sectionDef => {
+    const rows = gridState.sections[sectionDef.id];
+    const startRow = row;
+    rows.forEach((r, ri) => {
+      const rr = row + ri;
+      setCell('A'+rr, { t:'inlineStr', v: ri===0 ? sectionDef.label : '' });
+      DAYS.forEach((d, di) => {
+        const v = r[di];
+        const addr = colLetter(2+di) + rr;
+        if (v == null || v === ''){ /* leave blank */ }
+        else if (typeof v === 'number'){ setCell(addr, { t:'n', v: v }); }
+        else { setCell(addr, { t:'inlineStr', v: String(v) }); }
+      });
+    });
+    const endRow = row + rows.length - 1;
+    const totalAddr = colLetter(2+DAYS.length) + startRow;
+    const rangeStart = colLetter(2) + startRow;
+    const rangeEnd = colLetter(1+DAYS.length) + endRow;
+    const formula = sectionDef.mode === 'counta' ? 'COUNTA('+rangeStart+':'+rangeEnd+')' : 'SUM('+rangeStart+':'+rangeEnd+')';
+    setCell(totalAddr, { t:'n', f: formula, v:0, s:1 });
+    if (sectionDef.target){
+      setCell(colLetter(3+DAYS.length)+startRow, { t:'inlineStr', v: String(sectionDef.target) });
+    }
+    row = endRow + 2;
+  });
+
+  setCell('A'+row, { t:'inlineStr', v:'Theme Day Calls', s:1 });
+  row++;
+  THEME_DAY_ITEMS.forEach(item => {
+    const val = gridState.themeDayCalls[item.id];
+    setCell('A'+row, { t:'inlineStr', v: item.label });
+    setCell('B'+row, { t:'inlineStr', v: val===true?'Yes':val===false?'No':'' });
+    row++;
+  });
+
+  function cellXml(addr, cell){
+    if (!cell) return '';
+    const sAttr = cell.s ? ' s="'+cell.s+'"' : '';
+    if (cell.t === 'inlineStr'){
+      return '<c r="'+addr+'" t="inlineStr"'+sAttr+'><is><t xml:space="preserve">'+xmlEsc(String(cell.v))+'</t></is></c>';
+    }
+    const fXml = cell.f ? '<f>'+xmlEsc(cell.f)+'</f>' : '';
+    const vVal = (typeof cell.v === 'number' && !isNaN(cell.v)) ? cell.v : 0;
+    return '<c r="'+addr+'"'+sAttr+'>'+fXml+'<v>'+vVal+'</v></c>';
+  }
+  function sheetXml(){
+    const byRow = {};
+    Object.keys(cells).forEach(addr => {
+      const m = addr.match(/^([A-Z]+)(\d+)$/);
+      const rn = parseInt(m[2], 10);
+      (byRow[rn] = byRow[rn] || []).push(addr);
+    });
+    const rowNums = Object.keys(byRow).map(Number).sort((a,b)=>a-b);
+    const rowsXml = rowNums.map(rn => {
+      const addrs = byRow[rn].sort((a,b) => a.match(/^([A-Z]+)/)[1].localeCompare(b.match(/^([A-Z]+)/)[1]));
+      return '<row r="'+rn+'">' + addrs.map(a => cellXml(a, cells[a])).join('') + '</row>';
+    }).join('');
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+      '<sheetData>' + rowsXml + '</sheetData></worksheet>';
+  }
+
+  const stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+    '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>' +
+    '<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>' +
+    '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>' +
+    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+    '<cellXfs count="2">' +
+      '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+      '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +
+    '</cellXfs>' +
+    '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
+    '<dxfs count="0"/>' +
+    '</styleSheet>';
+
+  const workbookXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+    '<sheets><sheet name="Greatness Tracker" sheetId="1" r:id="rId1"/></sheets>' +
+    '<calcPr calcId="0" fullCalcOnLoad="1"/>' +
+    '</workbook>';
+  const workbookRelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
+    '</Relationships>';
+  const contentTypesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+    '<Default Extension="xml" ContentType="application/xml"/>' +
+    '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+    '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
+    '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+    '</Types>';
+  const rootRelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' +
+    '</Relationships>';
+
+  const zip = new JSZip();
+  zip.file('[Content_Types].xml', contentTypesXml);
+  zip.file('_rels/.rels', rootRelsXml);
+  zip.file('xl/workbook.xml', workbookXml);
+  zip.file('xl/_rels/workbook.xml.rels', workbookRelsXml);
+  zip.file('xl/styles.xml', stylesXml);
+  zip.file('xl/worksheets/sheet1.xml', sheetXml());
+
+  return zip.generateAsync({ type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+}
+
+const EXPORT_FILE_TYPE_INFO = {
+  pdf: { mime:'application/pdf', ext:'pdf', desc:'PDF Document' },
+  xlsx: { mime:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', ext:'xlsx', desc:'Excel Workbook' }
+};
+async function saveExportBlob(kind, blob){
+  const filename = buildExportFilename(kind);
+  const info = EXPORT_FILE_TYPE_INFO[kind];
+  if (window.showSaveFilePicker){
+    try {
+      const handle = await window.showSaveFilePicker({ suggestedName: filename, types: info ? [{ description: info.desc, accept: { [info.mime]: ['.'+info.ext] } }] : undefined });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return true;
+    } catch (err) {
+      if (err && err.name === 'AbortError') return false;
+    }
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  return true;
+}
+async function exportPdf(){
+  const { blob } = await buildGtPdfBlob();
+  await saveExportBlob('pdf', blob);
+}
+async function exportXlsx(){
+  const blob = await buildGtXlsxBlob();
+  await saveExportBlob('xlsx', blob);
+}
+
+// ===========================================================================
+window.addEventListener('DOMContentLoaded', function(){
+  document.getElementById('gtGridBody').addEventListener('change', onCellChange);
+  initSession();
+});
+</script>
+    border-radius:6px;
+    cursor:pointer;
+    font-family:Calibri, Arial, sans-serif;
+    transition:transform .1s ease, box-shadow .15s ease;
+    white-space:nowrap;
+  }
+  .export-btn:hover{ box-shadow:0 4px 14px rgba(0,0,0,.25); transform:translateY(-1px); }
+  .export-btn:active{ transform:translateY(0); }
+
+  .gt-header{
+    background:linear-gradient(135deg,var(--navy) 0%, var(--navy-deep) 100%);
+    color:#fff;
+    padding:14px 24px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+  .gt-header-left{ display:flex; align-items:center; gap:14px; }
+  .gt-header-left a{ color:#F4D9A0; font-size:12px; text-decoration:none; }
+  .gt-header-title{ font-family:Cambria, Georgia, serif; font-size:19px; font-weight:700; }
+  .gt-header-right{ display:flex; align-items:center; gap:10px; font-size:12px; flex-wrap:wrap; }
+  .gt-header-right a{ color:#F4D9A0; }
+
+  .save-status{ font-size:11.5px; min-height:16px; padding:4px 24px; }
+  .save-status.ok{ color:var(--good); }
+  .save-status.err{ color:#B3261E; }
+
+  .gt-grid-table{ border-collapse:collapse; width:100%; font-size:12px; min-width:760px; }
+  .gt-grid-table td, .gt-grid-table th{ border:1px solid var(--line); padding:4px 6px; vertical-align:top; }
+  .gt-grid-table thead th{ background:var(--navy); color:#fff; font-size:11px; padding:6px; position:sticky; top:0; }
+  .gt-label{ background:var(--slate-light); min-width:200px; }
+  .gt-label-main{ font-weight:700; color:var(--navy); font-size:12px; }
+  .gt-label-sub{ font-size:10px; color:var(--slate); margin-top:2px; }
+  .gt-cell{ text-align:center; width:62px; }
+  .gt-cell-input{ width:100%; border:none; text-align:center; font-size:12px; background:transparent; padding:3px 0; }
+  .gt-cell-input:focus{ outline:1px solid var(--gold); background:#fff; }
+  .gt-total{ background:rgba(201,162,75,0.14); text-align:center; min-width:92px; }
+  .gt-total-value{ font-weight:700; font-size:15px; color:var(--navy); }
+  .gt-total-target{ font-size:9.5px; color:var(--slate); margin-top:2px; }
+  .gt-add-row{ margin-top:4px; font-size:9px; padding:2px 6px; border:1px solid var(--line); background:#fff; border-radius:4px; cursor:pointer; color:var(--slate); }
+
+  .gt-theme-item{ display:flex; align-items:center; gap:16px; font-size:12px; padding:6px 0; border-bottom:1px solid var(--slate-light); }
+  .gt-theme-item label{ display:flex; align-items:center; gap:4px; cursor:pointer; }
+  .gt-theme-item span{ flex:1; }
+
+  .gt-log-bar{ position:sticky; bottom:0; background:#fff; border-top:1px solid var(--line); padding:10px 24px; display:flex; gap:8px; z-index:10; }
+  .gt-log-bar input{ flex:1; padding:9px 12px; font-size:13px; border:1px solid var(--line); border-radius:6px; }
+
+  /* MODALS */
+  .gt-modal-overlay{
+    display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:2000;
+    align-items:center; justify-content:center; padding:20px;
+  }
+  .gt-modal-overlay.open{ display:flex; }
+  .gt-modal{
+    background:#fff; border-radius:10px; max-width:560px; width:100%; max-height:86vh;
+    overflow-y:auto; padding:22px; font-family:Calibri, Arial, sans-serif;
+  }
+  .saved-row{
+    display:flex; justify-content:space-between; align-items:center; padding:9px 0;
+    border-bottom:1px solid var(--slate-light); font-size:12.5px;
+  }
+  .saved-row:last-child{ border-bottom:none; }
+  .saved-row-actions{ display:flex; gap:6px; }
+</style>
+
+<div class="gt-wrap">
+
+  <!-- LOGIN GATE -->
+  <div id="loginGateOverlay" style="display:flex; position:fixed; inset:0; background:var(--paper); z-index:3000; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:#fff; border:1px solid var(--line); border-radius:10px; max-width:400px; width:100%; padding:28px; font-family:Calibri, Arial, sans-serif; box-shadow:0 6px 24px rgba(16,27,51,0.12);">
+      <h3 style="margin-top:0; color:var(--navy);">Greatness Tracker</h3>
+      <div style="font-size:10px; color:#8A6A1F; background:rgba(201,162,75,0.16); border:1px solid rgba(201,162,75,0.45); padding:5px 9px; border-radius:4px; margin-bottom:14px;">Internal tool for FM Home Loans loan officers. Not a public FM Home Loans website or login.</div>
+      <div class="field-row" style="align-items:flex-start; flex-direction:column; gap:4px;">
+        <label>Email</label>
+        <input type="email" id="loginEmail" style="width:100%; box-sizing:border-box; text-align:left;" autocomplete="username">
+      </div>
+      <div class="field-row" style="align-items:flex-start; flex-direction:column; gap:4px; margin-top:10px;">
+        <label>Password</label>
+        <input type="password" id="loginPassword" style="width:100%; box-sizing:border-box; text-align:left;" autocomplete="current-password" onkeydown="if(event.key==='Enter') attemptLogin();">
+      </div>
+      <div id="loginError" style="color:#B3261E; font-size:12px; margin-top:10px; min-height:14px;"></div>
+      <button class="export-btn" style="width:100%; margin-top:14px; background:var(--navy); color:#fff; padding:11px;" onclick="attemptLogin()">Login</button>
+      <div style="text-align:center; margin-top:12px;">
+        <a href="#" onclick="openRequestLoginModal(); return false;" style="color:#8A6A1F; font-size:12px;">Request Login</a>
+      </div>
+      <div style="text-align:center; margin-top:10px; padding-top:10px; border-top:1px solid var(--line); font-size:10.5px; color:var(--slate);">
+        This tool is restricted to a small number of accounts — logging in doesn't guarantee access.
+      </div>
+    </div>
+  </div>
+
+  <!-- REQUEST LOGIN MODAL -->
+  <div id="requestLoginModalOverlay" class="gt-modal-overlay" style="z-index:3001;">
+    <div class="gt-modal" style="max-width:420px;">
+      <h3 style="margin-top:0; color:var(--navy);">Request Login</h3>
+      <p style="font-size:12.5px; color:var(--slate); line-height:1.5;">Choose your name, email, and a password. This sends a request for approval — you won't be able to log in until it's approved. (Same account works across all FM Home Loans internal tools.)</p>
+      <div class="field-row" style="align-items:flex-start; flex-direction:column; gap:4px;">
+        <label>Name</label>
+        <input type="text" id="reqLoginName" style="width:100%; box-sizing:border-box; text-align:left;">
+      </div>
+      <div class="field-row" style="align-items:flex-start; flex-direction:column; gap:4px; margin-top:10px;">
+        <label>Email</label>
+        <input type="email" id="reqLoginEmail" style="width:100%; box-sizing:border-box; text-align:left;" autocomplete="username">
+      </div>
+      <div class="field-row" style="align-items:flex-start; flex-direction:column; gap:4px; margin-top:10px;">
+        <label>Password <span style="font-size:10.5px; color:var(--slate);">At least 8 characters</span></label>
+        <input type="password" id="reqLoginPassword" style="width:100%; box-sizing:border-box; text-align:left;" autocomplete="new-password">
+      </div>
+      <div class="field-row" style="align-items:flex-start; flex-direction:column; gap:4px; margin-top:10px;">
+        <label>Confirm Password</label>
+        <input type="password" id="reqLoginPasswordConfirm" style="width:100%; box-sizing:border-box; text-align:left;" autocomplete="new-password" onkeydown="if(event.key==='Enter') attemptRequestLogin();">
+      </div>
+      <div id="reqLoginError" style="color:#B3261E; font-size:12px; margin-top:10px; min-height:14px;"></div>
+      <div id="reqLoginSuccess" style="color:var(--good); font-size:12px; margin-top:10px; display:none;">Request sent — you'll be able to log in once it's approved.</div>
+      <div style="margin-top:14px; display:flex; gap:8px; justify-content:flex-end;">
+        <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="closeRequestLoginModal()">Cancel</button>
+        <button class="export-btn" style="background:var(--navy); color:#fff;" onclick="attemptRequestLogin()">Send Request</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOP BAR -->
+  <div class="gt-header">
+    <div class="gt-header-left">
+      <a href="../">&larr; Back to Home</a>
+      <div class="gt-header-title">Greatness Tracker</div>
+    </div>
+    <div class="gt-header-right">
+      <span id="accountNote"></span>
+      <button class="export-btn" id="viewSavedBtn" onclick="openSavedModal()">Saved Weeks</button>
+      <button class="export-btn" onclick="saveWeek()">Save</button>
+      <button class="export-btn" onclick="exportPdf()">Export PDF</button>
+      <button class="export-btn" onclick="exportXlsx()">Export Excel</button>
+    </div>
+  </div>
+  <div id="gtSaveStatus" class="save-status"></div>
+
+  <div id="gtNotAuthorized" style="display:none; padding:48px 24px; text-align:center; color:var(--slate);">
+    This tool isn't enabled for your account. Contact Ann if you think that's wrong.
+  </div>
+
+  <div id="gtMain" style="display:none; flex:1; flex-direction:column;">
+    <div style="padding:10px 24px 0; font-size:11px; color:var(--slate);">Week of <b id="gtWeekOfLabel"></b></div>
+
+    <div style="overflow:auto; padding:10px 24px 0;">
+      <table class="gt-grid-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Mon</th><th>Tues</th><th>Wed</th><th>Thurs</th><th>Fri</th><th>Weekend</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody id="gtGridBody"></tbody>
+      </table>
+    </div>
+
+    <div style="padding:16px 24px 4px;">
+      <h4 style="color:var(--navy); margin:0 0 6px;">Theme Day Calls</h4>
+      <div id="gtThemeDayCalls"></div>
+    </div>
+
+    <div style="padding:14px 24px 8px; font-size:10.5px; color:var(--slate); line-height:1.5;">
+      Weekly metrics are subject to change, based on market trends. Please get in touch with The CORE and update your Greatness Tracker every 6 months.
+      <br>© 2001 Rick Ruby, The Core Training Inc., ALL RIGHTS RESERVED. Revised March 2025.
+    </div>
+
+    <!-- BOTTOM LOG BAR -->
+    <div class="gt-log-bar">
+      <input type="text" id="gtLogInput" placeholder="Type (or dictate with your phone keyboard's mic) an update — e.g. &quot;called 3 realtors and had lunch with a lead today&quot;" onkeydown="if(event.key==='Enter'){ handleLogSubmit(); }">
+      <button class="export-btn" onclick="handleLogSubmit()">Log it</button>
+      <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="openAskClaudeModal()">Ask Claude</button>
+    </div>
+    <div id="gtLogStatus" style="padding:0 24px 12px; font-size:11.5px; color:var(--good);"></div>
+  </div>
+
+  <!-- ASK CLAUDE MODAL -->
+  <div id="askClaudeModalOverlay" class="gt-modal-overlay">
+    <div class="gt-modal" style="max-width:640px;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3 style="margin:0; color:var(--navy);">Ask Claude</h3>
+        <button class="export-btn" style="padding:4px 8px; font-size:11px; background:var(--slate-light); color:var(--navy);" onclick="closeAskClaudeModal()">&times; Close</button>
+      </div>
+      <p style="font-size:12px; color:var(--slate); line-height:1.5;">Copy this prompt, click Open Claude, start any new chat, paste it in, and send. Then paste Claude's reply back below and click Apply.</p>
+      <textarea id="askClaudePromptBox" readonly style="width:100%; height:170px; box-sizing:border-box; font-family:monospace; font-size:11px; padding:8px; border:1px solid var(--line); border-radius:6px;"></textarea>
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button class="export-btn" onclick="copyClaudePrompt()">Copy Prompt</button>
+        <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="openClaudeSite()">Open Claude</button>
+      </div>
+      <div style="margin-top:14px;">
+        <label style="font-size:12px; color:var(--navy); font-weight:700;">Paste Claude's reply here</label>
+        <textarea id="askClaudeReply" style="width:100%; height:100px; box-sizing:border-box; font-family:monospace; font-size:11px; padding:8px; border:1px solid var(--line); border-radius:6px; margin-top:4px;"></textarea>
+      </div>
+      <div id="askClaudeStatus" style="font-size:12px; color:var(--slate); margin-top:8px; min-height:16px;"></div>
+      <div style="margin-top:8px; display:flex; justify-content:flex-end;">
+        <button class="export-btn" style="background:var(--navy); color:#fff;" onclick="applyClaudeReply()">Apply Reply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SAVED WEEKS MODAL -->
+  <div id="savedModalOverlay" class="gt-modal-overlay">
+    <div class="gt-modal">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3 style="margin:0; color:var(--navy);">Saved Weeks</h3>
+        <button class="export-btn" style="padding:4px 8px; font-size:11px; background:var(--slate-light); color:var(--navy);" onclick="closeSavedModal()">&times; Close</button>
+      </div>
+      <div id="savedListBody" style="margin-top:12px;"></div>
+    </div>
+  </div>
+
+  <!-- WEEK ROLLOVER MODAL -->
+  <div id="rolloverModalOverlay" class="gt-modal-overlay">
+    <div class="gt-modal" style="max-width:420px;">
+      <h3 style="margin-top:0; color:var(--navy);">New week started</h3>
+      <p style="font-size:12.5px; color:var(--slate); line-height:1.5;">Week of <span id="rolloverWeekLabel"></span> looked complete, so it was auto-saved and a fresh week has started. Want to export the finished week now?</p>
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:14px; flex-wrap:wrap;">
+        <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="closeWeekRolloverPrompt()">Not now</button>
+        <button class="export-btn" onclick="exportStaleWeek('pdf')">Export PDF</button>
+        <button class="export-btn" onclick="exportStaleWeek('xlsx')">Export Excel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===========================================================================
+// GT_API — mirrors PAG_API/CCE_API. Same API_BASE_URL, same localStorage
+// token key ('cce_session_token') so a login started in CCE or PAG carries
+// over automatically — all tools share one origin (GitHub Pages).
+// ===========================================================================
+const GT_API = (function(){
+  const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbzR3YEJAV08KsAnh7JbmC4Me-LaaR2Z9oK3_iX0t86qBpCgCkKGWyu5GxptKfOys_j6/exec';
+  const TOKEN_STORAGE_KEY = 'cce_session_token';
+
+  function getToken(){ return localStorage.getItem(TOKEN_STORAGE_KEY); }
+  function setToken(token){
+    if (token) localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    else localStorage.removeItem(TOKEN_STORAGE_KEY);
+  }
+
+  async function call(action, payload, opts){
+    opts = opts || {};
+    const body = { action: action, payload: payload || {}, token: opts.anonymous ? null : getToken() };
+    let res;
+    try {
+      res = await fetch(API_BASE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(body)
+      });
+    } catch (err) {
+      throw new Error('Could not reach the server. Check your connection and try again.');
+    }
+    let data;
+    try { data = await res.json(); } catch (err) { throw new Error('Unexpected response from the server.'); }
+    if (!data.ok) throw new Error(data.error || 'Request failed.');
+    return data;
+  }
+
+  return {
+    getToken: getToken,
+    isLoggedIn: function(){ return !!getToken(); },
+    logout: function(){ setToken(null); },
+
+    login: async function(email, password){
+      const data = await call('login', { email: email, password: password }, { anonymous: true });
+      setToken(data.token);
+      return data.account;
+    },
+    requestLogin: function(name, email, password){
+      return call('requestLogin', { name: name, email: email, password: password }, { anonymous: true }).then(() => true);
+    },
+    whoAmI: async function(){
+      const data = await call('whoAmI', {});
+      return data.account;
+    },
+
+    saveWeek: async function(payload){
+      const data = await call('saveGt', payload);
+      return { recordId: data.recordId, record: data.record };
+    },
+    listWeeks: async function(filters){
+      const data = await call('listGts', filters || {});
+      return data.records;
+    },
+    getWeek: async function(recordId){
+      return call('getGt', { recordId: recordId });
+    },
+    deleteWeek: async function(recordId){
+      const data = await call('deleteGt', { recordId: recordId });
+      return data.deleted;
+    },
+  };
+})();
+
+// ===========================================================================
+// LOGIN GATE — no guest mode: this tool is restricted to two accounts, so
+// there's nothing useful to show before login/authorization succeed.
+// ===========================================================================
+let currentAccount = null;
+
+async function initSession(){
+  if (!GT_API.isLoggedIn()){
+    showLoginGate();
+    return;
+  }
+  try {
+    currentAccount = await GT_API.whoAmI();
+    hideLoginGate();
+    await checkGtAuthorization();
+  } catch (err) {
+    GT_API.logout();
+    showLoginGate();
+  }
+}
+async function checkGtAuthorization(){
+  try {
+    await GT_API.listWeeks({});
+    document.getElementById('gtNotAuthorized').style.display = 'none';
+    document.getElementById('gtMain').style.display = 'flex';
+    const note = document.getElementById('accountNote');
+    if (note) note.innerHTML = 'Logged in as ' + currentAccount.Name + ' <a href="#" onclick="logoutAccount(); return false;">Logout</a>';
+    initWeek();
+  } catch (err) {
+    document.getElementById('gtMain').style.display = 'none';
+    document.getElementById('gtNotAuthorized').style.display = 'block';
+  }
+}
+function showLoginGate(){ document.getElementById('loginGateOverlay').style.display = 'flex'; }
+function hideLoginGate(){ document.getElementById('loginGateOverlay').style.display = 'none'; }
+function logoutAccount(){ GT_API.logout(); currentAccount = null; location.reload(); }
+async function attemptLogin(){
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  errEl.textContent = '';
+  if (!email || !password){ errEl.textContent = 'Enter your email and password.'; return; }
+  try {
+    currentAccount = await GT_API.login(email, password);
+    document.getElementById('loginPassword').value = '';
+    hideLoginGate();
+    await checkGtAuthorization();
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+}
+function openRequestLoginModal(){
+  ['reqLoginName','reqLoginEmail','reqLoginPassword','reqLoginPasswordConfirm'].forEach(id => { document.getElementById(id).value = ''; });
+  document.getElementById('reqLoginError').textContent = '';
+  document.getElementById('reqLoginSuccess').style.display = 'none';
+  document.getElementById('requestLoginModalOverlay').classList.add('open');
+}
+function closeRequestLoginModal(){ document.getElementById('requestLoginModalOverlay').classList.remove('open'); }
+async function attemptRequestLogin(){
+  const name = document.getElementById('reqLoginName').value.trim();
+  const email = document.getElementById('reqLoginEmail').value.trim();
+  const password = document.getElementById('reqLoginPassword').value;
+  const confirmPw = document.getElementById('reqLoginPasswordConfirm').value;
+  const errEl = document.getElementById('reqLoginError');
+  errEl.textContent = '';
+  if (!name || !email || !password){ errEl.textContent = 'Name, email, and password are all required.'; return; }
+  if (password.length < 8){ errEl.textContent = 'Password must be at least 8 characters.'; return; }
+  if (password !== confirmPw){ errEl.textContent = "Passwords don't match."; return; }
+  try {
+    await GT_API.requestLogin(name, email, password);
+    document.getElementById('reqLoginSuccess').style.display = 'block';
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+}
+
+// ===========================================================================
+// SECTION DATA MODEL — from Greatness Tracker_Lender.xlsx + the paper form.
+// mode 'counta' = each cell is one discrete interaction (total = # filled
+// cells, growth adds a row when a day's column runs out). mode 'sum' = a
+// day's cell is a running numeric total (new counts just add to it).
+// ===========================================================================
+const DAYS = ['Mon','Tues','Wed','Thurs','Fri','Weekend'];
+
+const SECTIONS = [
+  { id:'face_to_face', label:'Face to Face', sub:'REALTORS® & Leads — up to 2 people', mode:'counta', startRows:4, growable:true, target:'15' },
   { id:'break_bread', label:'Break Bread', sub:'', mode:'counta', startRows:1, growable:true, target:'4' },
   { id:'great_phone_calls', label:'Great Phone Calls', sub:'Leads / RLTRS® / Past Clients / Current Clients / VIPs / Whales — must ask for business or 1 referral', mode:'counta', startRows:13, growable:true, target:'75' },
   { id:'events', label:'Events', sub:'Attend or host, 3+ people', mode:'counta', startRows:1, growable:true, target:'2 per month' },
