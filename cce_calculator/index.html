@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -29,6 +30,44 @@
   .cce-scroll-area{
     flex:1 1 auto;
     overflow-y:auto;
+    min-width:0;
+  }
+  .cce-body-row{
+    display:flex;
+    flex-direction:row;
+    flex:1 1 auto;
+    min-height:0;
+  }
+  .cce-side-panel{
+    display:none;
+    width:280px;
+    flex:0 0 280px;
+    background:#fff;
+    overflow-y:auto;
+    padding:16px;
+  }
+  .cce-side-panel.open{ display:block; }
+  .cce-side-panel.cce-side-left{ border-right:1px solid var(--line); }
+  .cce-side-panel.cce-side-right{ border-left:1px solid var(--line); }
+  .cce-side-panel h3{ margin:0; color:var(--navy); font-size:15px; }
+  .cce-side-placeholder{ font-size:12.5px; color:var(--slate); line-height:1.6; margin-top:12px; }
+  .cce-side-backdrop{ display:none; }
+  @media (max-width: 880px){
+    .cce-side-panel.open{
+      position:fixed;
+      top:0; bottom:0;
+      width:86vw;
+      max-width:340px;
+      z-index:1500;
+    }
+    .cce-side-panel.cce-side-left.open{ left:0; right:auto; box-shadow:6px 0 24px rgba(16,27,51,0.18); }
+    .cce-side-panel.cce-side-right.open{ right:0; left:auto; box-shadow:-6px 0 24px rgba(16,27,51,0.18); }
+    .cce-side-backdrop.open{
+      display:block;
+      position:fixed; inset:0;
+      background:rgba(16,27,51,0.45);
+      z-index:1400;
+    }
   }
   .cce-header{
     background:linear-gradient(135deg,var(--navy) 0%, var(--navy-deep) 100%);
@@ -442,6 +481,33 @@
     </div>
   </div>
 
+  <div class="cce-body-row">
+  <div id="leftPanel" class="cce-side-panel cce-side-left">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h3>Saved Clients</h3>
+      <button class="export-btn" style="padding:4px 8px; font-size:11px; background:var(--slate-light); color:var(--navy);" onclick="toggleSidePanel('left')">&times; Close</button>
+    </div>
+
+    <div style="display:flex; gap:6px; margin-top:12px;">
+      <button id="clientTab_list" class="export-btn" style="flex:1; padding:6px; font-size:11px;" onclick="switchClientTab('list')">List</button>
+      <button id="clientTab_detail" class="export-btn" style="flex:1; padding:6px; font-size:11px; background:var(--slate-light); color:var(--navy);" onclick="switchClientTab('detail')">Detailed</button>
+      <button id="clientTab_pdf" class="export-btn" style="flex:1; padding:6px; font-size:11px; background:var(--slate-light); color:var(--navy);" onclick="switchClientTab('pdf')">PDF</button>
+    </div>
+
+    <div id="clientView_list">
+      <div style="margin-top:12px; display:flex; flex-direction:column; gap:6px;">
+        <input type="text" id="clientFilterProcessor" placeholder="Filter by processor" oninput="loadClientList()" style="width:100%; box-sizing:border-box; padding:6px 8px; font-size:12px; border:1px solid var(--line); border-radius:5px;">
+        <div style="display:flex; gap:6px;">
+          <input type="date" id="clientFilterDateFrom" onchange="loadClientList()" style="flex:1; padding:6px; font-size:12px; border:1px solid var(--line); border-radius:5px;" title="Created from">
+          <input type="date" id="clientFilterDateTo" onchange="loadClientList()" style="flex:1; padding:6px; font-size:12px; border:1px solid var(--line); border-radius:5px;" title="Created to">
+        </div>
+      </div>
+      <div id="clientListBody" style="margin-top:12px; font-size:12.5px;"></div>
+    </div>
+
+    <div id="clientView_detail" style="display:none; margin-top:12px; font-size:12.5px;"></div>
+    <div id="clientView_pdf" style="display:none; margin-top:12px;"></div>
+  </div>
   <div class="cce-scroll-area">
   <div class="cce-home">
     <div class="panel">
@@ -460,14 +526,71 @@
   </div>
 
   <div class="cce-toolbar">
+    <button id="savedClientsToggleBtn" class="export-btn" onclick="toggleSidePanel('left')">&#9776; Saved Clients</button>
     <button id="addLoanEstimateBtn" class="export-btn" onclick="openLoanTypeModal()">+ Add Loan Estimate</button>
     <button class="export-btn" onclick="openExportSelectModal('pdf')"><svg class="dl-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v11m0 0l-4.5-4.5M12 14l4.5-4.5M5 19h14" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>PDF</button>
     <button class="export-btn" onclick="openExportSelectModal('docx')"><svg class="dl-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v11m0 0l-4.5-4.5M12 14l4.5-4.5M5 19h14" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>DOCX</button>
     <button class="export-btn" onclick="openExportSelectModal('xlsx')"><svg class="dl-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v11m0 0l-4.5-4.5M12 14l4.5-4.5M5 19h14" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>XLSX</button>
+    <button id="saveThisClientBtn" class="export-btn" style="background:var(--navy); color:#fff;" onclick="saveThisClient()">Save This Client</button>
+    <button id="deleteThisClientBtn" class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="openDeleteClientModal()">Delete This Client</button>
+    <button id="accountToggleBtn" class="export-btn" style="margin-left:auto;" onclick="toggleSidePanel('right')">&#128100; Account</button>
   </div>
+  <div id="saveClientStatus" style="display:none; padding:8px 28px; font-size:12px;"></div>
 
   <div id="loanBlocksContainer"></div>
   </div>
+  <div id="rightPanel" class="cce-side-panel cce-side-right">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h3>Account</h3>
+      <button class="export-btn" style="padding:4px 8px; font-size:11px; background:var(--slate-light); color:var(--navy);" onclick="toggleSidePanel('right')">&times; Close</button>
+    </div>
+
+    <div style="text-align:center; margin-top:14px;">
+      <img id="accountPhotoPreview" src="" style="display:none; width:72px; height:72px; border-radius:50%; object-fit:cover; border:1px solid var(--line);">
+      <div id="accountPhotoPlaceholder" style="width:72px; height:72px; border-radius:50%; background:var(--slate-light); color:var(--slate); display:flex; align-items:center; justify-content:center; font-size:26px; margin:0 auto;">&#128100;</div>
+      <div style="margin-top:6px;">
+        <input type="file" id="accountPhotoInput" accept="image/*" style="display:none;" onchange="handleAccountPhotoChange(event)">
+        <a href="#" onclick="document.getElementById('accountPhotoInput').click(); return false;" style="color:#8A6A1F; font-size:11px;">Change photo</a>
+      </div>
+    </div>
+
+    <div class="field-row" style="align-items:flex-start; flex-direction:column; gap:4px; margin-top:14px;">
+      <label>Name</label>
+      <input type="text" id="accountName" style="width:100%; box-sizing:border-box;">
+    </div>
+    <div class="field-row" style="align-items:flex-start; flex-direction:column; gap:4px; margin-top:10px;">
+      <label>Email <span class="hint">Can't be changed here</span></label>
+      <input type="email" id="accountEmail" disabled style="width:100%; box-sizing:border-box; background:var(--slate-light);">
+    </div>
+    <div class="field-row" style="align-items:flex-start; flex-direction:column; gap:4px; margin-top:10px;">
+      <label>Phone <span class="hint">Optional</span></label>
+      <input type="text" id="accountPhone" style="width:100%; box-sizing:border-box;">
+    </div>
+    <div id="accountProfileError" style="color:#B3261E; font-size:12px; margin-top:8px; min-height:14px;"></div>
+    <div id="accountProfileSuccess" style="color:var(--good); font-size:12px; margin-top:4px; display:none;">Profile saved.</div>
+    <button class="export-btn" style="width:100%; margin-top:8px; background:var(--navy); color:#fff;" onclick="saveAccountProfile()">Save Profile</button>
+
+    <div style="border-top:1px solid var(--line); margin-top:18px; padding-top:14px;">
+      <h3 style="font-size:13px;">Change Password</h3>
+      <div class="field-row" style="align-items:flex-start; flex-direction:column; gap:4px;">
+        <label>Current Password <span class="hint">Yours, or the admin password</span></label>
+        <input type="password" id="accountCurrentPassword" style="width:100%; box-sizing:border-box;" autocomplete="current-password">
+      </div>
+      <div class="field-row" style="align-items:flex-start; flex-direction:column; gap:4px; margin-top:10px;">
+        <label>New Password <span class="hint">At least 8 characters</span></label>
+        <input type="password" id="accountNewPassword" style="width:100%; box-sizing:border-box;" autocomplete="new-password">
+      </div>
+      <div class="field-row" style="align-items:flex-start; flex-direction:column; gap:4px; margin-top:10px;">
+        <label>Confirm New Password</label>
+        <input type="password" id="accountConfirmPassword" style="width:100%; box-sizing:border-box;" autocomplete="new-password">
+      </div>
+      <div id="accountPasswordError" style="color:#B3261E; font-size:12px; margin-top:8px; min-height:14px;"></div>
+      <div id="accountPasswordSuccess" style="color:var(--good); font-size:12px; margin-top:4px; display:none;">Password changed.</div>
+      <button class="export-btn" style="width:100%; margin-top:8px; background:var(--navy); color:#fff;" onclick="changeAccountPassword()">Change Password</button>
+    </div>
+  </div>
+  </div>
+  <div id="sidePanelBackdrop" class="cce-side-backdrop" onclick="closeSidePanels()"></div>
 
 
       <!-- UPDATE INFORMATION MODAL -->
@@ -476,10 +599,15 @@
 
           <div id="update_step_password">
             <h3 style="margin-top:0; color:var(--navy);">Update Title &amp; Government Fee Information</h3>
-            <p style="font-size:13px; color:var(--slate); line-height:1.5;">This updates the shared rate table that every loan estimate on this tool reads from. It's not a login or account access of any kind — just a confirmation before changing numbers everyone relies on.</p>
-            <div style="margin-top:16px; display:flex; gap:8px; justify-content:flex-end;">
+            <p style="font-size:13px; color:var(--slate); line-height:1.5;">This updates the shared rate table that every loan estimate on this tool reads from — enter the admin password to continue.</p>
+            <div class="field-row" style="align-items:flex-start; flex-direction:column; gap:4px;">
+              <label>Admin Password</label>
+              <input type="password" id="updateAdminPassword" style="width:100%; box-sizing:border-box;" autocomplete="off" onkeydown="if(event.key==='Enter') verifyUpdatePassword();">
+            </div>
+            <div id="updateAdminPasswordError" style="color:#B3261E; font-size:12px; margin-top:6px; min-height:14px;"></div>
+            <div style="margin-top:10px; display:flex; gap:8px; justify-content:flex-end;">
               <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="closeUpdateModal()">Cancel</button>
-              <button class="export-btn" onclick="confirmUpdateModal()">Continue</button>
+              <button class="export-btn" onclick="verifyUpdatePassword()">Continue</button>
             </div>
           </div>
 
@@ -599,6 +727,38 @@
         </div>
       </div>
 
+      <!-- DELETE THIS CLIENT MODAL -->
+      <div id="deleteClientModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+        <div style="background:#fff; border-radius:10px; max-width:420px; width:100%; padding:24px; font-family:Calibri, Arial, sans-serif;">
+          <h3 style="margin-top:0; color:var(--navy);">Delete This Client</h3>
+          <p style="font-size:13px; color:var(--slate); line-height:1.5;">Permanently deleting removes this client from everyone's saved clients — this can't be undone. If you're not done yet, save it as a draft instead so it's not lost.</p>
+          <div id="deleteClientError" style="color:#B3261E; font-size:12px; margin-top:6px; min-height:14px;"></div>
+          <div style="margin-top:14px; display:flex; flex-direction:column; gap:8px;">
+            <button class="export-btn" style="padding:12px; background:var(--navy); color:#fff;" onclick="saveThisClientAsDraft()">Save as Draft</button>
+            <button class="export-btn" style="padding:12px; background:#B3261E; color:#fff;" onclick="confirmPermanentDelete()">Permanently Delete</button>
+          </div>
+          <div style="margin-top:14px; text-align:right;">
+            <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="closeDeleteClientModal()">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- LOAD INTO CALCULATOR CONFIRM MODAL -->
+      <div id="loadConfirmModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+        <div style="background:#fff; border-radius:10px; max-width:420px; width:100%; padding:24px; font-family:Calibri, Arial, sans-serif;">
+          <h3 style="margin-top:0; color:var(--navy);">Replace Current Page</h3>
+          <p style="font-size:13px; color:var(--slate); line-height:1.5;">Loading this client will replace everything currently on this page — this can't be undone. If you're not done with what's here, save it as a draft first so it's not lost.</p>
+          <div id="loadConfirmError" style="color:#B3261E; font-size:12px; margin-top:6px; min-height:14px;"></div>
+          <div style="margin-top:14px; display:flex; flex-direction:column; gap:8px;">
+            <button class="export-btn" style="padding:12px; background:var(--navy); color:#fff;" onclick="saveDraftThenLoad()">Save as Draft, Then Load</button>
+            <button class="export-btn" style="padding:12px; background:#B3261E; color:#fff;" onclick="discardAndLoad()">Discard and Load</button>
+          </div>
+          <div style="margin-top:14px; text-align:right;">
+            <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="closeLoadConfirmModal()">Cancel</button>
+          </div>
+        </div>
+      </div>
+
       <!-- EXPORT: SELECT WHICH LOANS MODAL -->
       <div id="exportSelectModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
         <div style="background:#fff; border-radius:10px; max-width:440px; width:100%; padding:24px; font-family:Calibri, Arial, sans-serif;">
@@ -623,6 +783,7 @@
           <div style="padding:14px 20px; border-top:1px solid var(--line); display:flex; gap:8px; justify-content:flex-end; align-items:center; flex-wrap:wrap;">
             <div id="exportPreviewNote" style="flex:1; font-size:11px; color:var(--slate); min-width:200px;"></div>
             <button class="export-btn" id="exportPreviewPrintBtn" style="background:var(--slate-light); color:var(--navy);" onclick="printExportPreview()">Print</button>
+            <button class="export-btn" id="exportPreviewWhatsAppBtn" style="background:var(--slate-light); color:var(--navy);" onclick="whatsappExportPreview()">WhatsApp</button>
             <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="emailExportPreview()">Email</button>
             <button class="export-btn" style="background:var(--navy); color:#fff;" onclick="saveExportPreview()">Save</button>
           </div>
@@ -643,7 +804,7 @@
             <button class="export-btn" onclick="saveDiscrepancyPdf()">Save PDF</button>
             <button class="export-btn" style="background:var(--navy); color:#fff;" onclick="emailDiscrepancy()">Email Developer</button>
           </div>
-          <div style="margin-top:8px; font-size:10.5px; color:var(--slate);">Email opens your device's default mail app, addressed to marketingfmhomeloans@gmail.com. No default mail app set up? <a href="#" onclick="emailDiscrepancyViaGmail(); return false;" style="color:#8A6A1F;">Use Gmail instead</a>.</div>
+          <div style="margin-top:8px; font-size:10.5px; color:var(--slate);">Email Developer sends the report directly to marketingfmhomeloans@gmail.com — no mail app needed. If that fails, it opens your device's default mail app instead. No default mail app set up? <a href="#" onclick="emailDiscrepancyViaGmail(); return false;" style="color:#8A6A1F;">Use Gmail instead</a>.</div>
         </div>
       </div>
 
@@ -669,6 +830,65 @@
       </div>
       </div>
       <div id="legalBottomSentinel" style="height:1px;"></div>
+  </div>
+</div>
+
+<!-- LOGIN GATE — visible by default (safe default: locked), hidden by JS
+     only after a valid session is confirmed. Highest z-index, no close
+     button, not dismissible by clicking outside. -->
+<div id="loginGateOverlay" style="display:flex; position:fixed; inset:0; background:var(--paper); z-index:2000; align-items:center; justify-content:center; padding:20px;">
+  <div style="background:#fff; border:1px solid var(--line); border-radius:10px; max-width:400px; width:100%; padding:28px; font-family:Calibri, Arial, sans-serif; box-shadow:0 6px 24px rgba(16,27,51,0.12);">
+    <h3 style="margin-top:0; color:var(--navy);">Closing Cost Estimate</h3>
+    <div class="dev-banner-inline">Internal tool for FM Home Loans loan officers. Not a public FM Home Loans website or login.</div>
+
+    <div class="field-row" style="align-items:flex-start; flex-direction:column; gap:4px;">
+      <label>Email</label>
+      <input type="email" id="loginEmail" style="width:100%; box-sizing:border-box;" autocomplete="username">
+    </div>
+    <div class="field-row" style="align-items:flex-start; flex-direction:column; gap:4px; margin-top:10px;">
+      <label>Password</label>
+      <input type="password" id="loginPassword" style="width:100%; box-sizing:border-box;" autocomplete="current-password" onkeydown="if(event.key==='Enter') attemptLogin();">
+    </div>
+    <div id="loginError" style="color:#B3261E; font-size:12px; margin-top:10px; min-height:14px;"></div>
+    <button class="export-btn" style="width:100%; margin-top:14px; background:var(--navy); color:#fff; padding:11px;" onclick="attemptLogin()">Login</button>
+    <div style="text-align:center; margin-top:12px;">
+      <a href="#" onclick="openRequestLoginModal(); return false;" style="color:#8A6A1F; font-size:12px;">Request Login</a>
+    </div>
+    <div style="text-align:center; margin-top:10px; padding-top:10px; border-top:1px solid var(--line);">
+      <a href="#" onclick="continueAsGuest(); return false;" style="color:var(--slate); font-size:12px;">Continue without logging in</a>
+      <div style="color:var(--slate); font-size:10.5px; margin-top:4px;">You can still use the calculator and export files — saving clients to the cloud requires logging in.</div>
+    </div>
+  </div>
+</div>
+
+<!-- REQUEST LOGIN MODAL -->
+<div id="requestLoginModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:2001; align-items:center; justify-content:center; padding:20px;">
+  <div style="background:#fff; border-radius:10px; max-width:420px; width:100%; padding:24px; font-family:Calibri, Arial, sans-serif;">
+    <h3 style="margin-top:0; color:var(--navy);">Request Login</h3>
+    <p style="font-size:12.5px; color:var(--slate); line-height:1.5;">Choose your name, email, and a password. This sends a request for approval — you won't be able to log in until it's approved.</p>
+
+    <div class="field-row" style="align-items:flex-start; flex-direction:column; gap:4px;">
+      <label>Name</label>
+      <input type="text" id="reqLoginName" style="width:100%; box-sizing:border-box;">
+    </div>
+    <div class="field-row" style="align-items:flex-start; flex-direction:column; gap:4px; margin-top:10px;">
+      <label>Email</label>
+      <input type="email" id="reqLoginEmail" style="width:100%; box-sizing:border-box;" autocomplete="username">
+    </div>
+    <div class="field-row" style="align-items:flex-start; flex-direction:column; gap:4px; margin-top:10px;">
+      <label>Password <span class="hint">At least 8 characters</span></label>
+      <input type="password" id="reqLoginPassword" style="width:100%; box-sizing:border-box;" autocomplete="new-password">
+    </div>
+    <div class="field-row" style="align-items:flex-start; flex-direction:column; gap:4px; margin-top:10px;">
+      <label>Confirm Password</label>
+      <input type="password" id="reqLoginPasswordConfirm" style="width:100%; box-sizing:border-box;" autocomplete="new-password" onkeydown="if(event.key==='Enter') attemptRequestLogin();">
+    </div>
+    <div id="reqLoginError" style="color:#B3261E; font-size:12px; margin-top:10px; min-height:14px;"></div>
+    <div id="reqLoginSuccess" style="color:var(--good); font-size:12px; margin-top:10px; display:none;">Request sent — you'll be able to log in once it's approved.</div>
+    <div style="margin-top:14px; display:flex; gap:8px; justify-content:flex-end;">
+      <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="closeRequestLoginModal()">Cancel</button>
+      <button class="export-btn" style="background:var(--navy); color:#fff;" onclick="attemptRequestLogin()">Send Request</button>
+    </div>
   </div>
 </div>
 
@@ -965,6 +1185,519 @@
 </template>
 
 <script>
+// ===========================================================================
+// CCE_API — the only thing in this file that talks to the backend. Every
+// method takes/returns plain objects, never Sheet-shaped data, so a future
+// move off Google Apps Script onto a real website/database only touches
+// this object's internals, not any of the calling UI code below.
+// ===========================================================================
+const CCE_API = (function(){
+  const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbzR3YEJAV08KsAnh7JbmC4Me-LaaR2Z9oK3_iX0t86qBpCgCkKGWyu5GxptKfOys_j6/exec';
+  const TOKEN_STORAGE_KEY = 'cce_session_token';
+
+  function getToken(){ return localStorage.getItem(TOKEN_STORAGE_KEY); }
+  function setToken(token){
+    if (token) localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    else localStorage.removeItem(TOKEN_STORAGE_KEY);
+  }
+
+  // POST + text/plain body is deliberate — a custom Content-Type (e.g.
+  // application/json) triggers a CORS preflight that Google Apps Script web
+  // apps don't handle cleanly. text/plain keeps every call a CORS "simple
+  // request", so no OPTIONS round-trip ever happens.
+  async function call(action, payload, opts){
+    opts = opts || {};
+    const body = { action: action, payload: payload || {}, token: opts.anonymous ? null : getToken() };
+    let res;
+    try {
+      res = await fetch(API_BASE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(body)
+      });
+    } catch (err) {
+      throw new Error('Could not reach the server. Check your connection and try again.');
+    }
+    let data;
+    try {
+      data = await res.json();
+    } catch (err) {
+      throw new Error('Unexpected response from the server.');
+    }
+    if (!data.ok) throw new Error(data.error || 'Request failed.');
+    return data;
+  }
+
+  return {
+    getToken: getToken,
+    isLoggedIn: function(){ return !!getToken(); },
+    logout: function(){ setToken(null); },
+
+    ping: function(){ return call('ping', {}, { anonymous: true }); },
+
+    login: async function(email, password){
+      const data = await call('login', { email: email, password: password }, { anonymous: true });
+      setToken(data.token);
+      return data.account;
+    },
+    requestLogin: function(name, email, password){
+      return call('requestLogin', { name: name, email: email, password: password }, { anonymous: true }).then(() => true);
+    },
+    whoAmI: async function(){
+      const data = await call('whoAmI', {});
+      return data.account;
+    },
+
+    saveClient: async function(payload){
+      const data = await call('saveClient', payload);
+      return { recordId: data.recordId, record: data.record };
+    },
+    listClients: async function(filters){
+      const data = await call('listClients', filters || {});
+      return data.records;
+    },
+    getClient: async function(recordId){
+      return call('getClient', { recordId: recordId });
+    },
+    deleteClient: async function(recordId){
+      const data = await call('deleteClient', { recordId: recordId });
+      return data.deleted;
+    },
+
+    getAccount: async function(){
+      const data = await call('getAccount', {});
+      return data.account;
+    },
+    updateProfile: async function(payload){
+      const data = await call('updateProfile', payload);
+      return data.account;
+    },
+    setPassword: async function(payload){
+      const data = await call('setPassword', payload);
+      return data.changed;
+    },
+
+    // Standalone admin-password check — deliberately anonymous (no session
+    // token). Update Information is gated by the shared admin password, not
+    // by being logged into a specific account, so this works in guest mode
+    // too.
+    adminVerify: async function(password){
+      const data = await call('adminVerify', { password: password }, { anonymous: true });
+      return data.verified;
+    },
+    sendDiscrepancyEmail: async function(subject, body){
+      const data = await call('sendDiscrepancyEmail', { subject: subject, body: body }, { anonymous: true });
+      return data.sent;
+    },
+  };
+})();
+
+// ===========================================================================
+// LOGIN GATE — shown by default (safe default: locked). On page load we
+// check for a locally-stored token and, if present, ask the backend to
+// confirm it's still valid via whoAmI before unlocking the page — the token
+// itself is never trusted client-side, only what the server says about it.
+// ===========================================================================
+let currentAccount = null;
+
+// Guest mode: the tool works fully without an account (calculator + PDF/
+// DOCX/XLSX export + Update Information), just with nothing cloud-saved and
+// no visibility into what anyone else has saved — so the Saved Clients
+// panel, the Account panel, and Save/Delete never appear in this mode.
+let guestMode = false;
+
+async function initSession(){
+  if (!CCE_API.isLoggedIn()){
+    showLoginGate();
+    return;
+  }
+  try {
+    currentAccount = await CCE_API.whoAmI();
+    guestMode = false;
+    applyGuestModeUI();
+    autoPopulateProcessorName();
+    hideLoginGate();
+  } catch (err) {
+    CCE_API.logout();
+    showLoginGate();
+  }
+}
+
+function showLoginGate(){
+  document.getElementById('loginGateOverlay').style.display = 'flex';
+}
+function hideLoginGate(){
+  document.getElementById('loginGateOverlay').style.display = 'none';
+}
+
+function continueAsGuest(){
+  guestMode = true;
+  applyGuestModeUI();
+  hideLoginGate();
+}
+
+function applyGuestModeUI(){
+  ['savedClientsToggleBtn', 'accountToggleBtn', 'saveThisClientBtn', 'deleteThisClientBtn'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = guestMode ? 'none' : '';
+  });
+}
+
+// Only fills the field if it's currently empty — a genuine "auto-populate
+// on login" convenience, not something that should clobber a value someone
+// already typed (e.g. filling in on behalf of a colleague).
+function autoPopulateProcessorName(){
+  const field = document.getElementById('processorName');
+  if (currentAccount && currentAccount.Name && !field.value.trim()) field.value = currentAccount.Name;
+}
+
+async function attemptLogin(){
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  errEl.textContent = '';
+  if (!email || !password){ errEl.textContent = 'Enter your email and password.'; return; }
+  try {
+    currentAccount = await CCE_API.login(email, password);
+    guestMode = false;
+    applyGuestModeUI();
+    autoPopulateProcessorName();
+    document.getElementById('loginPassword').value = '';
+    hideLoginGate();
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+}
+
+function openRequestLoginModal(){
+  ['reqLoginName','reqLoginEmail','reqLoginPassword','reqLoginPasswordConfirm'].forEach(id => { document.getElementById(id).value = ''; });
+  document.getElementById('reqLoginError').textContent = '';
+  document.getElementById('reqLoginSuccess').style.display = 'none';
+  document.getElementById('requestLoginModalOverlay').style.display = 'flex';
+}
+function closeRequestLoginModal(){
+  document.getElementById('requestLoginModalOverlay').style.display = 'none';
+}
+async function attemptRequestLogin(){
+  const name = document.getElementById('reqLoginName').value.trim();
+  const email = document.getElementById('reqLoginEmail').value.trim();
+  const password = document.getElementById('reqLoginPassword').value;
+  const confirm = document.getElementById('reqLoginPasswordConfirm').value;
+  const errEl = document.getElementById('reqLoginError');
+  errEl.textContent = '';
+
+  if (!name || !email || !password){ errEl.textContent = 'Name, email, and password are all required.'; return; }
+  if (password.length < 8){ errEl.textContent = 'Password must be at least 8 characters.'; return; }
+  if (password !== confirm){ errEl.textContent = 'Passwords don\'t match.'; return; }
+
+  try {
+    await CCE_API.requestLogin(name, email, password);
+    document.getElementById('reqLoginSuccess').style.display = 'block';
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+}
+
+// ===========================================================================
+// SIDE PANELS — left (Saved Clients) and right (Account) are independently
+// toggleable. Below the 880px breakpoint they switch from in-flow columns to
+// full-height overlays (see CSS) with a shared backdrop; closing the backdrop
+// closes both regardless of viewport, which is harmless on desktop since the
+// backdrop is invisible there.
+// ===========================================================================
+function toggleSidePanel(which){
+  if (guestMode) return; // no toggle buttons in guest mode, but defend against any other caller
+  const panel = document.getElementById(which === 'left' ? 'leftPanel' : 'rightPanel');
+  const other = document.getElementById(which === 'left' ? 'rightPanel' : 'leftPanel');
+  const opening = !panel.classList.contains('open');
+  // Below the overlay breakpoint, two full-height overlays stacked on top of
+  // each other is just broken — keep it to one at a time there. Side by side
+  // on desktop is fine, so this only applies under 880px.
+  if (opening && window.matchMedia('(max-width: 880px)').matches){
+    other.classList.remove('open');
+  }
+  panel.classList.toggle('open');
+  updateSidePanelBackdrop();
+  // Always reopen fresh on the List tab — otherwise a previous session's
+  // Detailed/PDF view (with now-stale cached data) would still be showing.
+  if (which === 'left' && panel.classList.contains('open')){ switchClientTab('list'); loadClientList(); }
+  if (which === 'right' && panel.classList.contains('open')) loadAccountPanel();
+}
+function closeSidePanels(){
+  document.getElementById('leftPanel').classList.remove('open');
+  document.getElementById('rightPanel').classList.remove('open');
+  updateSidePanelBackdrop();
+}
+function updateSidePanelBackdrop(){
+  const anyOpen = document.getElementById('leftPanel').classList.contains('open') || document.getElementById('rightPanel').classList.contains('open');
+  document.getElementById('sidePanelBackdrop').classList.toggle('open', anyOpen);
+}
+
+// ===========================================================================
+// SAVED CLIENTS PANEL — List / Detailed / PDF sub-views. selectedClient
+// holds the full getClient() result for whichever record was last opened
+// from the list; Detailed/PDF read from it rather than re-fetching.
+// ===========================================================================
+let selectedClient = null;
+let _clientPdfUrl = null;
+
+function switchClientTab(tab){
+  ['list','detail','pdf'].forEach(t => {
+    document.getElementById('clientView_'+t).style.display = (t === tab) ? 'block' : 'none';
+    const btn = document.getElementById('clientTab_'+t);
+    if (t === tab){ btn.style.background = 'var(--gold)'; btn.style.color = 'var(--navy-deep)'; }
+    else { btn.style.background = 'var(--slate-light)'; btn.style.color = 'var(--navy)'; }
+  });
+}
+
+async function loadClientList(){
+  const bodyEl = document.getElementById('clientListBody');
+  bodyEl.innerHTML = '<div style="color:var(--slate);">Loading…</div>';
+  try {
+    const records = await CCE_API.listClients({
+      processor: document.getElementById('clientFilterProcessor').value,
+      dateFrom: document.getElementById('clientFilterDateFrom').value,
+      dateTo: document.getElementById('clientFilterDateTo').value,
+    });
+    renderClientList(records);
+  } catch (err) {
+    bodyEl.innerHTML = '<div style="color:#B3261E;">'+xmlEsc(err.message)+'</div>';
+  }
+}
+
+function renderClientList(records){
+  const bodyEl = document.getElementById('clientListBody');
+  if (!records.length){
+    bodyEl.innerHTML = '<div style="color:var(--slate);">No saved clients match.</div>';
+    return;
+  }
+  bodyEl.innerHTML = records.map(r => {
+    const draftBadge = r.Status === 'draft' ? '<span style="color:#B3261E; font-weight:700; font-size:10.5px; margin-left:6px;">DRAFT</span>' : '';
+    const dateLabel = r.CreatedAt ? new Date(r.CreatedAt).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }) : '';
+    return '<div onclick="selectClient(\''+r.RecordID+'\')" style="cursor:pointer; padding:8px 6px; border-bottom:1px solid var(--line);">'
+      + '<div style="font-weight:700; color:var(--navy);">'+xmlEsc(r.ClientName)+draftBadge+'</div>'
+      + '<div style="color:var(--slate); font-size:11px;">'+xmlEsc(r.ProcessorNameSnapshot||'')+' &middot; '+dateLabel+'</div>'
+      + '</div>';
+  }).join('');
+}
+
+async function selectClient(recordId){
+  const bodyEl = document.getElementById('clientListBody');
+  try {
+    selectedClient = await CCE_API.getClient(recordId);
+    renderClientDetail();
+    renderClientPdf();
+    switchClientTab('detail');
+  } catch (err) {
+    bodyEl.innerHTML = '<div style="color:#B3261E;">'+xmlEsc(err.message)+'</div>';
+  }
+}
+
+function renderClientDetail(){
+  const el = document.getElementById('clientView_detail');
+  if (!selectedClient){
+    el.innerHTML = '<div style="color:var(--slate);">Select a client from the List tab.</div>';
+    return;
+  }
+  const r = selectedClient.record;
+  const draftBanner = r.Status === 'draft'
+    ? '<div style="background:#FBE9E7; border:1px solid #F0C4BE; color:#B3261E; font-weight:700; font-size:11px; padding:5px 8px; border-radius:5px; margin-bottom:10px;">DRAFT — not yet finalized</div>'
+    : '';
+  const dateLabel = r.CreatedAt ? new Date(r.CreatedAt).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }) : '';
+  const blocksHtml = (selectedClient.loanBlocks||[]).map(b => {
+    const price = (b.fields && b.fields.price) ? fmt(parseFloat(String(b.fields.price).replace(/[^0-9.\-]/g,''))||0) : '';
+    return '<div style="padding:4px 0; border-bottom:1px dashed var(--line);">'+xmlEsc(b.loanType||'Loan')+' — '+price+'</div>';
+  }).join('');
+
+  el.innerHTML = draftBanner
+    + '<div style="font-weight:700; color:var(--navy); font-size:14px;">'+xmlEsc(r.ClientName)+'</div>'
+    + '<div style="color:var(--slate); font-size:11px; margin-bottom:10px;">Processor: '+xmlEsc(r.ProcessorNameSnapshot||'')+' &middot; Saved '+dateLabel+'</div>'
+    + blocksHtml
+    + '<button class="export-btn" style="width:100%; margin-top:12px; background:var(--navy); color:#fff;" onclick="loadSelectedIntoCalculator()">Load into calculator</button>'
+    + '<div style="margin-top:8px;"><a href="#" onclick="switchClientTab(\'list\'); return false;" style="color:#8A6A1F; font-size:11px;">&larr; Back to list</a></div>';
+}
+
+function renderClientPdf(){
+  const el = document.getElementById('clientView_pdf');
+  if (_clientPdfUrl){ URL.revokeObjectURL(_clientPdfUrl); _clientPdfUrl = null; }
+  if (!selectedClient || !selectedClient.pdfBase64){
+    el.innerHTML = '<div style="color:var(--slate);">'+(selectedClient ? 'No PDF saved for this record.' : 'Select a client from the List tab.')+'</div>';
+    return;
+  }
+  const bytes = Uint8Array.from(atob(selectedClient.pdfBase64), c => c.charCodeAt(0));
+  const blob = new Blob([bytes], { type:'application/pdf' });
+  _clientPdfUrl = URL.createObjectURL(blob);
+  el.innerHTML = '<iframe src="'+_clientPdfUrl+'" style="width:100%; height:70vh; border:1px solid var(--line); border-radius:6px;"></iframe>';
+}
+
+// Loading a record replaces the ENTIRE current page — treated the same as
+// "Delete This Client" on whatever's currently here, with the same
+// save-as-draft escape hatch, before the replace happens. If the page is
+// already empty there's nothing to protect, so it loads immediately.
+let _pendingLoadRecord = null;
+
+function loadSelectedIntoCalculator(){
+  if (!selectedClient) return;
+  if (getAllLoanBlocks().length){
+    _pendingLoadRecord = selectedClient;
+    document.getElementById('loadConfirmError').textContent = '';
+    document.getElementById('loadConfirmModalOverlay').style.display = 'flex';
+  } else {
+    applyLoadRecord(selectedClient);
+  }
+}
+
+function applyLoadRecord(record){
+  loadPageFromData({ dealSetup: record.dealSetup, loanBlocks: record.loanBlocks });
+  currentRecordId = record.record.RecordID;
+  closeSidePanels();
+}
+
+function closeLoadConfirmModal(){
+  document.getElementById('loadConfirmModalOverlay').style.display = 'none';
+  _pendingLoadRecord = null;
+}
+
+// Discards whatever's unsaved on the current page (does NOT touch this
+// page's own backend record, if it has one — just like closing a document
+// without saving) and loads the new one.
+function discardAndLoad(){
+  const record = _pendingLoadRecord;
+  document.getElementById('loadConfirmModalOverlay').style.display = 'none';
+  _pendingLoadRecord = null;
+  if (record) applyLoadRecord(record);
+}
+
+async function saveDraftThenLoad(){
+  const errEl = document.getElementById('loadConfirmError');
+  if (!document.getElementById('borrowerName').value.trim()){
+    errEl.textContent = 'Enter a Name of Borrower / Client before saving as a draft.';
+    return;
+  }
+  const savedRecordId = await saveThisClient('draft');
+  if (!savedRecordId){
+    errEl.textContent = 'Could not save as draft — see the message behind this dialog.';
+    return;
+  }
+  const record = _pendingLoadRecord;
+  document.getElementById('loadConfirmModalOverlay').style.display = 'none';
+  _pendingLoadRecord = null;
+  if (record) applyLoadRecord(record);
+}
+
+// ===========================================================================
+// ACCOUNT PANEL — profile (photo/name/phone) + password change. Fetched
+// fresh via getAccount() every time the panel opens, since it includes the
+// (potentially large-ish) photo that whoAmI deliberately omits.
+// ===========================================================================
+let _pendingPhotoBase64 = null;
+
+async function loadAccountPanel(){
+  document.getElementById('accountProfileError').textContent = '';
+  document.getElementById('accountProfileSuccess').style.display = 'none';
+  document.getElementById('accountPasswordError').textContent = '';
+  document.getElementById('accountPasswordSuccess').style.display = 'none';
+  document.getElementById('accountCurrentPassword').value = '';
+  document.getElementById('accountNewPassword').value = '';
+  document.getElementById('accountConfirmPassword').value = '';
+  _pendingPhotoBase64 = null;
+
+  try {
+    const account = await CCE_API.getAccount();
+    document.getElementById('accountName').value = account.Name || '';
+    document.getElementById('accountEmail').value = account.Email || '';
+    document.getElementById('accountPhone').value = account.Phone || '';
+    setAccountPhotoPreview(account.photoBase64 ? 'data:image/jpeg;base64,' + account.photoBase64 : null);
+  } catch (err) {
+    document.getElementById('accountProfileError').textContent = err.message;
+  }
+}
+
+function setAccountPhotoPreview(dataUrl){
+  const img = document.getElementById('accountPhotoPreview');
+  const placeholder = document.getElementById('accountPhotoPlaceholder');
+  if (dataUrl){
+    img.src = dataUrl;
+    img.style.display = 'inline-block';
+    placeholder.style.display = 'none';
+  } else {
+    img.style.display = 'none';
+    placeholder.style.display = 'flex';
+  }
+}
+
+// Resizes/re-encodes to a small square JPEG client-side before upload —
+// keeps stored photos small and consistent regardless of what format/size
+// was picked, and means the backend never has to think about mime types.
+function handleAccountPhotoChange(event){
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(){
+    const img = new Image();
+    img.onload = function(){
+      const size = 200;
+      const canvas = document.createElement('canvas');
+      canvas.width = size; canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      const scale = Math.max(size / img.width, size / img.height);
+      const dx = (size - img.width * scale) / 2;
+      const dy = (size - img.height * scale) / 2;
+      ctx.drawImage(img, dx, dy, img.width * scale, img.height * scale);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      _pendingPhotoBase64 = dataUrl.split(',')[1];
+      setAccountPhotoPreview(dataUrl);
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function saveAccountProfile(){
+  const errEl = document.getElementById('accountProfileError');
+  const successEl = document.getElementById('accountProfileSuccess');
+  errEl.textContent = '';
+  successEl.style.display = 'none';
+
+  const name = document.getElementById('accountName').value.trim();
+  if (!name){ errEl.textContent = 'Name is required.'; return; }
+
+  try {
+    const payload = { name: name, phone: document.getElementById('accountPhone').value.trim() };
+    if (_pendingPhotoBase64) payload.photoBase64 = _pendingPhotoBase64;
+    const account = await CCE_API.updateProfile(payload);
+    currentAccount = account;
+    _pendingPhotoBase64 = null;
+    successEl.style.display = 'block';
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+}
+
+async function changeAccountPassword(){
+  const errEl = document.getElementById('accountPasswordError');
+  const successEl = document.getElementById('accountPasswordSuccess');
+  errEl.textContent = '';
+  successEl.style.display = 'none';
+
+  const password = document.getElementById('accountCurrentPassword').value;
+  const newPassword = document.getElementById('accountNewPassword').value;
+  const confirmPassword = document.getElementById('accountConfirmPassword').value;
+  if (!password || !newPassword || !confirmPassword){ errEl.textContent = 'All password fields are required.'; return; }
+  if (newPassword !== confirmPassword){ errEl.textContent = 'New passwords don\'t match.'; return; }
+  if (newPassword.length < 8){ errEl.textContent = 'New password must be at least 8 characters.'; return; }
+
+  try {
+    await CCE_API.setPassword({ password: password, newPassword: newPassword, confirmPassword: confirmPassword });
+    document.getElementById('accountCurrentPassword').value = '';
+    document.getElementById('accountNewPassword').value = '';
+    document.getElementById('accountConfirmPassword').value = '';
+    successEl.style.display = 'block';
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+}
+
 // Scoped element lookup — each loan block is a cloned template, so IDs repeat
 // across blocks. This finds an element within a SPECIFIC block's container
 // instead of the first match in the whole document (which document.getElementById
@@ -1838,6 +2571,8 @@ function openUpdateModal(){
   document.getElementById('updateModalOverlay').style.display = 'flex';
   ['update_step_password','update_step_choice','update_step_needPrompt','update_step_havePrompt','update_step_diff','update_step_done']
     .forEach(id => document.getElementById(id).style.display = 'none');
+  document.getElementById('updateAdminPassword').value = '';
+  document.getElementById('updateAdminPasswordError').textContent = '';
   if (_updateConfirmedThisSession){
     document.getElementById('update_step_choice').style.display = '';
   } else {
@@ -1847,9 +2582,19 @@ function openUpdateModal(){
 function closeUpdateModal(){
   document.getElementById('updateModalOverlay').style.display = 'none';
 }
-function confirmUpdateModal(){
-  _updateConfirmedThisSession = true;
-  showUpdateStep('choice');
+async function verifyUpdatePassword(){
+  const password = document.getElementById('updateAdminPassword').value;
+  const errEl = document.getElementById('updateAdminPasswordError');
+  errEl.textContent = '';
+  if (!password){ errEl.textContent = 'Enter the admin password.'; return; }
+  try {
+    await CCE_API.adminVerify(password);
+    _updateConfirmedThisSession = true;
+    document.getElementById('updateAdminPassword').value = '';
+    showUpdateStep('choice');
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
 }
 function showUpdateStep(step){
   ['password','choice','needPrompt','havePrompt','diff','done'].forEach(s => {
@@ -3498,10 +4243,66 @@ function confirmCustomLoanType(){
   createLoanBlock(type);
 }
 
+// Reads every data-fld form value out of a loan block into a plain object
+// (JSON-safe — used both for in-page duplication and for serializing a
+// block to save to the backend). Radio state (dpMode) has no data-fld on
+// the inputs themselves, so it's captured separately as __dpMode.
+function extractFieldValues(container){
+  const values = {};
+  container.querySelectorAll('[data-fld]').forEach(el => {
+    const tag = el.tagName;
+    if (tag !== 'INPUT' && tag !== 'SELECT' && tag !== 'TEXTAREA') return;
+    values[el.dataset.fld] = el.type === 'checkbox' ? el.checked : el.value;
+  });
+  const checkedRadio = container.querySelector('input[type="radio"]:checked');
+  if (checkedRadio) values.__dpMode = checkedRadio.value;
+  return values;
+}
+
+// Writes a plain values object (from extractFieldValues, or loaded from a
+// saved record) into a loan block (state first, so the county dropdown
+// repopulates with the right options before county is applied), then
+// recalculates. Reads/writes DOM values only — no shared references, so
+// editing the destination afterward never touches wherever the values came
+// from.
+function applyFieldValues(dest, values){
+  if (values.state !== undefined){
+    E(dest,'state').value = values.state;
+    populateCountyDropdown(dest);
+  }
+
+  Object.keys(values).forEach(fld => {
+    if (fld === 'state' || fld === '__dpMode') return;
+    const destEl = E(dest, fld);
+    if (!destEl) return;
+    const tag = destEl.tagName;
+    if (tag !== 'INPUT' && tag !== 'SELECT' && tag !== 'TEXTAREA') return;
+    if (destEl.type === 'checkbox') destEl.checked = values[fld];
+    else destEl.value = values[fld];
+  });
+
+  if (values.__dpMode){
+    dest.querySelectorAll('input[type="radio"]').forEach(r => { r.checked = (r.value === values.__dpMode); });
+  }
+
+  calc(dest);
+}
+
+function copyLoanBlockData(src, dest){
+  applyFieldValues(dest, extractFieldValues(src));
+}
+
 let loanBlockCounter = 0;
-function createLoanBlock(loanType){
+// skipDuplicate is used when loading a saved record (loadPageFromData) —
+// each restored block gets its OWN saved values, not a copy of whichever
+// block was created just before it. Returns the new block's container.
+function createLoanBlock(loanType, skipDuplicate){
   loanBlockCounter++;
   const id = 'loanblock_' + loanBlockCounter;
+
+  // Captured before the new block is appended, so it points at whichever
+  // block was added most recently (the natural "duplicate from" source).
+  const existingBlocks = getAllLoanBlocks();
 
   const template = document.getElementById('loanBlockTemplate');
   const clone = template.content.cloneNode(true);
@@ -3517,7 +4318,152 @@ function createLoanBlock(loanType){
   // would uncheck the equivalent radio in every other block.
   insertedRoot.querySelectorAll('input[name="dpMode"]').forEach(r => { r.name = 'dpMode_' + id; });
   initLoanBlock(insertedRoot);
+
+  // New estimates start as an editable duplicate of the last-added block
+  // (rather than blank), per Ann's 0.13.2 note — copies values only, so
+  // there's no live link back to the source block.
+  if (!skipDuplicate){
+    const sourceBlock = existingBlocks[existingBlocks.length - 1];
+    if (sourceBlock) copyLoanBlockData(sourceBlock, insertedRoot);
+  }
+
   if (typeof insertedRoot.scrollIntoView === 'function') insertedRoot.scrollIntoView({ behavior:'smooth', block:'start' });
+  return insertedRoot;
+}
+
+// ===========================================================================
+// SAVE / LOAD SERIALIZATION — full page state (Deal Setup + every loan
+// block's field values) as a plain JSON-safe object, and back. Used for
+// saving a client to the backend and for "Load into calculator".
+// ===========================================================================
+function serializeCurrentPage(){
+  return {
+    dealSetup: {
+      processorName: document.getElementById('processorName').value,
+      borrowerName: document.getElementById('borrowerName').value,
+    },
+    loanBlocks: getAllLoanBlocks().map(b => ({
+      loanType: b.dataset.loanType || 'Loan',
+      fields: extractFieldValues(b),
+    })),
+  };
+}
+
+// Replaces everything currently on the page (Deal Setup + all loan blocks)
+// with the given saved data. Used by "Load into calculator" — this is a
+// full replace, not a merge, so anything unsaved on the page is lost.
+function loadPageFromData(data){
+  document.getElementById('processorName').value = (data.dealSetup && data.dealSetup.processorName) || '';
+  document.getElementById('borrowerName').value = (data.dealSetup && data.dealSetup.borrowerName) || '';
+
+  document.getElementById('loanBlocksContainer').innerHTML = '';
+  (data.loanBlocks || []).forEach(b => {
+    const block = createLoanBlock(b.loanType || 'Loan', true);
+    applyFieldValues(block, b.fields || {});
+  });
+}
+
+// ===========================================================================
+// SAVE THIS CLIENT / DELETE THIS CLIENT — the toolbar actions that persist
+// the current page to the backend. currentRecordId tracks whether the page
+// corresponds to an existing saved record (set on save, or by "Load into
+// calculator"); null means this is a fresh, never-saved page.
+// ===========================================================================
+let currentRecordId = null;
+
+function blobToBase64(blob){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function buildCurrentPagePdfBase64(){
+  const blocks = getAllLoanBlocks();
+  if (!blocks.length) return null;
+  const { blob } = buildPdfExport(blocks);
+  return blobToBase64(blob);
+}
+
+function showSaveClientStatus(message, isError){
+  const el = document.getElementById('saveClientStatus');
+  el.textContent = message;
+  el.style.color = isError ? '#B3261E' : 'var(--good)';
+  el.style.display = 'block';
+  clearTimeout(showSaveClientStatus._t);
+  showSaveClientStatus._t = setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+function clearCurrentPage(){
+  document.getElementById('processorName').value = '';
+  document.getElementById('borrowerName').value = '';
+  document.getElementById('loanBlocksContainer').innerHTML = '';
+  currentRecordId = null;
+}
+
+async function saveThisClient(status){
+  status = status || 'final';
+  const blocks = getAllLoanBlocks();
+  if (!blocks.length){ showSaveClientStatus('Add at least one loan estimate first.', true); return null; }
+  const clientName = document.getElementById('borrowerName').value.trim();
+  if (!clientName){ showSaveClientStatus('Enter a Name of Borrower / Client before saving.', true); return null; }
+
+  blocks.forEach(b => calc(b));
+  const pageData = serializeCurrentPage();
+  const pdfBase64 = await buildCurrentPagePdfBase64();
+
+  try {
+    const { recordId } = await CCE_API.saveClient({
+      recordId: currentRecordId,
+      clientName: clientName,
+      status: status,
+      dealSetup: pageData.dealSetup,
+      loanBlocks: pageData.loanBlocks,
+      pdfBase64: pdfBase64,
+    });
+    currentRecordId = recordId;
+    showSaveClientStatus(status === 'draft' ? 'Saved as draft.' : 'Client saved.', false);
+    return recordId;
+  } catch (err) {
+    showSaveClientStatus(err.message, true);
+    return null;
+  }
+}
+
+function openDeleteClientModal(){
+  document.getElementById('deleteClientError').textContent = '';
+  document.getElementById('deleteClientModalOverlay').style.display = 'flex';
+}
+function closeDeleteClientModal(){
+  document.getElementById('deleteClientModalOverlay').style.display = 'none';
+}
+
+async function saveThisClientAsDraft(){
+  const errEl = document.getElementById('deleteClientError');
+  if (!document.getElementById('borrowerName').value.trim()){
+    errEl.textContent = 'Enter a Name of Borrower / Client before saving as a draft.';
+    return;
+  }
+  const recordId = await saveThisClient('draft');
+  if (!recordId){
+    errEl.textContent = 'Could not save as draft — see the message behind this dialog.';
+    return;
+  }
+  closeDeleteClientModal();
+  clearCurrentPage();
+}
+
+async function confirmPermanentDelete(){
+  const errEl = document.getElementById('deleteClientError');
+  try {
+    if (currentRecordId) await CCE_API.deleteClient(currentRecordId);
+    closeDeleteClientModal();
+    clearCurrentPage();
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
 }
 
 let _pendingRemoveBlock = null;
@@ -3664,15 +4610,18 @@ function showExportPreview(kind, blob, blocks){
   document.getElementById('exportPreviewTitle').textContent = 'Preview \u2014 ' + kind.toUpperCase();
   const bodyEl = document.getElementById('exportPreviewBody');
   const printBtn = document.getElementById('exportPreviewPrintBtn');
+  const whatsappBtn = document.getElementById('exportPreviewWhatsAppBtn');
   const noteEl = document.getElementById('exportPreviewNote');
 
   if (kind === 'pdf'){
     bodyEl.innerHTML = '<iframe src="'+_exportPreviewUrl+'" style="width:100%; height:68vh; border:1px solid var(--line); border-radius:6px; background:#fff;"></iframe>';
     printBtn.style.display = '';
+    whatsappBtn.style.display = '';
     noteEl.textContent = '';
   } else {
     bodyEl.innerHTML = blocks.map(b => renderLoanSummaryHtml(b._cceData)).join('');
     printBtn.style.display = 'none';
+    whatsappBtn.style.display = 'none';
     noteEl.textContent = 'This shows the data that will be in the ' + kind.toUpperCase() + ' file \u2014 the actual file will have full ' + (kind === 'xlsx' ? 'spreadsheet formulas and formatting.' : 'Word document formatting.');
   }
   document.getElementById('exportPreviewModalOverlay').style.display = 'flex';
@@ -3682,9 +4631,39 @@ function closeExportPreviewModal(){
   document.getElementById('exportPreviewModalOverlay').style.display = 'none';
 }
 
-function saveExportPreview(){
-  if (!_exportBlob) return;
+const EXPORT_FILE_TYPE_INFO = {
+  pdf:  { mime:'application/pdf', ext:'pdf', desc:'PDF Document' },
+  docx: { mime:'application/vnd.openxmlformats-officedocument.wordprocessingml.document', ext:'docx', desc:'Word Document' },
+  xlsx: { mime:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', ext:'xlsx', desc:'Excel Workbook' }
+};
+
+// Prompts for a save location via the File System Access API where the
+// browser supports it (Chrome/Edge), falling back to the old download-to-
+// Downloads behavior everywhere else (Safari, Firefox, mobile). Returns
+// false only when the user actively cancels the location picker, so callers
+// (e.g. emailExportPreview) can tell "cancelled" apart from "saved".
+async function saveExportPreview(){
+  if (!_exportBlob) return false;
   const filename = buildExportFilename(_exportKind);
+  const info = EXPORT_FILE_TYPE_INFO[_exportKind];
+
+  if (window.showSaveFilePicker){
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: info ? [{ description: info.desc, accept: { [info.mime]: ['.' + info.ext] } }] : undefined
+      });
+      const writable = await handle.createWritable();
+      await writable.write(_exportBlob);
+      await writable.close();
+      return true;
+    } catch (err){
+      if (err && err.name === 'AbortError') return false;
+      // Any other failure (unsupported context, permission denial, etc.)
+      // falls through to the plain download below.
+    }
+  }
+
   const url = _exportPreviewUrl || URL.createObjectURL(_exportBlob);
   const a = document.createElement('a');
   a.href = url;
@@ -3692,6 +4671,7 @@ function saveExportPreview(){
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+  return true;
 }
 
 // Opens the PDF in a new tab and triggers the browser's native print dialog
@@ -3710,12 +4690,25 @@ function printExportPreview(){
 // of this tool. Best available approximation: download the file (so it's
 // sitting in Downloads, one drag away) and open the mail app with the
 // subject pre-filled.
-function emailExportPreview(){
+async function emailExportPreview(){
   if (!_exportBlob) return;
-  saveExportPreview();
+  const saved = await saveExportPreview();
+  if (!saved) return; // user cancelled the save-location picker
   const subject = encodeURIComponent(buildEmailSubject());
-  const body = encodeURIComponent('The ' + _exportKind.toUpperCase() + ' was just downloaded to your device \u2014 attach it here before sending.');
+  const body = encodeURIComponent('The ' + _exportKind.toUpperCase() + ' was just saved \u2014 attach it here before sending.');
   window.location.href = 'mailto:?subject=' + subject + '&body=' + body;
+}
+
+// WhatsApp has no more of a "share this file" API from a webpage than email
+// does \u2014 same hard restriction, same workaround: save the file, then open a
+// WhatsApp deep link with the message pre-filled, and attach the PDF
+// manually in one extra tap. PDF-only (this button is hidden for DOCX/XLSX).
+async function whatsappExportPreview(){
+  if (!_exportBlob) return;
+  const saved = await saveExportPreview();
+  if (!saved) return; // user cancelled the save-location picker
+  const text = encodeURIComponent(buildEmailSubject() + ' \u2014 PDF just saved, attach it here before sending.');
+  window.open('https://wa.me/?text=' + text, '_blank');
 }
 
 // ===========================================================================
@@ -3845,14 +4838,20 @@ function saveDiscrepancyPdf(){
   doc.save('CCE_Discrepancy_' + sanitizeFilenamePart(data.state) + '_' + new Date().toISOString().slice(0,10) + '.pdf');
 }
 
-// Browsers can't auto-detect whether a default mail app is configured, so
-// this offers the mailto: attempt as the primary action and an explicit
-// Gmail-web fallback link alongside it, rather than guessing.
-function emailDiscrepancy(){
+// Sends straight through the backend (no mail app popup) so the report
+// just lands in the developer's inbox. If that call fails for any reason
+// (offline, deployment down), falls back to the old mailto: approach
+// automatically — a backend outage shouldn't leave zero recourse.
+async function emailDiscrepancy(){
   const data = buildDiscrepancyData();
-  const subject = encodeURIComponent('CCE Discrepancy Report - ' + data.state + ' - ' + data.loanType);
-  const body = encodeURIComponent(buildDiscrepancySummaryText(data));
-  window.location.href = 'mailto:marketingfmhomeloans@gmail.com?subject=' + subject + '&body=' + body;
+  const subject = 'CCE Discrepancy Report - ' + data.state + ' - ' + data.loanType;
+  const body = buildDiscrepancySummaryText(data);
+  try {
+    await CCE_API.sendDiscrepancyEmail(subject, body);
+    alert('Discrepancy report sent.');
+  } catch (err) {
+    window.location.href = 'mailto:marketingfmhomeloans@gmail.com?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+  }
 }
 function emailDiscrepancyViaGmail(){
   const data = buildDiscrepancyData();
@@ -3862,4 +4861,5 @@ function emailDiscrepancyViaGmail(){
 }
 
 populateDateBar();
+initSession();
 </script>
