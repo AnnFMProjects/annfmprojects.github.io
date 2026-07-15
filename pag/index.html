@@ -3,6 +3,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="../assets/api.js"></script>
+<script src="../export/docx-helpers.js"></script>
 <link rel="stylesheet" href="../assets/style.css">
 <style>
   :root{
@@ -1552,36 +1553,10 @@ function downloadPdf(){
 }
 
 // ===========================================================================
-// DOCX EXPORT — hand-rolled OOXML via JSZip, same helper pattern as
-// cce_calculator.html's docxPara/docxCell/docxTable.
+// DOCX EXPORT — xmlEsc/docxPara/docxCell/docxTable/DOCX_CONTENT_TYPES_XML/
+// DOCX_RELS_XML/docxDocumentXml now live in export/docx-helpers.js (shared
+// with CCE). Only PAG-specific composition stays here.
 // ===========================================================================
-function xmlEsc(s){
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-function docxPara(text, opts){
-  opts = opts || {};
-  const rPr = (opts.bold ? '<w:b/>' : '') + (opts.italic ? '<w:i/>' : '') + (opts.size ? '<w:sz w:val="' + (opts.size*2) + '"/>' : '') + (opts.color ? '<w:color w:val="' + opts.color + '"/>' : '');
-  const pPr = opts.spaceAfter !== undefined ? '<w:pPr><w:spacing w:after="' + opts.spaceAfter + '"/></w:pPr>' : '';
-  return '<w:p>' + pPr + '<w:r>' + (rPr ? '<w:rPr>' + rPr + '</w:rPr>' : '') + '<w:t xml:space="preserve">' + xmlEsc(text) + '</w:t></w:r></w:p>';
-}
-function docxCell(text, opts){
-  opts = opts || {};
-  const width = opts.width || 4500;
-  return '<w:tc><w:tcPr><w:tcW w:w="' + width + '" w:type="dxa"/><w:tcBorders>' +
-    '<w:top w:val="single" w:sz="4" w:color="D9DCE3"/><w:bottom w:val="single" w:sz="4" w:color="D9DCE3"/>' +
-    '<w:left w:val="single" w:sz="4" w:color="D9DCE3"/><w:right w:val="single" w:sz="4" w:color="D9DCE3"/></w:tcBorders></w:tcPr>' +
-    docxPara(text, opts) + '</w:tc>';
-}
-function docxTable(rowsData){
-  const trs = rowsData.map(row =>
-    '<w:tr>' + docxCell(row[0], {}) + docxCell(row[1], { bold:true }) + '</w:tr>'
-  ).join('');
-  return '<w:tbl><w:tblPr><w:tblW w:w="9000" w:type="dxa"/><w:tblBorders>' +
-    '<w:top w:val="single" w:sz="4" w:color="D9DCE3"/><w:bottom w:val="single" w:sz="4" w:color="D9DCE3"/>' +
-    '<w:left w:val="single" w:sz="4" w:color="D9DCE3"/><w:right w:val="single" w:sz="4" w:color="D9DCE3"/>' +
-    '<w:insideH w:val="single" w:sz="4" w:color="D9DCE3"/><w:insideV w:val="single" w:sz="4" w:color="D9DCE3"/></w:tblBorders></w:tblPr>' +
-    '<w:tblGrid><w:gridCol w:w="4500"/><w:gridCol w:w="4500"/></w:tblGrid>' + trs + '</w:tbl>';
-}
 // Hex (no '#') equivalents of PAG_THEME_RGB, for DOCX's w:color attribute.
 const PAG_THEME_HEX = { red:'B3261E', black:'1C1C1C', blue:'1B4F8C', gold:'C9A24B', grey:'6B7280' };
 
@@ -1626,26 +1601,11 @@ async function buildPagDocx(){
   body += docxPara('I look forward to working with you. Please contact me should you have any questions.', { size:9, spaceAfter:200 });
   body += docxPara('Ann Zeilingold | NMLS ID: 41850 | P: 845-354-9700', { bold:true, size:10 });
 
-  const documentXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
-    '<w:body>' + body + '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1080" w:right="1080" w:bottom="1080" w:left="1080"/></w:sectPr></w:body>' +
-    '</w:document>';
-
-  const contentTypesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
-    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
-    '<Default Extension="xml" ContentType="application/xml"/>' +
-    '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
-    '</Types>';
-
-  const relsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
-    '</Relationships>';
+  const documentXml = docxDocumentXml(body, 1080);
 
   const zip = new JSZip();
-  zip.file('[Content_Types].xml', contentTypesXml);
-  zip.file('_rels/.rels', relsXml);
+  zip.file('[Content_Types].xml', DOCX_CONTENT_TYPES_XML);
+  zip.file('_rels/.rels', DOCX_RELS_XML);
   zip.file('word/document.xml', documentXml);
   const blob = await zip.generateAsync({ type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
   return { blob: blob };

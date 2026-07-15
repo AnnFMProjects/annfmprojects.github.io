@@ -3,6 +3,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="../assets/api.js"></script>
+<script src="../export/docx-helpers.js"></script>
+<script src="../export/xlsx-helpers.js"></script>
 <link rel="stylesheet" href="../assets/style.css">
 <style>
   :root{
@@ -4070,11 +4072,8 @@ async function buildXlsxExport(container, dpMode){
   // producing corrupted output in real deployed pages (it's only reliably tested
   // as a Node package) — building the XLSX ourselves with the same proven
   // approach already used for DOCX avoids that risk entirely.
-  function colLetter(n){
-    let s = '';
-    while (n > 0){ const rem = (n-1) % 26; s = String.fromCharCode(65+rem) + s; n = Math.floor((n-1)/26); }
-    return s;
-  }
+  // colLetter/cellXml/sheetXml/xmlEsc now live in export/xlsx-helpers.js
+  // (shared with GT).
   // Style indices, defined in xlsxStylesXml() below: 0/1 = general (normal/bold),
   // 2/3 = currency, 4/5 = percent, 6/7 = integer.
   function styleIdx(kind, bold){
@@ -4262,44 +4261,7 @@ async function buildXlsxExport(container, dpMode){
   });
 
   // ---- Serialize both sheets + styles + workbook scaffolding as raw OOXML ----
-  function cellXml(addr, cell){
-    if (!cell) return '';
-    const sAttr = cell.s ? ' s="'+cell.s+'"' : '';
-    if (cell.t === 'inlineStr'){
-      return '<c r="'+addr+'" t="inlineStr"'+sAttr+'><is><t xml:space="preserve">'+xmlEsc(String(cell.v))+'</t></is></c>';
-    }
-    if (cell.t === 'str'){
-      const fXml = cell.f ? '<f>'+xmlEsc(cell.f)+'</f>' : '';
-      return '<c r="'+addr+'" t="str"'+sAttr+'>'+fXml+'<v>'+xmlEsc(String(cell.v||''))+'</v></c>';
-    }
-    if (cell.t === 'b'){
-      return '<c r="'+addr+'" t="b"'+sAttr+'><v>'+(cell.v?1:0)+'</v></c>';
-    }
-    // numeric (plain value or formula)
-    const fXml = cell.f ? '<f>'+xmlEsc(cell.f)+'</f>' : '';
-    const vVal = (typeof cell.v === 'number' && !isNaN(cell.v)) ? cell.v : 0;
-    return '<c r="'+addr+'"'+sAttr+'>'+fXml+'<v>'+vVal+'</v></c>';
-  }
-  function sheetXml(cells, colWidths){
-    const byRow = {};
-    Object.keys(cells).forEach(addr => {
-      const m = addr.match(/^([A-Z]+)(\d+)$/);
-      const rn = parseInt(m[2], 10);
-      (byRow[rn] = byRow[rn] || []).push(addr);
-    });
-    const rowNums = Object.keys(byRow).map(Number).sort((a,b)=>a-b);
-    const colsXml = '<cols>' + colWidths.map((w,i) => '<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>').join('') + '</cols>';
-    const rowsXml = rowNums.map(rn => {
-      const addrs = byRow[rn].sort((a,b) => {
-        const ca = a.match(/^([A-Z]+)/)[1], cb = b.match(/^([A-Z]+)/)[1];
-        return ca.localeCompare(cb);
-      });
-      return '<row r="'+rn+'">' + addrs.map(a => cellXml(a, cells[a])).join('') + '</row>';
-    }).join('');
-    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
-      colsXml + '<sheetData>' + rowsXml + '</sheetData></worksheet>';
-  }
+  // (cellXml/sheetXml themselves live in export/xlsx-helpers.js)
 
   const stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
@@ -4364,36 +4326,10 @@ async function buildXlsxExport(container, dpMode){
 }
 
 // ===========================================================================
-// DOCX EXPORT — genuine OOXML .docx built by hand via JSZip (no external
-// docx-building library needed), fully editable in Word.
+// DOCX EXPORT — xmlEsc/docxPara/docxCell/docxTable/DOCX_CONTENT_TYPES_XML/
+// DOCX_RELS_XML/docxDocumentXml now live in export/docx-helpers.js (shared
+// with PAG). Only CCE-specific composition stays here.
 // ===========================================================================
-function xmlEsc(s){
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-function docxPara(text, opts){
-  opts = opts || {};
-  const rPr = (opts.bold ? '<w:b/>' : '') + (opts.italic ? '<w:i/>' : '') + (opts.size ? '<w:sz w:val="' + (opts.size*2) + '"/>' : '') + (opts.color ? '<w:color w:val="' + opts.color + '"/>' : '');
-  const pPr = opts.spaceAfter !== undefined ? '<w:pPr><w:spacing w:after="' + opts.spaceAfter + '"/></w:pPr>' : '';
-  return '<w:p>' + pPr + '<w:r>' + (rPr ? '<w:rPr>' + rPr + '</w:rPr>' : '') + '<w:t xml:space="preserve">' + xmlEsc(text) + '</w:t></w:r></w:p>';
-}
-function docxCell(text, opts){
-  opts = opts || {};
-  const width = opts.width || 4500;
-  return '<w:tc><w:tcPr><w:tcW w:w="' + width + '" w:type="dxa"/><w:tcBorders>' +
-    '<w:top w:val="single" w:sz="4" w:color="D9DCE3"/><w:bottom w:val="single" w:sz="4" w:color="D9DCE3"/>' +
-    '<w:left w:val="single" w:sz="4" w:color="D9DCE3"/><w:right w:val="single" w:sz="4" w:color="D9DCE3"/></w:tcBorders></w:tcPr>' +
-    docxPara(text, opts) + '</w:tc>';
-}
-function docxTable(rowsData){
-  const trs = rowsData.map(row =>
-    '<w:tr>' + docxCell(row[0], {}) + docxCell(row[1], { bold:true }) + '</w:tr>'
-  ).join('');
-  return '<w:tbl><w:tblPr><w:tblW w:w="9000" w:type="dxa"/><w:tblBorders>' +
-    '<w:top w:val="single" w:sz="4" w:color="D9DCE3"/><w:bottom w:val="single" w:sz="4" w:color="D9DCE3"/>' +
-    '<w:left w:val="single" w:sz="4" w:color="D9DCE3"/><w:right w:val="single" w:sz="4" w:color="D9DCE3"/>' +
-    '<w:insideH w:val="single" w:sz="4" w:color="D9DCE3"/><w:insideV w:val="single" w:sz="4" w:color="D9DCE3"/></w:tblBorders></w:tblPr>' +
-    '<w:tblGrid><w:gridCol w:w="4500"/><w:gridCol w:w="4500"/></w:tblGrid>' + trs + '</w:tbl>';
-}
 function docxGroupSection(title, rowsData, totalLabel, totalValue, afterRows){
   const data = rowsData.slice();
   if (totalLabel) data.push([totalLabel, totalValue]);
@@ -4484,25 +4420,11 @@ async function buildDocxExport(blocks){
   body += docxPara('This is an internal planning tool built by and for FM Home Loans loan officers to prepare closing cost estimates for their own clients. It is not a public FM Home Loans website, is not affiliated with any other lender, and does not collect or transmit personal information to any outside party.', { size:9, spaceAfter:200 });
   body += docxPara('FM Home Loans \u2013 56 Congers Road, New City, NY 10956 | 718-377-7900 | NMLS ID # 2212 | Licensed Mortgage Banker. AZ Mortgage Banker License #0909583. CA \u2013 Loans made or arranged pursuant to the California Financing Law and Licensed by the Department of Financial Protection and Innovation under the California Residential Mortgage Lending Act. CT, DC, FL, GA, IL \u2013 For licensing information, go to: www.nmlsconsumeraccess.org. MA Mortgage Lender and Broker Licenses # MC2212. MD, MN. Licensed by the N.J. Department of Banking and Insurance. Licensed Mortgage Banker \u2013 NYS Department of Financial Services. PA, TX, VA \u2013 NMLS ID #2212 (www.nmlsconsumeraccess.org).', { size:8, color:'5B6472' });
 
-  const documentXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
-    '<w:body>' + body + '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1000" w:right="1000" w:bottom="1000" w:left="1000"/></w:sectPr></w:body></w:document>';
-
-  const contentTypesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
-    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
-    '<Default Extension="xml" ContentType="application/xml"/>' +
-    '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
-    '</Types>';
-
-  const relsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
-    '</Relationships>';
+  const documentXml = docxDocumentXml(body, 1000);
 
   const zip = new JSZip();
-  zip.file('[Content_Types].xml', contentTypesXml);
-  zip.file('_rels/.rels', relsXml);
+  zip.file('[Content_Types].xml', DOCX_CONTENT_TYPES_XML);
+  zip.file('_rels/.rels', DOCX_RELS_XML);
   zip.file('word/document.xml', documentXml);
 
   const blob = await zip.generateAsync({ type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });

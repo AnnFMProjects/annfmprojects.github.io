@@ -4,6 +4,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="../assets/api.js"></script>
+<script src="../export/xlsx-helpers.js"></script>
 <link rel="stylesheet" href="../assets/style.css">
 <style>
   :root{
@@ -1058,9 +1059,8 @@ async function buildGtPdfBlob(){
 }
 
 async function buildGtXlsxBlob(){
-  function xmlEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;'); }
-  function colLetter(n){ let s=''; while(n>0){ const rem=(n-1)%26; s=String.fromCharCode(65+rem)+s; n=Math.floor((n-1)/26);} return s; }
-
+  // xmlEsc/colLetter/cellXml/sheetXml now live in export/xlsx-helpers.js
+  // (shared with CCE).
   const cells = {};
   function setCell(addr, opts){ cells[addr] = Object.assign({ s:0 }, opts); }
 
@@ -1111,32 +1111,6 @@ async function buildGtXlsxBlob(){
     row++;
   });
 
-  function cellXml(addr, cell){
-    if (!cell) return '';
-    const sAttr = cell.s ? ' s="'+cell.s+'"' : '';
-    if (cell.t === 'inlineStr'){
-      return '<c r="'+addr+'" t="inlineStr"'+sAttr+'><is><t xml:space="preserve">'+xmlEsc(String(cell.v))+'</t></is></c>';
-    }
-    const fXml = cell.f ? '<f>'+xmlEsc(cell.f)+'</f>' : '';
-    const vVal = (typeof cell.v === 'number' && !isNaN(cell.v)) ? cell.v : 0;
-    return '<c r="'+addr+'"'+sAttr+'>'+fXml+'<v>'+vVal+'</v></c>';
-  }
-  function sheetXml(){
-    const byRow = {};
-    Object.keys(cells).forEach(addr => {
-      const m = addr.match(/^([A-Z]+)(\d+)$/);
-      const rn = parseInt(m[2], 10);
-      (byRow[rn] = byRow[rn] || []).push(addr);
-    });
-    const rowNums = Object.keys(byRow).map(Number).sort((a,b)=>a-b);
-    const rowsXml = rowNums.map(rn => {
-      const addrs = byRow[rn].sort((a,b) => a.match(/^([A-Z]+)/)[1].localeCompare(b.match(/^([A-Z]+)/)[1]));
-      return '<row r="'+rn+'">' + addrs.map(a => cellXml(a, cells[a])).join('') + '</row>';
-    }).join('');
-    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
-      '<sheetData>' + rowsXml + '</sheetData></worksheet>';
-  }
 
   const stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
@@ -1180,7 +1154,7 @@ async function buildGtXlsxBlob(){
   zip.file('xl/workbook.xml', workbookXml);
   zip.file('xl/_rels/workbook.xml.rels', workbookRelsXml);
   zip.file('xl/styles.xml', stylesXml);
-  zip.file('xl/worksheets/sheet1.xml', sheetXml());
+  zip.file('xl/worksheets/sheet1.xml', sheetXml(cells));
 
   return zip.generateAsync({ type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 }
