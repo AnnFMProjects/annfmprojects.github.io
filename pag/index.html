@@ -2,6 +2,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="../assets/api.js"></script>
 <style>
   :root{
     --navy:#1B2A4A;
@@ -568,69 +569,26 @@
 // CCE calculator (or vice versa) carries over automatically — both tools
 // share one origin (GitHub Pages), so localStorage is shared by default.
 // ===========================================================================
+// Shared login/session plumbing lives in assets/api.js (createFmApiCore).
 const PAG_API = (function(){
-  const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbzR3YEJAV08KsAnh7JbmC4Me-LaaR2Z9oK3_iX0t86qBpCgCkKGWyu5GxptKfOys_j6/exec';
-  const TOKEN_STORAGE_KEY = 'cce_session_token';
-
-  function getToken(){ return localStorage.getItem(TOKEN_STORAGE_KEY); }
-  function setToken(token){
-    if (token) localStorage.setItem(TOKEN_STORAGE_KEY, token);
-    else localStorage.removeItem(TOKEN_STORAGE_KEY);
-  }
-
-  async function call(action, payload, opts){
-    opts = opts || {};
-    const body = { action: action, payload: payload || {}, token: opts.anonymous ? null : getToken() };
-    let res;
-    try {
-      res = await fetch(API_BASE_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(body)
-      });
-    } catch (err) {
-      throw new Error('Could not reach the server. Check your connection and try again.');
-    }
-    let data;
-    try { data = await res.json(); } catch (err) { throw new Error('Unexpected response from the server.'); }
-    if (!data.ok) throw new Error(data.error || 'Request failed.');
-    return data;
-  }
-
-  return {
-    getToken: getToken,
-    isLoggedIn: function(){ return !!getToken(); },
-    logout: function(){ setToken(null); },
-
-    login: async function(email, password){
-      const data = await call('login', { email: email, password: password }, { anonymous: true });
-      setToken(data.token);
-      return data.account;
-    },
-    requestLogin: function(name, email, password){
-      return call('requestLogin', { name: name, email: email, password: password }, { anonymous: true }).then(() => true);
-    },
-    whoAmI: async function(){
-      const data = await call('whoAmI', {});
-      return data.account;
-    },
-
+  const core = createFmApiCore();
+  return Object.assign({}, core, {
     saveLetter: async function(payload){
-      const data = await call('savePag', payload);
+      const data = await core.call('savePag', payload);
       return { recordId: data.recordId, record: data.record };
     },
     listLetters: async function(filters){
-      const data = await call('listPags', filters || {});
+      const data = await core.call('listPags', filters || {});
       return data.records;
     },
     getLetter: async function(recordId){
-      return call('getPag', { recordId: recordId });
+      return core.call('getPag', { recordId: recordId });
     },
     deleteLetter: async function(recordId){
-      const data = await call('deletePag', { recordId: recordId });
+      const data = await core.call('deletePag', { recordId: recordId });
       return data.deleted;
     },
-  };
+  });
 })();
 
 // ===========================================================================

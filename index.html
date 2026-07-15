@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AnnFMProjects Landing Page</title>
+<script src="assets/api.js"></script>
 <style>
   :root{
     --navy:#1B2A4A;
@@ -362,75 +363,34 @@
 // key ('cce_session_token') so a login here carries over to every tool, and
 // vice versa (shared GitHub Pages origin).
 // ===========================================================================
+// Shared login/session plumbing lives in assets/api.js (createFmApiCore).
 const HUB_API = (function(){
-  const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbzR3YEJAV08KsAnh7JbmC4Me-LaaR2Z9oK3_iX0t86qBpCgCkKGWyu5GxptKfOys_j6/exec';
-  const TOKEN_STORAGE_KEY = 'cce_session_token';
-
-  function getToken(){ return localStorage.getItem(TOKEN_STORAGE_KEY); }
-  function setToken(token){
-    if (token) localStorage.setItem(TOKEN_STORAGE_KEY, token);
-    else localStorage.removeItem(TOKEN_STORAGE_KEY);
-  }
-
-  async function call(action, payload, opts){
-    opts = opts || {};
-    const body = { action: action, payload: payload || {}, token: opts.anonymous ? null : getToken() };
-    let res;
-    try {
-      res = await fetch(API_BASE_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(body)
-      });
-    } catch (err) {
-      throw new Error('Could not reach the server. Check your connection and try again.');
-    }
-    let data;
-    try { data = await res.json(); } catch (err) { throw new Error('Unexpected response from the server.'); }
-    if (!data.ok) throw new Error(data.error || 'Request failed.');
-    return data;
-  }
-
-  return {
-    isLoggedIn: function(){ return !!getToken(); },
-    logout: function(){ setToken(null); },
-
-    login: async function(email, password){
-      const data = await call('login', { email: email, password: password }, { anonymous: true });
-      setToken(data.token);
-      return data.account;
-    },
-    requestLogin: function(name, email, password){
-      return call('requestLogin', { name: name, email: email, password: password }, { anonymous: true }).then(() => true);
-    },
-    whoAmI: async function(){
-      const data = await call('whoAmI', {});
-      return data.account;
-    },
+  const core = createFmApiCore();
+  return Object.assign({}, core, {
     submitAppRequest: async function(payload){
-      const data = await call('submitAppRequest', payload);
+      const data = await core.call('submitAppRequest', payload);
       return data.request;
     },
     listAppRequests: async function(){
-      const data = await call('listAppRequests', {});
+      const data = await core.call('listAppRequests', {});
       return data.requests;
     },
     deleteAppRequest: async function(requestId){
-      const data = await call('deleteAppRequest', { requestId: requestId });
+      const data = await core.call('deleteAppRequest', { requestId: requestId });
       return data.deleted;
     },
     emailAppRequestJson: async function(requestId){
-      const data = await call('emailAppRequestJson', { requestId: requestId });
+      const data = await core.call('emailAppRequestJson', { requestId: requestId });
       return data.sent;
     },
     // PREP FOR LATER — see APP_REQUEST_CLAUDE_ENABLED below. The backend
     // action this calls is fully wired; only the button that calls it is
     // gated off until Ann has Anthropic API billing set up.
     sendAppRequestToClaude: async function(requestId){
-      const data = await call('sendAppRequestToClaude', { requestId: requestId });
+      const data = await core.call('sendAppRequestToClaude', { requestId: requestId });
       return data.reply;
     },
-  };
+  });
 })();
 
 // Flip to true once Ann sets ANTHROPIC_API_KEY (Script Properties) and
