@@ -932,7 +932,12 @@
      only after a valid session is confirmed. Highest z-index, no close
      button, not dismissible by clicking outside. -->
 <div id="loginGateOverlay" style="display:flex; position:fixed; inset:0; background:var(--paper); z-index:2000; align-items:center; justify-content:center; padding:20px;">
-  <div style="background:#fff; border:1px solid var(--line); border-radius:10px; max-width:400px; width:100%; padding:28px; font-family:Calibri, Arial, sans-serif; box-shadow:0 6px 24px rgba(16,27,51,0.12);">
+  <div id="loginGateChecking" style="display:none; text-align:center; font-family:Calibri, Arial, sans-serif; color:var(--slate);">
+    <div style="width:28px; height:28px; margin:0 auto 12px; border:3px solid var(--line); border-top-color:var(--navy); border-radius:50%; animation:loginGateSpin 0.8s linear infinite;"></div>
+    Checking your session&hellip;
+  </div>
+  <style>@keyframes loginGateSpin { to { transform: rotate(360deg); } }</style>
+  <div id="loginGateForm" style="background:#fff; border:1px solid var(--line); border-radius:10px; max-width:400px; width:100%; padding:28px; font-family:Calibri, Arial, sans-serif; box-shadow:0 6px 24px rgba(16,27,51,0.12);">
     <h3 style="margin-top:0; color:var(--navy);">Closing Cost Estimate</h3>
     <div class="dev-banner-inline">Internal tool for FM Home Loans loan officers. Not a public FM Home Loans website or login.</div>
 
@@ -955,6 +960,19 @@
     </div>
   </div>
 </div>
+<script>
+// Runs immediately at parse time (before whoAmI resolves) so a returning,
+// already-logged-in user sees a neutral "checking" spinner instead of a
+// flash of the login form while the token is being validated.
+(function(){
+  try {
+    if (localStorage.getItem('cce_session_token')) {
+      document.getElementById('loginGateForm').style.display = 'none';
+      document.getElementById('loginGateChecking').style.display = 'block';
+    }
+  } catch (e) {}
+})();
+</script>
 
 <!-- REQUEST LOGIN MODAL -->
 <div id="requestLoginModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:2001; align-items:center; justify-content:center; padding:20px;">
@@ -1403,9 +1421,10 @@ let guestMode = false;
 
 async function initSession(){
   if (!CCE_API.isLoggedIn()){
-    showLoginGate();
+    showLoginGate('form');
     return;
   }
+  showLoginGate('checking');
   try {
     currentAccount = await CCE_API.whoAmI();
     guestMode = false;
@@ -1414,12 +1433,15 @@ async function initSession(){
     hideLoginGate();
   } catch (err) {
     CCE_API.logout();
-    showLoginGate();
+    showLoginGate('form');
   }
 }
 
-function showLoginGate(){
+function showLoginGate(mode){
   document.getElementById('loginGateOverlay').style.display = 'flex';
+  const checking = mode === 'checking';
+  document.getElementById('loginGateForm').style.display = checking ? 'none' : 'block';
+  document.getElementById('loginGateChecking').style.display = checking ? 'block' : 'none';
 }
 function hideLoginGate(){
   document.getElementById('loginGateOverlay').style.display = 'none';
@@ -5421,3 +5443,4 @@ function emailDiscrepancyViaGmail(){
 populateDateBar();
 initSession();
 </script>
+
