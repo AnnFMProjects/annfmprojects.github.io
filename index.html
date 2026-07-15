@@ -124,6 +124,19 @@
     font-weight:700;
     color:var(--gold);
   }
+  .card-request{
+    background:none;
+    border:1px dotted var(--slate);
+  }
+  .card-request .card-title,
+  .card-request .card-desc{
+    color:var(--slate);
+    font-style:italic;
+  }
+  .card-request .card-arrow{
+    color:#8A6A1F;
+    font-style:italic;
+  }
   .footer{
     text-align:center;
     padding:24px 20px 40px 20px;
@@ -261,6 +274,10 @@
             <label style="display:flex; align-items:center; gap:5px; font-weight:400;"><input type="checkbox" id="wizExportPdf" style="width:auto;"> PDF</label>
             <label style="display:flex; align-items:center; gap:5px; font-weight:400;"><input type="checkbox" id="wizExportWord" style="width:auto;"> Word</label>
             <label style="display:flex; align-items:center; gap:5px; font-weight:400;"><input type="checkbox" id="wizExportExcel" style="width:auto;"> Excel</label>
+            <label style="display:flex; align-items:center; gap:5px; font-weight:400;"><input type="checkbox" id="wizExportPng" style="width:auto;"> PNG</label>
+            <label style="display:flex; align-items:center; gap:5px; font-weight:400;"><input type="checkbox" id="wizExportJpeg" style="width:auto;"> JPEG</label>
+            <label style="display:flex; align-items:center; gap:5px; font-weight:400;"><input type="checkbox" id="wizExportOther" style="width:auto;" onchange="toggleWizExportOther()"> <span id="wizExportOtherLabel">Other</span></label>
+            <input type="text" id="wizExportOtherText" placeholder="Specify export type..." style="display:none; flex:1 1 140px; min-width:120px; font-size:12.5px; padding:4px 7px; border:1px solid var(--line); border-radius:5px; font-family:inherit;">
           </div>
         </div>
         <div class="hub-field">
@@ -321,7 +338,13 @@
         <span class="card-arrow">Open tool →</span>
       </a>
 
-      <a class="card" href="#" onclick="openAppWizard(); return false;">
+      <a class="card" href="social_media/">
+        <div class="card-title">Social Media Tool</div>
+        <p class="card-desc">Build Market Update Summary and Rate Change posts from pasted MBS Highway text or an MND screenshot, fill designs, and export as PNG/JPEG.</p>
+        <span class="card-arrow">Open tool →</span>
+      </a>
+
+      <a class="card card-request" href="#" onclick="openAppWizard(); return false;">
         <div class="card-title">Request an App</div>
         <p class="card-desc">Have an idea for a new internal tool? Answer a few questions and we'll turn it into a build-ready spec.</p>
         <span class="card-arrow">Request an app to build →</span>
@@ -541,6 +564,13 @@ function openAppWizard(){
   document.getElementById('appWizardModalOverlay').classList.add('open');
 }
 function closeAppWizard(){ document.getElementById('appWizardModalOverlay').classList.remove('open'); }
+function toggleWizExportOther(){
+  const checked = document.getElementById('wizExportOther').checked;
+  document.getElementById('wizExportOtherLabel').style.display = checked ? 'none' : '';
+  const textEl = document.getElementById('wizExportOtherText');
+  textEl.style.display = checked ? '' : 'none';
+  if (checked) textEl.focus();
+}
 
 function wizGoToReview(){
   const appName = document.getElementById('wizAppName').value.trim();
@@ -554,6 +584,9 @@ function wizGoToReview(){
   if (document.getElementById('wizExportPdf').checked) exportBits.push('PDF');
   if (document.getElementById('wizExportWord').checked) exportBits.push('Word');
   if (document.getElementById('wizExportExcel').checked) exportBits.push('Excel');
+  if (document.getElementById('wizExportPng').checked) exportBits.push('PNG');
+  if (document.getElementById('wizExportJpeg').checked) exportBits.push('JPEG');
+  if (document.getElementById('wizExportOther').checked) exportBits.push(document.getElementById('wizExportOtherText').value.trim() || 'Other');
 
   wizardAnswers = {
     appName: appName,
