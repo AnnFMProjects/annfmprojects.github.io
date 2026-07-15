@@ -6088,6 +6088,14 @@ const CCE_NAV_LABELS = {
   prepaidsEscrow: 'Prepaids / Escrow Setup', cashToClose: 'Cash to Close', monthlyPayment: 'Estimated Monthly Payment',
 };
 
+// Which section the Section nav group is "on" — a deliberate state, not derived from
+// scroll position. Sections like Title & Gov Fees sit in a second column alongside
+// Lender/3rd-Party Fees, so there's no single well-defined "nearest section" from scroll
+// position alone; guessing from scroll caused the nav to skip/mislabel unpredictably.
+// Stays on Loan Basics until the user either uses Prev/Next or clicks/focuses inside a
+// section themselves (see cceSectionInteractionHandler_).
+let cceCurrentSectionKey = 'loanBasics';
+
 // Briefly outlines an element (whole loan estimate, or one panel within it)
 // so clicking Prev/Next visibly confirms where you landed, not just a scroll.
 function cceNavFlashHighlight_(el){
@@ -6194,11 +6202,24 @@ function cceNavGo(direction){
   const block = blocks[cceNearestIndexByTop_(blocks)];
   const sections = getCceNavSectionsForBlock_(block);
   if (!sections.length) return;
-  const idx = cceNearestIndexByTop_(sections.map(s => s.el));
+  let idx = sections.findIndex(s => s.key === cceCurrentSectionKey);
+  if (idx === -1) idx = 0;
   const targetIdx = Math.min(sections.length - 1, Math.max(0, idx + direction));
   const targetEl = sections[targetIdx].el;
+  cceCurrentSectionKey = sections[targetIdx].key;
   targetEl.scrollIntoView({ behavior:'smooth', block:'start' });
   cceNavFlashHighlight_(targetEl);
+  updateCceNavSectionGroup_(blocks);
+}
+
+// Fires on click/focus anywhere inside a section panel — the only other way
+// cceCurrentSectionKey changes besides Prev/Next (see the state comment above).
+function cceSectionInteractionHandler_(e){
+  const panel = e.target.closest('[data-nav]');
+  if (!panel || !CCE_NAV_ORDER.includes(panel.dataset.nav)) return;
+  if (cceCurrentSectionKey === panel.dataset.nav) return;
+  cceCurrentSectionKey = panel.dataset.nav;
+  updateCceNavSectionGroup_(getAllLoanBlocks());
 }
 
 function updateCceNavSectionGroup_(blocks){
@@ -6210,7 +6231,8 @@ function updateCceNavSectionGroup_(blocks){
     document.getElementById('cceNavNextBtn').disabled = true;
     return;
   }
-  const idx = cceNearestIndexByTop_(sections.map(s => s.el));
+  let idx = sections.findIndex(s => s.key === cceCurrentSectionKey);
+  if (idx === -1) idx = 0;
   document.getElementById('cceNavLabel').textContent = CCE_NAV_LABELS[sections[idx].key] || '';
   document.getElementById('cceNavPrevBtn').disabled = idx === 0;
   document.getElementById('cceNavNextBtn').disabled = idx === sections.length - 1;
@@ -6235,10 +6257,15 @@ function cceNavOnScroll_(){
 function initCceNavBar(){
   updateCceNavBar_();
   // The page scrolls inside .cce-scroll-area (an inner overflow:auto div),
-  // not the window, so the scroll listener has to live there.
+  // not the window, so the scroll listener has to live there. Scroll only
+  // drives which loan estimate is "current" (blocks are a simple vertical
+  // stack, so that's unambiguous) — the Section group no longer listens to
+  // scroll at all, see cceCurrentSectionKey above.
   const scrollArea = document.querySelector('.cce-scroll-area');
   if (scrollArea) scrollArea.addEventListener('scroll', cceNavOnScroll_, { passive:true });
   new MutationObserver(updateCceNavBar_).observe(document.getElementById('loanBlocksContainer'), { childList:true });
+  document.getElementById('loanBlocksContainer').addEventListener('focusin', cceSectionInteractionHandler_);
+  document.getElementById('loanBlocksContainer').addEventListener('click', cceSectionInteractionHandler_);
 }
 
 // Loads the shared PMI table once at startup (works in guest mode too, same
