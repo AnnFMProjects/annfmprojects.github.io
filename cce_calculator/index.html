@@ -574,6 +574,16 @@
 <div id="cceNavBar">
   <div class="cce-nav-group">
     <div>
+      <span class="cce-nav-group-caption">Page</span>
+      <div>
+        <button id="cceNavToTopBtn" onclick="cceNavToTop()" title="Scroll to top">&#9650;</button>
+        <button id="cceNavToBottomBtn" onclick="cceNavToBottom()" title="Scroll to bottom">&#9660;</button>
+      </div>
+    </div>
+  </div>
+  <div class="cce-nav-divider"></div>
+  <div class="cce-nav-group">
+    <div>
       <span class="cce-nav-group-caption">Loan Estimate</span>
       <div>
         <button id="cceNavEstimatePrevBtn" onclick="cceNavEstimateGo(-1)" title="Previous loan estimate">&#9664;</button>
@@ -6096,14 +6106,47 @@ function cceNearestIndexByTop_(elements){
 }
 
 // --- Loan Estimate group ---------------------------------------------------
+// Running off either end doesn't disable the button — it jumps to whichever
+// "+ Add Loan Estimate" button sits there (top-of-page for Prev, bottom of
+// the last block for Next) and highlights it, since that's the action the
+// user almost certainly wants next.
 function cceNavEstimateGo(direction){
   const blocks = getAllLoanBlocks();
   if (!blocks.length) return;
   const idx = cceNearestIndexByTop_(blocks);
-  const targetIdx = Math.min(blocks.length - 1, Math.max(0, idx + direction));
+  const targetIdx = idx + direction;
+  if (targetIdx < 0){
+    cceNavGoToAddButton_('top');
+    return;
+  }
+  if (targetIdx > blocks.length - 1){
+    cceNavGoToAddButton_('bottom');
+    return;
+  }
   const target = blocks[targetIdx];
   target.scrollIntoView({ behavior:'smooth', block:'start' });
   cceNavFlashHighlight_(target);
+}
+
+// 'top' = the toolbar's Add Loan Estimate button (above every block);
+// 'bottom' = the Add Loan Estimate button in the last block's own closing
+// header (every loan-block template bookends itself with one at each end).
+function cceNavGoToAddButton_(where){
+  let btn = null;
+  if (where === 'top'){
+    btn = document.getElementById('addLoanEstimateBtn');
+  } else {
+    const blocks = getAllLoanBlocks();
+    const lastBlock = blocks[blocks.length - 1];
+    if (lastBlock){
+      const headers = lastBlock.querySelectorAll(':scope > .loan-block-header');
+      const lastHeader = headers[headers.length - 1];
+      if (lastHeader) btn = lastHeader.querySelector('button');
+    }
+  }
+  if (!btn) return;
+  btn.scrollIntoView({ behavior:'smooth', block:'center' });
+  cceNavFlashHighlight_(btn);
 }
 
 function updateCceNavEstimateGroup_(blocks){
@@ -6112,8 +6155,21 @@ function updateCceNavEstimateGroup_(blocks){
     ? (idx + 1) + ' of ' + blocks.length + ' — ' + (blocks[idx].dataset.loanType || 'Loan')
     : (blocks[idx].dataset.loanType || 'Loan');
   document.getElementById('cceNavEstimateLabel').textContent = label;
-  document.getElementById('cceNavEstimatePrevBtn').disabled = idx === 0;
-  document.getElementById('cceNavEstimateNextBtn').disabled = idx === blocks.length - 1;
+}
+
+// --- Page group (jump straight to the very top/bottom of the scroll area) -
+function cceNavToTop(){
+  const scrollArea = document.querySelector('.cce-scroll-area');
+  if (!scrollArea) return;
+  scrollArea.scrollTo({ top:0, behavior:'smooth' });
+  const btn = document.getElementById('addLoanEstimateBtn');
+  if (btn) cceNavFlashHighlight_(btn);
+}
+
+function cceNavToBottom(){
+  const scrollArea = document.querySelector('.cce-scroll-area');
+  if (!scrollArea) return;
+  scrollArea.scrollTo({ top: scrollArea.scrollHeight, behavior:'smooth' });
 }
 
 // --- Section group (scoped to whichever loan estimate is current) ---------
