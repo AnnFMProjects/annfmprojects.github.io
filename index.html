@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AnnFMProjects Landing Page</title>
 <script src="assets/api.js"></script>
+<script src="assets/broadcast.js"></script>
 <link rel="stylesheet" href="assets/style.css">
 <style>
   :root{
@@ -420,8 +421,25 @@ function renderHubAccountArea(){
   let html = 'Hi, ' + escapeHtml_(hubAccount.Name) + ' &middot; <a href="#" onclick="hubLogout(); return false;">Logout</a>';
   if (hubAccount.isAdmin) {
     html += ' <button class="hub-admin-btn" onclick="openAdminPanel()">App Requests</button>';
+    html += ' <button class="hub-admin-btn" onclick="triggerBroadcastNow()">Notify Everyone to Refresh</button>';
+    html += ' <span id="hubBroadcastStatus" style="font-size:11px; color:var(--slate); margin-left:6px;"></span>';
   }
   area.innerHTML = html;
+}
+
+// Fires the second, independent "please refresh" mechanism (not tied to a
+// specific code version, unlike CCE's own version-check banner) — every
+// tool's open tabs will pick this up within a couple minutes via their own
+// poller (assets/broadcast.js).
+async function triggerBroadcastNow(){
+  const statusEl = document.getElementById('hubBroadcastStatus');
+  statusEl.textContent = 'Sending...';
+  try {
+    await HUB_API.triggerBroadcast();
+    statusEl.textContent = 'Sent — open tabs will see it within a couple minutes.';
+  } catch (err) {
+    statusEl.textContent = 'Failed: ' + err.message;
+  }
 }
 
 function hubLogout(){
@@ -699,6 +717,7 @@ async function deleteAdminRequest(i){
 }
 
 document.addEventListener('DOMContentLoaded', initHubSession);
+document.addEventListener('DOMContentLoaded', () => initFmBroadcastPoll(HUB_API));
 </script>
 </body>
 </html>

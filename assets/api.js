@@ -87,5 +87,20 @@ function createFmApiCore(){
       const data = await call('sendDiscrepancyEmail', { subject: subject, body: body }, { anonymous: true });
       return data.sent;
     },
+
+    // "Notify Everyone to Refresh" broadcast (independent from CCE's own
+    // per-deploy version-check banner) — an on-demand admin trigger that
+    // works across every tool, not tied to any specific code version.
+    // Anonymous read (every tool's poller needs it, logged in or not);
+    // write is admin-account-gated server-side via requireAdminAccess_,
+    // same allowlist as the hub's "App Requests" panel.
+    getBroadcastState: async function(){
+      const data = await call('getBroadcastState', {}, { anonymous: true });
+      return data.broadcastAt;
+    },
+    triggerBroadcast: async function(){
+      const data = await call('triggerBroadcast', {});
+      return data.broadcastAt;
+    },
   };
 }

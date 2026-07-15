@@ -4,6 +4,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="../assets/api.js"></script>
+<script src="../assets/broadcast.js"></script>
 <script src="../export/xlsx-helpers.js"></script>
 <link rel="stylesheet" href="../assets/style.css">
 <style>
@@ -1196,5 +1197,6 @@ async function exportXlsx(){
 window.addEventListener('DOMContentLoaded', function(){
   document.getElementById('gtGridBody').addEventListener('change', onCellChange);
   initSession();
+  initFmBroadcastPoll(GT_API);
 });
 </script>
