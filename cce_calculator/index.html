@@ -3892,6 +3892,10 @@ function renderPdfLoanPage(doc, d, navy, gold, slate, pageW, logoDataUrl){
     doc.text(l.text, leftMargin, l.y);
   });
 
+  doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
+  doc.setTextColor(210,214,224);
+  doc.text(ANN_CONTACT_LINE, pageW-40, 46, {align:'right'});
+
   doc.setFont('helvetica','italic'); doc.setFontSize(7.5);
   doc.setTextColor(210,214,224);
   doc.text('This is not a Good Faith Estimate', pageW-40, headerH-8, {align:'right'});
@@ -4603,6 +4607,7 @@ async function buildXlsxEstimateData_(container, dpMode, mathTabName, colOffset)
   }
 
   fpush('CLOSING COST ESTIMATE');
+  fpush(ANN_CONTACT_LINE);
   fpush('THIS IS NOT A GOOD FAITH ESTIMATE');
   fblank();
   FR.clientName = fpush('Client Name', d.clientName || '');
@@ -4818,6 +4823,7 @@ function buildDocxLoanSection(d){
   let body = '';
   body += docxPara(d.loanType + ' — Closing Cost Estimate', { bold:true, size:28, color:'1B2A4A', spaceAfter:60 });
   body += docxPara((d.program + ' Purchase — ' + d.county).toUpperCase(), { bold:true, size:11, color:'C9A24B', spaceAfter:40 });
+  body += docxPara(ANN_CONTACT_LINE, { size:9, color:'5B6472', spaceAfter:40 });
   if (d.clientName) body += docxPara('Prepared for: ' + d.clientName + (d.processorName ? '  |  By: ' + d.processorName : ''), { size:10, spaceAfter:40 });
   body += docxPara('This is not a Good Faith Estimate', { size:9, color:'5B6472', spaceAfter:200 });
   if (d.address) body += docxPara('Property: ' + d.address, { size:10, spaceAfter:200 });
