@@ -6083,9 +6083,14 @@ function cceNavFlashHighlight_(el){
 
 function cceNearestIndexByTop_(elements){
   const threshold = 140; // px from viewport top — counts as "current" once scrolled near the top
+  // Scans every element rather than breaking at the first miss: sections like Title & Gov Fees
+  // sit in a second column alongside Lender/3rd-Party Fees, so their tops aren't in strict
+  // top-to-bottom order on screen and an early-break loop would get stuck on the wrong index.
   let idx = 0;
+  let bestTop = -Infinity;
   for (let i = 0; i < elements.length; i++){
-    if (elements[i].getBoundingClientRect().top <= threshold) idx = i; else break;
+    const top = elements[i].getBoundingClientRect().top;
+    if (top <= threshold && top > bestTop){ bestTop = top; idx = i; }
   }
   return idx;
 }
