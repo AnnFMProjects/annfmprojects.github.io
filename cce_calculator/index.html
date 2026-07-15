@@ -853,10 +853,89 @@
         </div>
       </div>
 
+      <!-- UPDATE PMI TABLE MODAL (CCE 0.20) — admin-gated editor for the
+           shared PMI rate table, synced via the backend (getPmiTable/
+           savePmiTable) so it's the same on every device, not just this
+           browser. Any-number-of-rows, chooseable axes (LTV band / Credit
+           Score band / Loan Type), plus a Talk-and-Fill-style Use-Claude
+           prompt/paste bridge for filling it in from a real rate sheet. -->
+      <div id="pmiTableModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+        <div style="background:#fff; border-radius:10px; max-width:720px; width:100%; max-height:88vh; overflow-y:auto; padding:24px; font-family:Calibri, Arial, sans-serif;">
+
+          <div id="pmi_step_password">
+            <h3 style="margin-top:0; color:var(--navy);">Update PMI Table</h3>
+            <p style="font-size:13px; color:var(--slate); line-height:1.5;">This updates the shared PMI rate table every loan estimate on every device reads from — enter the admin password to continue.</p>
+            <div class="field-row" style="align-items:flex-start; flex-direction:column; gap:4px;">
+              <label>Admin Password</label>
+              <input type="password" id="pmiAdminPasswordInput" style="width:100%; box-sizing:border-box;" autocomplete="off" onkeydown="if(event.key==='Enter') verifyPmiPassword();">
+            </div>
+            <div id="pmiAdminPasswordError" style="color:#B3261E; font-size:12px; margin-top:6px; min-height:14px;"></div>
+            <div style="margin-top:10px; display:flex; gap:8px; justify-content:flex-end;">
+              <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="closePmiTableModal()">Cancel</button>
+              <button class="export-btn" onclick="verifyPmiPassword()">Continue</button>
+            </div>
+          </div>
+
+          <div id="pmi_step_editor" style="display:none;">
+            <h3 style="margin-top:0; color:var(--navy);">Update PMI Table</h3>
+            <p style="font-size:12.5px; color:var(--slate); line-height:1.5;">Choose which axes this table is keyed on, then add as many rows as you need. Conventional loans over 80% LTV will auto-pull PMI from here once a row matches — otherwise PMI stays manual, same as today.</p>
+
+            <div style="margin:10px 0;">
+              <label style="font-size:12px; font-weight:700; color:var(--navy); display:block; margin-bottom:4px;">Axes</label>
+              <div style="display:flex; gap:14px; flex-wrap:wrap; font-size:13px;">
+                <label class="radio-opt"><input type="checkbox" id="pmiAxisLtv" onchange="renderPmiRowTable()"> LTV Band</label>
+                <label class="radio-opt"><input type="checkbox" id="pmiAxisCreditScore" onchange="renderPmiRowTable()"> Credit Score Band</label>
+                <label class="radio-opt"><input type="checkbox" id="pmiAxisLoanType" onchange="renderPmiRowTable()"> Loan Type</label>
+              </div>
+            </div>
+
+            <div id="pmiRowTableWrap" style="overflow-x:auto;"></div>
+            <button class="export-btn" style="margin-top:8px; padding:6px 12px; font-size:12px;" onclick="addPmiRow()">+ Add Row</button>
+
+            <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--line);">
+              <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="openPmiClaudeBridge()">Use Claude to fill this in</button>
+            </div>
+
+            <div id="pmiEditorError" style="color:#B3261E; font-size:12px; margin-top:10px; min-height:14px;"></div>
+            <div style="margin-top:10px; display:flex; gap:8px; justify-content:flex-end;">
+              <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="closePmiTableModal()">Close</button>
+              <button class="export-btn" style="background:var(--navy); color:#fff;" onclick="savePmiTable()">Save</button>
+            </div>
+          </div>
+
+          <div id="pmi_step_claudePrompt" style="display:none;">
+            <h3 style="margin-top:0; color:var(--navy);">Use Claude</h3>
+            <p style="font-size:12.5px; color:var(--slate); line-height:1.5;">Copy this prompt, paste it (plus a photo or text of your real PMI rate sheet) into a new Claude chat, then paste its reply back here.</p>
+            <textarea id="pmiClaudePromptBox" readonly style="width:100%; height:160px; font-size:11px; font-family:monospace; padding:10px; border:1px solid var(--line); border-radius:5px; box-sizing:border-box;"></textarea>
+            <div id="pmiClaudeBridgeStatus" style="font-size:12px; color:var(--good); margin-top:6px; min-height:14px;"></div>
+            <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; justify-content:space-between;">
+              <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="showPmiStep('editor')">&larr; Back</button>
+              <div style="display:flex; gap:8px;">
+                <button class="export-btn" onclick="copyPmiClaudePrompt()">Copy Prompt</button>
+                <button class="export-btn" onclick="window.open('https://claude.ai/new', '_blank')">Open Claude</button>
+                <button class="export-btn" style="background:var(--navy); color:#fff;" onclick="showPmiStep('claudeReply')">I have a reply &rarr;</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="pmi_step_claudeReply" style="display:none;">
+            <h3 style="margin-top:0; color:var(--navy);">Paste Claude's Reply</h3>
+            <textarea id="pmiClaudeReplyBox" placeholder="Paste the JSON Claude replied with..." style="width:100%; height:160px; font-size:11px; font-family:monospace; padding:10px; border:1px solid var(--line); border-radius:5px; box-sizing:border-box;"></textarea>
+            <div id="pmiClaudeReplyError" style="color:#B3261E; font-size:12px; margin-top:6px; min-height:14px;"></div>
+            <div style="margin-top:10px; display:flex; gap:8px; justify-content:space-between;">
+              <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="showPmiStep('claudePrompt')">&larr; Back</button>
+              <button class="export-btn" style="background:var(--navy); color:#fff;" onclick="applyPmiClaudeReply()">Apply to Table</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
       <!-- XLSX DOWN-PAYMENT-MODE MODAL -->
       <div id="xlsxModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
         <div style="background:#fff; border-radius:10px; max-width:480px; width:100%; padding:24px; font-family:Calibri, Arial, sans-serif;">
           <h3 style="margin-top:0; color:var(--navy);">One quick thing before exporting</h3>
+          <p id="xlsxModalWhichEstimate" style="font-size:12px; color:#8A6A1F; font-weight:700; display:none;"></p>
           <p style="font-size:13px; color:var(--slate); line-height:1.5;">
             Excel spreadsheets cannot calculate this three ways at once like the website can. Please select your preferred manual input — the other two will become live formulas based on it.
           </p>
@@ -977,6 +1056,17 @@
         </div>
       </div>
 
+      <!-- EXPORT-NO-DATA MODAL (replaces native alert()) -->
+      <div id="exportNoDataModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+        <div style="background:#fff; border-radius:10px; max-width:380px; width:100%; padding:24px; font-family:Calibri, Arial, sans-serif;">
+          <h3 style="margin-top:0; color:var(--navy);">Nothing to Export</h3>
+          <p id="exportNoDataMessage" style="font-size:13px; color:var(--slate); line-height:1.5;"></p>
+          <div style="margin-top:16px; text-align:right;">
+            <button class="export-btn" style="background:var(--navy); color:#fff;" onclick="closeExportNoDataModal()">OK</button>
+          </div>
+        </div>
+      </div>
+
       <!-- DELETE THIS CLIENT MODAL -->
       <div id="deleteClientModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
         <div style="background:#fff; border-radius:10px; max-width:420px; width:100%; padding:24px; font-family:Calibri, Arial, sans-serif;">
@@ -1087,7 +1177,7 @@
         Mortgage/Mansion/Transfer tax auto-calculate from the State/County selected above for verified states (uncheck "Auto-calculate" to override for special cases like co-ops, CEMAs, or contract-shifted taxes).
       </div>
       <div class="footer-note" style="margin-top:8px; padding-top:8px; font-style:italic;">
-        Rates &amp; defaults last updated: <span id="footerLastUpdated"></span>. <a href="#" onclick="openUpdateModal(); return false;" style="color:#8A6A1F;">Update Information</a>
+        Rates &amp; defaults last updated: <span id="footerLastUpdated"></span>. <a href="#" onclick="openUpdateModal(); return false;" style="color:#8A6A1F;">Update Information</a> &nbsp;|&nbsp; <a href="#" onclick="openPmiTableModal(); return false;" style="color:#8A6A1F;">Update PMI Table</a>
       </div>
       <div class="footer-note" style="margin-top:8px; padding-top:8px;">
         This is an internal planning tool built by and for FM Home Loans loan officers to prepare closing cost estimates for their own clients. It is not a public FM Home Loans website, is not affiliated with any other lender, and does not collect or transmit personal information to any outside party.
@@ -1215,20 +1305,20 @@
             <input type="text" inputmode="decimal" data-fld="price" value="0" oninput="onPriceChange(this.closest('.loan-block'))">
           </div>
 
-          <div style="margin:8px 0 4px 0; font-size:12px; font-weight:700; color:var(--slate);">
+          <div data-fld="row_dpModeGroup" style="margin:8px 0 4px 0; font-size:12px; font-weight:700; color:var(--slate);">
             Enter ONE of the following — the other two auto-calculate:
           </div>
-          <div class="radio-group">
+          <div class="radio-group" data-fld="row_dpModeRadios">
             <label class="radio-opt"><input type="radio" name="dpMode" value="amount" checked onchange="calc(this.closest('.loan-block'))"> Down Payment ($)</label>
             <label class="radio-opt"><input type="radio" name="dpMode" value="percent" onchange="calc(this.closest('.loan-block'))"> Down Payment (%)</label>
             <label class="radio-opt"><input type="radio" name="dpMode" value="loan" onchange="calc(this.closest('.loan-block'))"> Base Loan Amount ($)</label>
           </div>
 
-          <div class="field-row">
+          <div class="field-row" data-fld="row_downAmt">
             <label>Down Payment ($)</label>
             <input type="text" inputmode="decimal" data-fld="downAmt" value="0" oninput="onEdit(this.closest('.loan-block'), 'amount')">
           </div>
-          <div class="field-row">
+          <div class="field-row" data-fld="row_downPct">
             <label>Down Payment (%)</label>
             <input type="number" step="0.01" data-fld="downPct" value="3.5" oninput="onEdit(this.closest('.loan-block'), 'percent')">
           </div>
@@ -1276,8 +1366,12 @@
             <label>MI (Mortgage Insurance) <span class="calc-badge" data-fld="badge_mi">Auto</span> <span class="hint" data-fld="miHint"></span></label>
             <input type="text" inputmode="decimal" data-fld="mi" value="0" oninput="calc(this.closest('.loan-block'))">
           </div>
+          <div class="field-row" data-fld="row_creditScore" style="display:none;">
+            <label>Credit Score <span class="manual-badge">Manual</span> <span class="hint">Optional — only used if the PMI table is keyed by credit score</span></label>
+            <input type="number" step="1" data-fld="creditScore" oninput="calc(this.closest('.loan-block'))">
+          </div>
           <div class="field-row" data-fld="row_pmi_specifics" style="display:none;">
-            <label>PMI (Private Mortgage Insurance) <span class="manual-badge">Manual</span></label>
+            <label>PMI (Private Mortgage Insurance) <span class="manual-badge" data-fld="badge_pmi">Manual</span> <span class="hint" data-fld="pmiHint"></span></label>
             <input type="text" inputmode="decimal" data-fld="pmi" value="0" oninput="calc(this.closest('.loan-block'))">
           </div>
           <div class="field-row">
@@ -1486,6 +1580,14 @@ const CCE_API = (function(){
     deleteClient: async function(recordId){
       const data = await core.call('deleteClient', { recordId: recordId });
       return data.deleted;
+    },
+    getPmiTable: async function(){
+      const data = await core.call('getPmiTable', {});
+      return data.table;
+    },
+    savePmiTable: async function(adminPassword, table){
+      const data = await core.call('savePmiTable', { adminPassword: adminPassword, table: table });
+      return data.table;
     },
   });
 })();
@@ -1810,8 +1912,12 @@ async function exportSavedClient(kind){
   } else if (kind === 'xlsx'){
     // XLSX needs the down-payment-mode modal step first — keep the temp
     // container alive until onXlsxDpModeChosen/closeXlsxModal clean it up.
-    _xlsxPendingContainer = blocks[0];
+    // Saved-Clients-preview export is always single-loan (this flow doesn't
+    // offer a multi-select), so the queue is always just the one container.
+    _xlsxPendingQueue = [blocks[0]];
+    _xlsxChosenPairs = [];
     _xlsxPendingTempContainer = tempContainer;
+    document.getElementById('xlsxModalWhichEstimate').style.display = 'none';
     document.getElementById('xlsxModalOverlay').style.display = 'flex';
   }
 }
@@ -2012,10 +2118,15 @@ function E(container, id){
   return container.querySelector('[data-fld="'+id+'"]');
 }
 
+// Single source of truth for Ann's contact line (0.20) — shown in the live
+// header (see the div right above the loan blocks container) and now on
+// every export (PDF/DOCX/XLSX) too, so a future phone/NMLS change is a
+// one-line edit instead of three.
+const ANN_CONTACT_LINE = 'Ann Zeilingold | NMLS# 41850 | P: 845-354-9700 | C: 914-260-9000';
+
 // ===========================================================================
-// EXPORT NAMING — CCE_[Client Name]_[MM-DD-YYYY]_[HH-00-00].[ext] for files
-// (slashes/colons aren't valid in filenames, so hyphens stand in for those),
-// and "CCE [Client Name] MM/DD/YYYY HH:00:00" for the email subject line.
+// EXPORT NAMING — filename is just the client's name (sanitized), and
+// "CCE [Client Name] MM/DD/YYYY HH:00:00" for the email subject line.
 // ===========================================================================
 function sanitizeFilenamePart(s){
   return String(s||'').replace(/[\/\\:*?"<>|]/g, '').trim();
@@ -3134,6 +3245,206 @@ function downloadUpdatedTool(){
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+// ===========================================================================
+// PMI TABLE (CCE 0.20) — admin-gated editor, synced via the backend
+// (CCE_API.getPmiTable/savePmiTable) so it's the same on every device. Data
+// model is row-based (array of flat objects), not a rigid 2D grid, so "any
+// number of rows and columns" is just adding/removing keys — no grid-
+// reshaping logic needed. Axes are whichever of ltv/creditScore/loanType
+// Ann ticks; each row carries a value per ticked axis plus a rate.
+// ===========================================================================
+const PMI_AXIS_DEFS = {
+  ltv: { label: 'LTV Band', checkboxId: 'pmiAxisLtv', placeholder: 'e.g. 95.01-97%' },
+  creditScore: { label: 'Credit Score Band', checkboxId: 'pmiAxisCreditScore', placeholder: 'e.g. 740-759' },
+  loanType: { label: 'Loan Type', checkboxId: 'pmiAxisLoanType', placeholder: 'e.g. Conventional' },
+};
+let _pmiTable = { axes: [], rows: [] };
+let _pmiAdminPassword = null; // held in memory only (like _updateConfirmedThisSession, never persisted) so Save doesn't re-prompt
+
+function openPmiTableModal(){
+  document.getElementById('pmiTableModalOverlay').style.display = 'flex';
+  document.getElementById('pmiAdminPasswordInput').value = '';
+  document.getElementById('pmiAdminPasswordError').textContent = '';
+  if (_pmiAdminPassword){
+    showPmiStep('editor');
+  } else {
+    showPmiStep('password');
+  }
+}
+function closePmiTableModal(){
+  document.getElementById('pmiTableModalOverlay').style.display = 'none';
+}
+function showPmiStep(step){
+  ['password','editor','claudePrompt','claudeReply'].forEach(s => {
+    document.getElementById('pmi_step_'+s).style.display = (s === step) ? '' : 'none';
+  });
+  if (step === 'claudePrompt') document.getElementById('pmiClaudePromptBox').value = buildPmiClaudePrompt();
+}
+
+async function verifyPmiPassword(){
+  const password = document.getElementById('pmiAdminPasswordInput').value;
+  const errEl = document.getElementById('pmiAdminPasswordError');
+  errEl.textContent = '';
+  if (!password){ errEl.textContent = 'Enter the admin password.'; return; }
+  try {
+    await CCE_API.adminVerify(password);
+    _pmiAdminPassword = password;
+    document.getElementById('pmiAdminPasswordInput').value = '';
+    await loadPmiTableIntoEditor();
+    showPmiStep('editor');
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+}
+
+async function loadPmiTableIntoEditor(){
+  const editorErr = document.getElementById('pmiEditorError');
+  editorErr.textContent = '';
+  try {
+    const table = await CCE_API.getPmiTable();
+    _pmiTable = table || { axes: [], rows: [] };
+  } catch (err) {
+    _pmiTable = { axes: [], rows: [] };
+    editorErr.textContent = 'Could not load the current table (' + err.message + ') — starting from a blank one; Save will still overwrite whatever is live.';
+  }
+  Object.keys(PMI_AXIS_DEFS).forEach(key => {
+    document.getElementById(PMI_AXIS_DEFS[key].checkboxId).checked = _pmiTable.axes.includes(key);
+  });
+  renderPmiRowTable();
+}
+
+function activePmiAxes_(){
+  return Object.keys(PMI_AXIS_DEFS).filter(key => document.getElementById(PMI_AXIS_DEFS[key].checkboxId).checked);
+}
+
+function renderPmiRowTable(){
+  const axes = activePmiAxes_();
+  const wrap = document.getElementById('pmiRowTableWrap');
+  if (!_pmiTable.rows.length){
+    wrap.innerHTML = '<div style="font-size:12.5px; color:var(--slate); padding:10px 0;">No rows yet — click + Add Row, or Use Claude to fill this in from a real rate sheet.</div>';
+    return;
+  }
+  let html = '<table style="border-collapse:collapse; width:100%; font-size:12.5px;"><thead><tr>';
+  axes.forEach(key => { html += '<th style="text-align:left; padding:4px 8px; border-bottom:1px solid var(--line); color:var(--navy);">' + PMI_AXIS_DEFS[key].label + '</th>'; });
+  html += '<th style="text-align:left; padding:4px 8px; border-bottom:1px solid var(--line); color:var(--navy);">Rate (%)</th><th style="border-bottom:1px solid var(--line);"></th></tr></thead><tbody>';
+  _pmiTable.rows.forEach((row, i) => {
+    html += '<tr>';
+    axes.forEach(key => {
+      html += '<td style="padding:4px 8px;"><input type="text" value="' + xmlEsc(row[key] || '') + '" placeholder="' + xmlEsc(PMI_AXIS_DEFS[key].placeholder) + '" style="width:120px; padding:4px 6px; border:1px solid var(--line); border-radius:4px;" oninput="updatePmiRowField(' + i + ',\'' + key + '\',this.value)"></td>';
+    });
+    html += '<td style="padding:4px 8px;"><input type="number" step="0.01" value="' + xmlEsc(row.rate !== undefined ? row.rate : '') + '" style="width:80px; padding:4px 6px; border:1px solid var(--line); border-radius:4px;" oninput="updatePmiRowField(' + i + ',\'rate\',this.value)"></td>';
+    html += '<td style="padding:4px 8px;"><button class="export-btn" style="padding:3px 8px; font-size:11px; background:var(--slate-light); color:var(--navy);" onclick="removePmiRow(' + i + ')">Remove</button></td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+function addPmiRow(){
+  _pmiTable.rows.push({});
+  renderPmiRowTable();
+}
+function removePmiRow(i){
+  _pmiTable.rows.splice(i, 1);
+  renderPmiRowTable();
+}
+function updatePmiRowField(i, key, value){
+  _pmiTable.rows[i][key] = key === 'rate' ? (parseFloat(value) || 0) : value;
+}
+
+async function savePmiTable(){
+  const errEl = document.getElementById('pmiEditorError');
+  errEl.textContent = '';
+  const axes = activePmiAxes_();
+  if (!axes.length){ errEl.textContent = 'Pick at least one axis before saving.'; return; }
+  if (!_pmiTable.rows.length){ errEl.textContent = 'Add at least one row before saving.'; return; }
+  const table = { axes: axes, rows: _pmiTable.rows };
+  try {
+    const saved = await CCE_API.savePmiTable(_pmiAdminPassword, table);
+    _pmiTable = saved;
+    getAllLoanBlocks().forEach(b => calc(b)); // re-run PMI auto-lookup against the just-saved table immediately
+    closePmiTableModal();
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+}
+
+// ---- Use Claude bridge — same copy-prompt/open-claude.ai/paste-reply
+// pattern as Talk-and-Fill and GT's Ask Claude, not a live API call. ----
+function buildPmiClaudePrompt(){
+  const axes = activePmiAxes_();
+  const exampleRow = {};
+  axes.forEach(key => { exampleRow[key] = PMI_AXIS_DEFS[key].placeholder.replace('e.g. ', ''); });
+  exampleRow.rate = 0.58;
+  return [
+    'You are helping a mortgage loan officer build a PMI (Private Mortgage Insurance) rate table for Conventional loans.',
+    'Reply with ONLY a JSON array of row objects (no prose, no markdown fences), one row per rate tier, using ONLY these keys: ' + axes.concat(['rate']).join(', ') + '.',
+    '"rate" is the annual PMI rate as a PERCENT (e.g. 0.58 means 0.58%/year, not 0.0058).',
+    'Example shape (not real data):',
+    JSON.stringify([exampleRow], null, 2),
+    '',
+    'Read the rate sheet I\'m about to paste/attach and extract every tier into this shape.',
+  ].join('\n');
+}
+function openPmiClaudeBridge(){
+  showPmiStep('claudePrompt');
+}
+async function copyPmiClaudePrompt(){
+  const statusEl = document.getElementById('pmiClaudeBridgeStatus');
+  try {
+    await navigator.clipboard.writeText(document.getElementById('pmiClaudePromptBox').value);
+    statusEl.textContent = 'Copied — click Open Claude, start any new chat, paste (plus your rate sheet), and send.';
+  } catch (err) {
+    statusEl.textContent = 'Could not copy automatically — select the text above and copy manually.';
+  }
+}
+function applyPmiClaudeReply(){
+  const raw = document.getElementById('pmiClaudeReplyBox').value.trim();
+  const errEl = document.getElementById('pmiClaudeReplyError');
+  errEl.textContent = '';
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch (err) { errEl.textContent = "That doesn't look like valid JSON — copy Claude's whole reply and try again."; return; }
+  if (!Array.isArray(parsed)){ errEl.textContent = 'Expected a JSON array of rows.'; return; }
+  _pmiTable.rows = _pmiTable.rows.concat(parsed);
+  document.getElementById('pmiClaudeReplyBox').value = '';
+  showPmiStep('editor');
+  renderPmiRowTable();
+}
+
+// ---- calc() integration — Conventional loans over 80% LTV auto-pull PMI
+// from whichever table row matches every axis Ann's table is keyed on.
+// Only ltv/creditScore/loanType are matchable (the three known axis keys);
+// if the saved table has no rows, or more than one row matches (ambiguous),
+// or zero rows match, PMI falls back to manual — same as before this table
+// existed, never guesses. ----
+function parsePmiBand_(band, value){
+  band = String(band || '').trim();
+  if (!band) return false;
+  let m = band.match(/^([\d.]+)\s*-\s*([\d.]+)/); // "95.01-97" or "740-759"
+  if (m) return value >= parseFloat(m[1]) && value <= parseFloat(m[2]);
+  m = band.match(/^([\d.]+)\s*\+/); // "760+"
+  if (m) return value >= parseFloat(m[1]);
+  m = band.match(/^<\s*([\d.]+)/); // "<640"
+  if (m) return value < parseFloat(m[1]);
+  return false;
+}
+function lookupPmiRate_(container, ltv){
+  if (!_pmiTable || !_pmiTable.axes || !_pmiTable.axes.length || !_pmiTable.rows.length) return null;
+  const unknownAxis = _pmiTable.axes.some(a => !PMI_AXIS_DEFS[a]);
+  if (unknownAxis) return null; // custom/generic axis this app has no matching field for — stays manual
+  const program = E(container,'loanProgram').value;
+  const creditScore = parseFloat((E(container,'creditScore') || {}).value) || null;
+  const matches = _pmiTable.rows.filter(row => {
+    return _pmiTable.axes.every(axis => {
+      if (axis === 'ltv') return parsePmiBand_(row.ltv, ltv);
+      if (axis === 'creditScore') return creditScore !== null && parsePmiBand_(row.creditScore, creditScore);
+      if (axis === 'loanType') return String(row.loanType || '').trim().toLowerCase() === program.toLowerCase();
+      return false;
+    });
+  });
+  return matches.length === 1 ? matches[0].rate : null;
+}
+
 function renderDataSourcesNote(container){
   const el = E(container,'dataSourcesNote');
   if (!el) return; // panel removed from UI; sources still tracked in container._sourceNotes for exports
@@ -3198,11 +3509,25 @@ function fmtNum(n){
 
 function calc(container){
   const price = numVal(container,'price');
-  const mode = container.querySelector('input[type="radio"]:checked').value;
+  const isRefi = (container.dataset.loanType || '').trim().toLowerCase() === 'refinance';
+  let mode = container.querySelector('input[type="radio"]:checked').value;
 
   let downAmt = numVal(container,'downAmt');
   let downPct = numVal(container,'downPct');
   let loanAmt = numVal(container,'loanAmt');
+
+  // Refinance loans have no down payment — force the amount-mode math path
+  // with downAmt pinned to 0 so Loan Amount comes out to the full Purchase
+  // Price, and hide the now-inapplicable Down Payment inputs below.
+  if (isRefi){
+    mode = 'amount';
+    downAmt = 0;
+    container.querySelectorAll('input[name="dpMode"]').forEach(r => { r.checked = (r.value === 'amount'); });
+  }
+  E(container,'row_dpModeGroup').style.display = isRefi ? 'none' : '';
+  E(container,'row_dpModeRadios').style.display = isRefi ? 'none' : '';
+  E(container,'row_downAmt').style.display = isRefi ? 'none' : '';
+  E(container,'row_downPct').style.display = isRefi ? 'none' : '';
 
   if (mode === 'amount'){
     downPct = price ? (downAmt/price*100) : 0;
@@ -3358,9 +3683,11 @@ function calc(container){
   const ltv = price ? (loanAmt/price*100) : 0;
   let mi = 0, pmi = 0;
   let miRateLabel = '';
+  let pmiRateLabel = '';
   E(container,'row_mi').style.display = hasMipMi ? '' : 'none';
   E(container,'row_pmi').style.display = hasMipMi ? 'none' : '';
   E(container,'row_mi_specifics').style.display = hasMipMi ? '' : 'none';
+  E(container,'row_creditScore').style.display = hasMipMi ? 'none' : '';
   E(container,'row_pmi_specifics').style.display = hasMipMi ? 'none' : '';
 
   if (hasMipMi){
@@ -3380,8 +3707,26 @@ function calc(container){
       miRateLabel = '';
     }
   } else {
-    pmi = numVal(container,'pmi');
+    // PMI (Conventional only) — auto-populates from the shared PMI table
+    // (0.20) when LTV > 80% and exactly one table row matches this loan's
+    // axes; otherwise stays manual, same as before the table existed.
+    const pmiTableRate = (ltv > 80) ? lookupPmiRate_(container, ltv) : null;
+    if (pmiTableRate !== null){
+      pmi = pmiTableRate/100/12 * loanAmt;
+      E(container,'pmi').value = pmi.toFixed(2);
+      E(container,'pmi').disabled = true;
+      E(container,'badge_pmi').textContent = 'Auto';
+      E(container,'badge_pmi').className = 'calc-badge';
+      pmiRateLabel = '(' + pmiTableRate.toFixed(2) + '%/yr, LTV ' + ltv.toFixed(1) + '%, from PMI table)';
+    } else {
+      pmi = numVal(container,'pmi');
+      E(container,'pmi').disabled = false;
+      E(container,'badge_pmi').textContent = 'Manual';
+      E(container,'badge_pmi').className = 'manual-badge';
+      pmiRateLabel = '';
+    }
   }
+  E(container,'pmiHint').textContent = pmiRateLabel;
 
   const monthlyTotal = pi + mTaxes + mIns + mi + pmi + hoaFee;
 
@@ -3693,6 +4038,11 @@ function renderPdfLegalPage(doc, navy, gold, slate, pageW, pageH, logoDataUrl){
     'Licensed Mortgage Banker \u2013 NYS Department of Financial Services. PA, TX, VA \u2013 NMLS ID #2212 (www.nmlsconsumeraccess.org).',
     pageW-100);
   doc.text(legalLines, 50, y);
+  y += legalLines.length*10 + 14;
+
+  doc.setFontSize(8.5);
+  doc.setTextColor(...navy);
+  doc.text(ANN_CONTACT_LINE, 50, y);
 }
 
 // ===========================================================================
@@ -3759,6 +4109,8 @@ function openStewartRateCalculator(container){
 
 function closeXlsxModal(){
   document.getElementById('xlsxModalOverlay').style.display = 'none';
+  _xlsxPendingQueue = [];
+  _xlsxChosenPairs = [];
   // Cancelling out of the down-payment-mode step while exporting a saved
   // client (not the main page) — clean up its hidden temp blocks so they
   // don't leak.
@@ -3784,11 +4136,27 @@ function closeXlsxModal(){
 // Builds a single-loan XLSX export and returns { blob } — does NOT save/
 // download; the preview flow handles that. Excel is single-loan only (the
 // Math tab is a dedicated engine for one loan at a time).
-async function buildXlsxExport(container, dpMode){
+// Auto-generated row-5 title for the two-estimate side-by-side layout (0.20)
+// — e.g. "5% Down, 0 Points". Built from the loan's own numbers rather than
+// typed per-export, so it's always accurate (if less pithy than a person's
+// own phrasing).
+function buildXlsxRowTitle_(d){
+  const pts = Math.round((d.pointsPct || 0) * 10) / 10;
+  return Math.round(d.downPct) + '% Down, ' + pts + ' Points';
+}
+
+// Builds ONE estimate's worth of cell data (front-tab cells written into
+// columns colA/colB instead of always A/B, so a second estimate can share
+// the same "Closing Cost Estimate" sheet at columns D/E; math-tab formulas
+// live entirely on their own private mathTabName sheet, untouched by the
+// column offset). Returns the raw cell data — buildXlsxExport (below)
+// merges 1 or 2 of these into the actual workbook.
+async function buildXlsxEstimateData_(container, dpMode, mathTabName, colOffset){
   calc(container);
   const d = container._cceData;
-  const MATH = 'Math - Do Not Delete';
+  const MATH = mathTabName;
   const ref = r => "'" + MATH + "'!B" + r;
+  const colA = String.fromCharCode(65 + colOffset), colB = String.fromCharCode(66 + colOffset);
 
   const rows = [];
   const R = {}; // semantic name -> row number (1-indexed)
@@ -4228,6 +4596,7 @@ async function buildXlsxExport(container, dpMode){
   fpush('THIS IS NOT A GOOD FAITH ESTIMATE');
   fblank();
   FR.clientName = fpush('Client Name', d.clientName || '');
+  FR.title = fpush(buildXlsxRowTitle_(d), ''); // always row 5 — what's unique about this estimate, for the two-estimate side-by-side layout
   fpush('Property Address', d.address || '');
   fpush('County / State', d.county);
   let fr = fpush('Loan Program', null); FF[fr] = ref(R.program); plainFrontRowsSet.add(fr); textFrontRowsSet.add(fr);
@@ -4297,10 +4666,13 @@ async function buildXlsxExport(container, dpMode){
   fref('HOA / Monthly Fee', R.hoaFee, { bold:true });
   fref('Total Monthly Payment', R.monthlyTotal, { alwaysShow:true, bold:true });
 
+  fsection('PREPARED BY');
+  fpush(ANN_CONTACT_LINE, '');
+
   // ---- Now that front-tab row numbers are known, redirect the Math tab's
   // Purchase Price (always) and the chosen down-payment field (per dpMode)
   // to reference the front tab instead of holding their own raw values ----
-  const frontRef = fr2 => "'Closing Cost Estimate'!B" + fr2;
+  const frontRef = fr2 => "'Closing Cost Estimate'!" + colB + fr2;
   setCell(mathCells, 'B'+R.price, { t:'n', f: frontRef(FR.price), v:0, s: styleIdx('currency', false) });
   if (dpMode === 'amount') setCell(mathCells, 'B'+R.downAmt, { t:'n', f: frontRef(FR.downAmt), v:0, s: styleIdx('currency', false) });
   if (dpMode === 'loan') setCell(mathCells, 'B'+R.loanAmt, { t:'n', f: frontRef(FR.loanAmt), v:0, s: styleIdx('currency', false) });
@@ -4309,26 +4681,40 @@ async function buildXlsxExport(container, dpMode){
   front.forEach((row, i) => {
     const rowNum = i+1;
     const rawLabel = row[0];
-    const bold = boldRows.has(rowNum);
+    const bold = boldRows.has(rowNum) || rowNum === FR.title;
     if (rawLabel && typeof rawLabel === 'object' && rawLabel.hideIfZero){
-      setCell(frontCells, 'A'+rowNum, { t:'str', f: 'IF('+rawLabel.mathRef+'=0,"","'+rawLabel.label+'")', v: rawLabel.label, s: styleIdx('general', bold) });
+      setCell(frontCells, colA+rowNum, { t:'str', f: 'IF('+rawLabel.mathRef+'=0,"","'+rawLabel.label+'")', v: rawLabel.label, s: styleIdx('general', bold) });
     } else if (rawLabel !== undefined && rawLabel !== null){
-      setCell(frontCells, 'A'+rowNum, { t:'inlineStr', v: rawLabel, s: styleIdx('general', bold) });
+      setCell(frontCells, colA+rowNum, { t:'inlineStr', v: rawLabel, s: styleIdx('general', bold) });
     }
     if (FF[rowNum] !== undefined){
       const isText = textFrontRowsSet.has(rowNum);
       const kind = pctFrontRowsSet.has(rowNum) ? 'percent' : (plainFrontRowsSet.has(rowNum) || isText) ? 'general' : 'currency';
-      setCell(frontCells, 'B'+rowNum, { t: isText ? 'str' : 'n', f: FF[rowNum], v: isText ? '' : 0, s: styleIdx(kind, bold) });
+      setCell(frontCells, colB+rowNum, { t: isText ? 'str' : 'n', f: FF[rowNum], v: isText ? '' : 0, s: styleIdx(kind, bold) });
     } else if (row[1] !== undefined && row[1] !== null && row[1] !== ''){
       if (typeof row[1] === 'number'){
-        setCell(frontCells, 'B'+rowNum, { t:'n', v: row[1], s: styleIdx('currency', bold) });
+        setCell(frontCells, colB+rowNum, { t:'n', v: row[1], s: styleIdx('currency', bold) });
       } else {
-        setCell(frontCells, 'B'+rowNum, { t:'inlineStr', v: row[1], s: styleIdx('general', bold) });
+        setCell(frontCells, colB+rowNum, { t:'inlineStr', v: row[1], s: styleIdx('general', bold) });
       }
     }
   });
 
-  // ---- Serialize both sheets + styles + workbook scaffolding as raw OOXML ----
+  return { mathCells, frontCells, mathTabName: MATH };
+}
+
+// Builds the actual .xlsx from 1 or 2 { container, dpMode } pairs — 1 is the
+// original single-loan workbook (colOffset 0, one math tab, unchanged
+// layout); 2 places both estimates side by side on the SAME "Closing Cost
+// Estimate" sheet (columns A-B / C blank / D-E, per Ann's spec), each with
+// its own private math tab so their formulas never collide.
+async function buildXlsxExport(pairs){
+  const estimates = await Promise.all(pairs.map((pair, i) => {
+    const mathTabName = pairs.length > 1 ? ('Math - Do Not Delete (' + (i+1) + ')') : 'Math - Do Not Delete';
+    return buildXlsxEstimateData_(pair.container, pair.dpMode, mathTabName, i * 3);
+  }));
+
+  // ---- Serialize all sheets + styles + workbook scaffolding as raw OOXML ----
   // (cellXml/sheetXml themselves live in export/xlsx-helpers.js)
 
   const stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
@@ -4352,26 +4738,32 @@ async function buildXlsxExport(container, dpMode){
     '<dxfs count="0"/>' +
     '</styleSheet>';
 
+  // sheetId 1 = the shared front sheet; sheetId 2..N+1 = one math tab per estimate.
+  const sheetEntries = ['<sheet name="Closing Cost Estimate" sheetId="1" r:id="rId1"/>']
+    .concat(estimates.map((est, i) => '<sheet name="' + xmlEsc(est.mathTabName) + '" sheetId="' + (i+2) + '" r:id="rId' + (i+2) + '"/>'));
   const workbookXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
-    '<sheets><sheet name="Closing Cost Estimate" sheetId="1" r:id="rId1"/><sheet name="' + xmlEsc(MATH) + '" sheetId="2" r:id="rId2"/></sheets>' +
+    '<sheets>' + sheetEntries.join('') + '</sheets>' +
     '<calcPr calcId="0" fullCalcOnLoad="1"/>' +
     '</workbook>';
 
+  const sheetRelEntries = ['<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>']
+    .concat(estimates.map((est, i) => '<Relationship Id="rId' + (i+2) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i+2) + '.xml"/>'));
+  const stylesRelId = 'rId' + (estimates.length + 2);
   const workbookRelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
-    '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>' +
-    '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
+    sheetRelEntries.join('') +
+    '<Relationship Id="' + stylesRelId + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
     '</Relationships>';
 
+  const sheetOverrides = ['<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>']
+    .concat(estimates.map((est, i) => '<Override PartName="/xl/worksheets/sheet' + (i+2) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'));
   const contentTypesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
     '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
     '<Default Extension="xml" ContentType="application/xml"/>' +
     '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
-    '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
-    '<Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+    sheetOverrides.join('') +
     '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
     '</Types>';
 
@@ -4380,14 +4772,21 @@ async function buildXlsxExport(container, dpMode){
     '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' +
     '</Relationships>';
 
+  // Front sheet cells are disjoint column ranges per estimate (A-B, then D-E
+  // for a 2nd) — a plain merge is safe, nothing to collide.
+  const mergedFrontCells = Object.assign({}, ...estimates.map(e => e.frontCells));
+  const frontColWidths = estimates.length > 1 ? [34, 20, 4, 34, 20] : [34, 20];
+
   const zip = new JSZip();
   zip.file('[Content_Types].xml', contentTypesXml);
   zip.file('_rels/.rels', rootRelsXml);
   zip.file('xl/workbook.xml', workbookXml);
   zip.file('xl/_rels/workbook.xml.rels', workbookRelsXml);
   zip.file('xl/styles.xml', stylesXml);
-  zip.file('xl/worksheets/sheet1.xml', sheetXml(frontCells, [34, 20]));
-  zip.file('xl/worksheets/sheet2.xml', sheetXml(mathCells, [40, 18, 55]));
+  zip.file('xl/worksheets/sheet1.xml', sheetXml(mergedFrontCells, frontColWidths));
+  estimates.forEach((est, i) => {
+    zip.file('xl/worksheets/sheet' + (i+2) + '.xml', sheetXml(est.mathCells, [40, 18, 55]));
+  });
 
   const blob = await zip.generateAsync({ type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   return { blob };
@@ -4486,7 +4885,8 @@ async function buildDocxExport(blocks){
 
   body += '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
   body += docxPara('This is an internal planning tool built by and for FM Home Loans loan officers to prepare closing cost estimates for their own clients. It is not a public FM Home Loans website, is not affiliated with any other lender, and does not collect or transmit personal information to any outside party.', { size:9, spaceAfter:200 });
-  body += docxPara('FM Home Loans \u2013 56 Congers Road, New City, NY 10956 | 718-377-7900 | NMLS ID # 2212 | Licensed Mortgage Banker. AZ Mortgage Banker License #0909583. CA \u2013 Loans made or arranged pursuant to the California Financing Law and Licensed by the Department of Financial Protection and Innovation under the California Residential Mortgage Lending Act. CT, DC, FL, GA, IL \u2013 For licensing information, go to: www.nmlsconsumeraccess.org. MA Mortgage Lender and Broker Licenses # MC2212. MD, MN. Licensed by the N.J. Department of Banking and Insurance. Licensed Mortgage Banker \u2013 NYS Department of Financial Services. PA, TX, VA \u2013 NMLS ID #2212 (www.nmlsconsumeraccess.org).', { size:8, color:'5B6472' });
+  body += docxPara('FM Home Loans \u2013 56 Congers Road, New City, NY 10956 | 718-377-7900 | NMLS ID # 2212 | Licensed Mortgage Banker. AZ Mortgage Banker License #0909583. CA \u2013 Loans made or arranged pursuant to the California Financing Law and Licensed by the Department of Financial Protection and Innovation under the California Residential Mortgage Lending Act. CT, DC, FL, GA, IL \u2013 For licensing information, go to: www.nmlsconsumeraccess.org. MA Mortgage Lender and Broker Licenses # MC2212. MD, MN. Licensed by the N.J. Department of Banking and Insurance. Licensed Mortgage Banker \u2013 NYS Department of Financial Services. PA, TX, VA \u2013 NMLS ID #2212 (www.nmlsconsumeraccess.org).', { size:8, color:'5B6472', spaceAfter:120 });
+  body += docxPara(ANN_CONTACT_LINE, { size:9, bold:true, color:'1B2A4A' });
 
   const documentXml = docxDocumentXml(body, 1000);
 
@@ -5216,6 +5616,14 @@ function confirmRemoveBlock(){
   closeRemoveBlockModal();
 }
 
+function openExportNoDataModal(message){
+  document.getElementById('exportNoDataMessage').textContent = message;
+  document.getElementById('exportNoDataModalOverlay').style.display = 'flex';
+}
+function closeExportNoDataModal(){
+  document.getElementById('exportNoDataModalOverlay').style.display = 'none';
+}
+
 // ===========================================================================
 // EXPORT FLOW (0.22 — folded into the single footer Export button) — pick
 // which loan estimate(s) to include first, then pick a format, see a
@@ -5225,7 +5633,8 @@ function confirmRemoveBlock(){
 // ===========================================================================
 let _exportKind = null;         // 'pdf' | 'docx' | 'xlsx'
 let _exportPickedBlocks = [];   // loan blocks chosen in step 1, read by step 2
-let _xlsxPendingContainer = null;
+let _xlsxPendingQueue = [];     // containers still needing a dpMode pick, in order
+let _xlsxChosenPairs = [];      // { container, dpMode } collected so far this export
 // Set only when exportSavedClient('xlsx') is mid-flow (exporting a saved
 // client from the Saved Clients preview, not the main page) — holds the
 // hidden temp block container so it can be cleaned up once the down-
@@ -5236,7 +5645,7 @@ let _exportPreviewUrl = null;
 
 function openExportPickModal(){
   const blocks = getAllLoanBlocks();
-  if (!blocks.length){ alert('Add at least one loan estimate first.'); return; }
+  if (!blocks.length){ openExportNoDataModal('Add at least one loan estimate first.'); return; }
   blocks.forEach(b => calc(b));
 
   document.getElementById('exportSelectHint').textContent = 'Choose which loan estimates to include, then pick a format.';
@@ -5257,17 +5666,17 @@ function closeExportPickModal(){
 
 function proceedFromExportPick(){
   const checkedEls = Array.from(document.querySelectorAll('input[name="exportSelectChoice"]:checked'));
-  if (!checkedEls.length){ alert('Select at least one loan.'); return; }
+  if (!checkedEls.length){ openExportNoDataModal('Select at least one loan.'); return; }
   const blocks = getAllLoanBlocks();
   _exportPickedBlocks = checkedEls.map(el => blocks[+el.value]);
   closeExportPickModal();
 
   const xlsxBtn = document.getElementById('exportFormatXlsxBtn');
-  const multiple = _exportPickedBlocks.length > 1;
-  xlsxBtn.disabled = multiple;
-  document.getElementById('exportFormatHint').textContent = multiple
-    ? 'XLSX still supports one loan estimate at a time \u2014 go back and select just one to export as Excel.'
-    : '';
+  const tooMany = _exportPickedBlocks.length > 2;
+  xlsxBtn.disabled = tooMany;
+  document.getElementById('exportFormatHint').textContent = tooMany
+    ? 'XLSX supports up to 2 loan estimates side by side \u2014 go back and select 1 or 2.'
+    : (_exportPickedBlocks.length === 2 ? 'XLSX will place both selected estimates side by side in one file.' : '');
 
   document.getElementById('exportFormatModalOverlay').style.display = 'flex';
 }
@@ -5281,8 +5690,12 @@ async function chooseExportFormat(kind){
   const selected = _exportPickedBlocks;
 
   if (kind === 'xlsx'){
-    _xlsxPendingContainer = selected[0];
-    document.getElementById('xlsxModalOverlay').style.display = 'flex';
+    // dpMode is a per-export choice, not stored per block — with 2 loans
+    // selected, the picker runs once per loan, sequentially, before the
+    // (now plural) buildXlsxExport is called with both.
+    _xlsxPendingQueue = selected.slice();
+    _xlsxChosenPairs = [];
+    xlsxAdvanceQueue_();
     return;
   }
   if (kind === 'pdf'){
@@ -5294,13 +5707,37 @@ async function chooseExportFormat(kind){
   }
 }
 
+// Shows the Down-Payment-mode picker for whichever loan is next in the
+// queue — called once up front, then again by onXlsxDpModeChosen after
+// each pick, until the queue (1 or 2 loans) is empty.
+function xlsxAdvanceQueue_(){
+  const container = _xlsxPendingQueue[0];
+  const whichEl = document.getElementById('xlsxModalWhichEstimate');
+  if (_xlsxPendingQueue.length + _xlsxChosenPairs.length > 1){
+    const idx = _xlsxChosenPairs.length + 1;
+    const total = _xlsxPendingQueue.length + _xlsxChosenPairs.length;
+    whichEl.textContent = 'Estimate ' + idx + ' of ' + total + ' — ' + (container.dataset.loanType || 'Loan');
+    whichEl.style.display = '';
+  } else {
+    whichEl.style.display = 'none';
+  }
+  document.getElementById('xlsxModalOverlay').style.display = 'flex';
+}
+
 // Called by the XLSX modal's three Down-Payment-mode buttons.
 async function onXlsxDpModeChosen(dpMode){
+  const container = _xlsxPendingQueue.shift();
+  if (!container) { closeXlsxModal(); return; }
+  _xlsxChosenPairs.push({ container: container, dpMode: dpMode });
+
+  if (_xlsxPendingQueue.length){
+    xlsxAdvanceQueue_();
+    return;
+  }
+
   document.getElementById('xlsxModalOverlay').style.display = 'none';
-  const container = _xlsxPendingContainer;
-  if (!container) return;
-  const { blob } = await buildXlsxExport(container, dpMode);
-  showExportPreview('xlsx', blob, [container]);
+  const { blob } = await buildXlsxExport(_xlsxChosenPairs);
+  showExportPreview('xlsx', blob, _xlsxChosenPairs.map(p => p.container));
   if (_xlsxPendingTempContainer){
     _xlsxPendingTempContainer.remove();
     _xlsxPendingTempContainer = null;
@@ -5737,10 +6174,22 @@ function initCceNavBar(){
   new MutationObserver(updateCceNavBar_).observe(document.getElementById('loanBlocksContainer'), { childList:true });
 }
 
+// Loads the shared PMI table once at startup (works in guest mode too, same
+// as adminVerify) so calc()'s auto-lookup has data from the first render,
+// not just after someone opens the admin editor. Silent on failure — PMI
+// just stays manual, same as before this table existed.
+async function loadPmiTableGlobal_(){
+  try {
+    const table = await CCE_API.getPmiTable();
+    if (table) _pmiTable = table;
+  } catch (err) { /* stays manual */ }
+}
+
 populateDateBar();
 initSharedDealInfo();
 initCceNavBar();
 initSession();
 startCceVersionPolling();
+loadPmiTableGlobal_();
 </script>
 
