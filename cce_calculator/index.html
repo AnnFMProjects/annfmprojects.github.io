@@ -547,6 +547,7 @@
   <div class="cce-toolbar">
     <button id="savedClientsToggleBtn" class="export-btn" onclick="toggleSidePanel('left')">&#9776; Saved Clients</button>
     <button id="addLoanEstimateBtn" class="export-btn" onclick="openLoanTypeModal()">+ Add Loan Estimate</button>
+    <button id="talkAndFillBtn" class="export-btn" onclick="tafOpen()">&#127908; Talk and Fill</button>
     <button class="export-btn" onclick="openExportSelectModal('pdf')"><svg class="dl-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v11m0 0l-4.5-4.5M12 14l4.5-4.5M5 19h14" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>PDF</button>
     <button class="export-btn" onclick="openExportSelectModal('docx')"><svg class="dl-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v11m0 0l-4.5-4.5M12 14l4.5-4.5M5 19h14" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>DOCX</button>
     <button class="export-btn" onclick="openExportSelectModal('xlsx')"><svg class="dl-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v11m0 0l-4.5-4.5M12 14l4.5-4.5M5 19h14" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>XLSX</button>
@@ -732,6 +733,79 @@
           <div style="margin-top:16px; display:flex; gap:8px; justify-content:flex-end;">
             <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="closeLoanTypeModal()">Cancel</button>
             <button class="export-btn" style="background:var(--navy); color:#fff;" onclick="confirmCustomLoanType()">Add</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TALK AND FILL MODAL (Update 4.0) — one overlay, three steps shown/
+           hidden via tafShowStep(): pick a target, capture voice/text, then
+           review the extracted fields before anything is actually applied. -->
+      <div id="tafModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:1100; align-items:center; justify-content:center; padding:20px;">
+        <div style="background:#fff; border-radius:10px; max-width:520px; width:100%; padding:24px; font-family:Calibri, Arial, sans-serif; max-height:88vh; overflow-y:auto;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="margin:0; color:var(--navy);">Talk and Fill</h3>
+            <button class="export-btn" style="padding:4px 8px; font-size:11px; background:var(--slate-light); color:var(--navy);" onclick="tafClose()">&times; Close</button>
+          </div>
+
+          <!-- STEP 1: target picker -->
+          <div id="tafStepTarget">
+            <p style="font-size:12.5px; color:var(--slate); line-height:1.5;">Which part of the page should this fill?</p>
+            <div id="tafTargetList" style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;"></div>
+            <div id="tafNewBlockPicker" style="display:none; margin-top:8px; padding-top:10px; border-top:1px solid var(--line);">
+              <label style="font-size:12px; color:var(--slate); display:block; margin-bottom:6px;">New loan estimate's type:</label>
+              <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+                <button class="export-btn" onclick="tafCreateTargetBlock('Purchase')">Purchase</button>
+                <button class="export-btn" onclick="tafCreateTargetBlock('Refinance')">Refinance</button>
+                <button class="export-btn" onclick="tafCreateTargetBlock('HELOC')">HELOC</button>
+                <button class="export-btn" onclick="tafCreateTargetBlock('Construction')">Construction</button>
+                <button class="export-btn" onclick="tafCreateTargetBlock('Reverse Mortgage')">Reverse Mortgage</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- STEP 2: voice/text capture -->
+          <div id="tafStepCapture" style="display:none;">
+            <p id="tafTargetLabel" style="font-size:12.5px; color:var(--slate); line-height:1.5;"></p>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <button type="button" id="tafMicBtn" class="export-btn" style="font-size:16px; padding:8px 12px;" onclick="tafToggleMic()">&#127908;</button>
+              <input type="text" id="tafTextInput" placeholder="Talk or type — e.g. &quot;purchase price 450k, 20% down, FHA, 30 year, rate 6.5&quot;" style="flex:1; padding:8px; border:1px solid var(--line); border-radius:5px; font-size:13px;" onkeydown="if(event.key==='Enter') tafRunTier1();">
+            </div>
+            <div id="tafCaptureStatus" style="font-size:11.5px; color:var(--slate); margin-top:6px; min-height:14px;"></div>
+            <div style="margin-top:14px; display:flex; gap:8px; justify-content:flex-end;">
+              <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="tafShowStep('target')">&larr; Back</button>
+              <button class="export-btn" style="background:var(--navy); color:#fff;" onclick="tafRunTier1()">Parse</button>
+            </div>
+          </div>
+
+          <!-- STEP 3: review + confirm -->
+          <div id="tafStepReview" style="display:none;">
+            <p style="font-size:12.5px; color:var(--slate); line-height:1.5;">Review what was found — edit anything that's wrong before applying.</p>
+            <div id="tafReviewList" style="display:flex; flex-direction:column; gap:8px;"></div>
+            <div id="tafReviewStatus" style="font-size:11.5px; color:var(--slate); margin-top:8px; min-height:14px;"></div>
+            <div style="margin-top:14px; display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
+              <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="tafTryAgain()">Try Again</button>
+              <button id="tafUseClaudeBtn" class="export-btn" onclick="tafOpenClaudeBridge()">Use Claude</button>
+              <button class="export-btn" style="background:var(--navy); color:#fff;" onclick="tafApplyConfirmed()">Apply</button>
+            </div>
+          </div>
+
+          <!-- STEP 4: copy prompt into claude.ai, paste the reply back -->
+          <div id="tafStepClaudeBridge" style="display:none;">
+            <p style="font-size:12px; color:var(--slate); line-height:1.5;">Copy this prompt, click Open Claude, start any new chat, paste it in, and send. Then paste Claude's reply back below and click Apply Reply.</p>
+            <textarea id="tafClaudePromptBox" readonly style="width:100%; height:150px; box-sizing:border-box; font-family:monospace; font-size:11px; padding:8px; border:1px solid var(--line); border-radius:6px;"></textarea>
+            <div style="display:flex; gap:8px; margin-top:8px;">
+              <button class="export-btn" onclick="tafCopyClaudePrompt()">Copy Prompt</button>
+              <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="tafOpenClaudeSite()">Open Claude</button>
+            </div>
+            <div style="margin-top:14px;">
+              <label style="font-size:12px; color:var(--navy); font-weight:700;">Paste Claude's reply here</label>
+              <textarea id="tafClaudeReplyBox" style="width:100%; height:100px; box-sizing:border-box; font-family:monospace; font-size:11px; padding:8px; border:1px solid var(--line); border-radius:6px; margin-top:4px;"></textarea>
+            </div>
+            <div id="tafClaudeBridgeStatus" style="font-size:11.5px; color:var(--slate); margin-top:8px; min-height:14px;"></div>
+            <div style="margin-top:8px; display:flex; gap:8px; justify-content:flex-end;">
+              <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="tafShowStep('review')">&larr; Back</button>
+              <button class="export-btn" style="background:var(--navy); color:#fff;" onclick="tafApplyClaudeReply()">Apply Reply</button>
+            </div>
           </div>
         </div>
       </div>
@@ -4467,6 +4541,307 @@ function createLoanBlock(loanType, skipDuplicate, targetContainerId){
     insertedRoot.scrollIntoView({ behavior:'smooth', block:'start' });
   }
   return insertedRoot;
+}
+
+// ===========================================================================
+// TALK AND FILL (Update 4.0) — voice/text capture -> free local regex pass
+// (Tier 1) -> editable review -> optional real Anthropic call (Tier 2) ->
+// Apply. Per Ann's decision, the user always explicitly picks a target
+// (Deal Setup or one specific loan block) before recording/typing — this
+// never guesses which block a phrase like "the rate is 6.5%" means.
+// ===========================================================================
+let tafTarget = null;   // { type:'dealSetup' } or { type:'block', container: <el> }
+let tafState = null;    // { rawTranscript, fields: {...} } — set once Tier 1 or Tier 2 has run
+let tafRecognition = null;
+let tafListening = false;
+
+const CCE_TAF_FIELD_LABELS = {
+  processorName: 'Processor Name', borrowerName: 'Borrower Name',
+  propertyAddress: 'Property Address', state: 'State',
+  loanProgram: 'Loan Program', price: 'Purchase Price', dpMode: 'Down Payment Mode',
+  downAmt: 'Down Payment $', downPct: 'Down Payment %', loanAmt: 'Loan Amount',
+  term: 'Term (years)', rate: 'Interest Rate %', ratePoints: 'Rate Points',
+  sellerConcession: "Seller's Concession", hoaFee: 'HOA Fee', emd: 'Deposit (EMD)',
+};
+const CCE_TAF_DEALSETUP_KEYS = ['processorName', 'borrowerName'];
+
+function tafNumFromMatch(m){
+  let n = parseFloat(String(m[1]).replace(/,/g, ''));
+  if (isNaN(n)) return null;
+  if (m[2]) n *= 1000; // "k" suffix, e.g. "450k" -> 450000
+  return n;
+}
+function tafTitleCase(s){
+  return String(s).trim().replace(/\s+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+// Applied in order; downAmt is skipped once downPct has already matched
+// (see tafParseWithRules_) since "20% down" and "$50,000 down" are the same
+// phrase shape and only one can be right per mention.
+const CCE_TAF_RULES = [
+  { key:'downPct', re:/(\d+(?:\.\d+)?)\s?%\s?(?:down|down payment)/i, transform: tafNumFromMatch },
+  { key:'downAmt', re:/down(?:\s?payment)?\D{0,6}\$?([\d,]+(?:\.\d+)?)\s?(k)?\b/i, transform: tafNumFromMatch },
+  { key:'price', re:/(?:purchase price|sale price|price)\D{0,10}\$?([\d,]+(?:\.\d+)?)\s?(k)?\b/i, transform: tafNumFromMatch },
+  { key:'rate', re:/(?:interest rate|rate)\D{0,10}(\d+(?:\.\d+)?)\s?%?/i, transform: tafNumFromMatch },
+  { key:'term', re:/(\d{2})[- ]?year/i, transform: tafNumFromMatch },
+  { key:'loanProgram', re:/\b(FHA|VA|USDA|conventional)\b/i, transform: m => /conventional/i.test(m[1]) ? 'Conventional' : m[1].toUpperCase() },
+  { key:'sellerConcession', re:/seller(?:'s)? concession\D{0,10}\$?([\d,]+(?:\.\d+)?)\s?(k)?\b/i, transform: tafNumFromMatch },
+  { key:'hoaFee', re:/\bhoa\D{0,10}\$?([\d,]+(?:\.\d+)?)\s?(k)?\b/i, transform: tafNumFromMatch },
+  { key:'emd', re:/(?:deposit|emd)\D{0,10}\$?([\d,]+(?:\.\d+)?)\s?(k)?\b/i, transform: tafNumFromMatch },
+  { key:'borrowerName', re:/(?:borrower|client)(?:'s)? name (?:is|=)\s*([a-z .'-]+?)(?:[,.]|$)/i, transform: m => tafTitleCase(m[1]) },
+  { key:'processorName', re:/processor(?:'s)? name (?:is|=)\s*([a-z .'-]+?)(?:[,.]|$)/i, transform: m => tafTitleCase(m[1]) },
+  { key:'propertyAddress', re:/(?:address|property)(?: is)?\s*:?\s*([\w\s.,#-]+?)(?:[,.]?\s*(?:price|purchase|rate|down|seller|concession|hoa|deposit|emd|borrower|processor|$))/i, transform: m => m[1].trim() },
+];
+function tafParseWithRules_(text, rules){
+  const fields = {};
+  rules.forEach(rule => {
+    if (rule.key === 'downAmt' && fields.downPct !== undefined) return;
+    const m = text.match(rule.re);
+    if (!m) return;
+    const v = rule.transform(m);
+    if (v !== null && v !== undefined && v !== '') fields[rule.key] = v;
+  });
+  // Reuses the exact same state-detection logic parseAddress() already uses
+  // for the address field, instead of duplicating a keyword table here.
+  const detectedState = detectStateFromText(text.toLowerCase());
+  if (detectedState) fields.state = detectedState;
+  return fields;
+}
+
+function tafFieldKeysForTarget_(){
+  return tafTarget && tafTarget.type === 'dealSetup'
+    ? CCE_TAF_DEALSETUP_KEYS
+    : Object.keys(CCE_TAF_FIELD_LABELS).filter(k => CCE_TAF_DEALSETUP_KEYS.indexOf(k) === -1);
+}
+
+function tafOpen(){
+  tafTarget = null;
+  tafState = null;
+  document.getElementById('tafTextInput').value = '';
+  document.getElementById('tafCaptureStatus').textContent = '';
+  tafRenderTargetList();
+  document.getElementById('tafModalOverlay').style.display = 'flex';
+  tafShowStep('target');
+}
+function tafClose(){
+  if (tafListening && tafRecognition) tafRecognition.stop();
+  document.getElementById('tafModalOverlay').style.display = 'none';
+}
+function tafShowStep(step){
+  document.getElementById('tafStepTarget').style.display = step === 'target' ? '' : 'none';
+  document.getElementById('tafStepCapture').style.display = step === 'capture' ? '' : 'none';
+  document.getElementById('tafStepReview').style.display = step === 'review' ? '' : 'none';
+  document.getElementById('tafStepClaudeBridge').style.display = step === 'claudeBridge' ? '' : 'none';
+}
+
+function tafRenderTargetList(){
+  const list = document.getElementById('tafTargetList');
+  const blocks = getAllLoanBlocks();
+  let html = '<button class="export-btn" style="text-align:left;" onclick="tafSelectTarget(\'dealSetup\')">Deal Setup <span style="color:var(--slate); font-weight:400;">(Processor / Borrower name)</span></button>';
+  blocks.forEach(b => {
+    const title = b.querySelector('.loan-block-title').textContent;
+    html += '<button class="export-btn" style="text-align:left;" onclick="tafSelectTargetBlock(\'' + b.id + '\')">' + title + '</button>';
+  });
+  html += '<button class="export-btn" style="text-align:left; background:var(--slate-light); color:var(--navy);" onclick="tafShowNewBlockPicker()">+ New loan estimate&hellip;</button>';
+  list.innerHTML = html;
+  document.getElementById('tafNewBlockPicker').style.display = 'none';
+}
+function tafShowNewBlockPicker(){
+  document.getElementById('tafNewBlockPicker').style.display = '';
+}
+function tafCreateTargetBlock(loanType){
+  const block = createLoanBlock(loanType);
+  tafTarget = { type:'block', container: block };
+  tafEnterCaptureStep_();
+}
+function tafSelectTarget(type){
+  tafTarget = { type: type };
+  tafEnterCaptureStep_();
+}
+function tafSelectTargetBlock(blockId){
+  const container = document.getElementById(blockId);
+  if (!container) return;
+  tafTarget = { type:'block', container: container };
+  tafEnterCaptureStep_();
+}
+function tafEnterCaptureStep_(){
+  const label = tafTarget.type === 'dealSetup'
+    ? 'Filling: Deal Setup'
+    : 'Filling: ' + tafTarget.container.querySelector('.loan-block-title').textContent;
+  document.getElementById('tafTargetLabel').textContent = label;
+  document.getElementById('tafTextInput').value = '';
+  document.getElementById('tafCaptureStatus').textContent = '';
+  tafShowStep('capture');
+}
+
+// ---------------------------------------------------------------------------
+// Voice capture — browser SpeechRecognition, typed/pasted text works
+// identically with zero extra code since they share the same input.
+// ---------------------------------------------------------------------------
+function tafInitSpeech_(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return null;
+  const rec = new SR();
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.lang = 'en-US';
+  rec.onresult = function(e){
+    let finalText = '';
+    for (let i = e.resultIndex; i < e.results.length; i++){
+      if (e.results[i].isFinal) finalText += e.results[i][0].transcript;
+    }
+    if (finalText){
+      const box = document.getElementById('tafTextInput');
+      box.value = ((box.dataset.committed || '') + ' ' + finalText).trim();
+      box.dataset.committed = box.value;
+    }
+  };
+  rec.onerror = function(){ tafListening = false; tafUpdateMicUI_(); document.getElementById('tafCaptureStatus').textContent = 'Voice capture stopped — you can keep typing instead.'; };
+  rec.onend = function(){ tafListening = false; tafUpdateMicUI_(); };
+  return rec;
+}
+function tafUpdateMicUI_(){
+  document.getElementById('tafMicBtn').style.background = tafListening ? '#B3261E' : '';
+  document.getElementById('tafMicBtn').style.color = tafListening ? '#fff' : '';
+}
+function tafToggleMic(){
+  if (!tafRecognition) tafRecognition = tafInitSpeech_();
+  if (!tafRecognition){
+    document.getElementById('tafCaptureStatus').textContent = 'Voice input is not supported in this browser — type instead.';
+    return;
+  }
+  if (tafListening){
+    tafRecognition.stop();
+  } else {
+    document.getElementById('tafTextInput').dataset.committed = document.getElementById('tafTextInput').value;
+    try { tafRecognition.start(); tafListening = true; tafUpdateMicUI_(); } catch (err) { /* already started — ignore */ }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Tier 1 (free, local) -> review UI
+// ---------------------------------------------------------------------------
+function tafRunTier1(){
+  const text = document.getElementById('tafTextInput').value.trim();
+  if (!text) return;
+  const fields = tafParseWithRules_(text, CCE_TAF_RULES);
+  tafState = { rawTranscript: text, fields: fields };
+  tafRenderReview();
+  tafShowStep('review');
+}
+function tafRenderReview(){
+  const list = document.getElementById('tafReviewList');
+  const allowedKeys = tafFieldKeysForTarget_();
+  const fields = tafState.fields || {};
+  const rows = Object.keys(fields).filter(k => allowedKeys.indexOf(k) !== -1 && CCE_TAF_FIELD_LABELS[k]);
+  if (!rows.length){
+    list.innerHTML = '<div style="font-size:12.5px; color:var(--slate);">Nothing recognized locally — try rephrasing, or click Use Claude for a smarter pass.</div>';
+  } else {
+    list.innerHTML = rows.map(k =>
+      '<div style="display:flex; align-items:center; gap:8px;">' +
+        '<label style="font-size:12px; color:var(--navy); font-weight:700; min-width:150px;">' + CCE_TAF_FIELD_LABELS[k] + '</label>' +
+        '<input data-taf-key="' + k + '" value="' + String(fields[k]).replace(/"/g, '&quot;') + '" style="flex:1; padding:6px 8px; border:1px solid var(--line); border-radius:5px; font-size:13px;">' +
+      '</div>'
+    ).join('');
+  }
+  document.getElementById('tafReviewStatus').textContent = '';
+}
+
+// ---------------------------------------------------------------------------
+// USE CLAUDE — manual escape hatch for whatever Tier 1 couldn't resolve. No
+// API key, no server call: composes a prompt to copy into a normal claude.ai
+// chat, and applies whatever JSON comes back through the same review list
+// (still editable, still requires a separate Apply click).
+// ---------------------------------------------------------------------------
+function tafComposeClaudePrompt_(){
+  const exampleShape = {
+    processorName: 'Jane Doe', borrowerName: 'John Smith', propertyAddress: '123 Main St, Nyack, NY',
+    state: 'NY', loanProgram: 'FHA', price: 450000, dpMode: 'percent', downAmt: 90000, downPct: 20,
+    loanAmt: 360000, term: 30, rate: 6.5, ratePoints: 0, sellerConcession: 5000, hoaFee: 0, emd: 1000,
+  };
+  return [
+    'You are helping fill in a mortgage Closing Cost Estimate calculator for a loan officer.',
+    'Given her raw note below, reply with ONLY a JSON object (no prose, no markdown fences) using ONLY the keys actually stated in her note — omit anything not mentioned, never guess or fabricate a value. Example shape (not real data, just the keys/format):',
+    JSON.stringify(exampleShape, null, 2),
+    '',
+    '"dpMode" (if included) must be one of: amount, percent, loan — whichever of downAmt/downPct/loanAmt she actually stated.',
+    '',
+    'Her note: "' + tafState.rawTranscript.replace(/"/g, '\\"') + '"',
+  ].join('\n');
+}
+function tafOpenClaudeBridge(){
+  document.getElementById('tafClaudePromptBox').value = tafComposeClaudePrompt_();
+  document.getElementById('tafClaudeReplyBox').value = '';
+  document.getElementById('tafClaudeBridgeStatus').textContent = '';
+  tafShowStep('claudeBridge');
+}
+async function tafCopyClaudePrompt(){
+  try {
+    await navigator.clipboard.writeText(document.getElementById('tafClaudePromptBox').value);
+    document.getElementById('tafClaudeBridgeStatus').textContent = 'Copied — click Open Claude, start any new chat, paste, and send.';
+  } catch (err) {
+    document.getElementById('tafClaudeBridgeStatus').textContent = 'Could not copy automatically — select the text above and copy manually.';
+  }
+}
+function tafOpenClaudeSite(){ window.open('https://claude.ai/new', '_blank'); }
+function tafApplyClaudeReply(){
+  const raw = document.getElementById('tafClaudeReplyBox').value.trim();
+  const statusEl = document.getElementById('tafClaudeBridgeStatus');
+  if (!raw){ statusEl.textContent = "Paste Claude's reply first."; return; }
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch (err) { statusEl.textContent = "That doesn't look like valid JSON — copy Claude's whole reply and try again."; return; }
+  tafState.fields = parsed;
+  tafRenderReview();
+  tafShowStep('review');
+}
+function tafTryAgain(){
+  tafState = null;
+  document.getElementById('tafTextInput').value = '';
+  document.getElementById('tafTextInput').dataset.committed = '';
+  tafShowStep('capture');
+}
+function tafApplyConfirmed(){
+  const edited = {};
+  document.querySelectorAll('#tafReviewList [data-taf-key]').forEach(el => {
+    if (el.value !== '') edited[el.dataset.tafKey] = el.value;
+  });
+  applyTalkAndFillCce(edited);
+  tafClose();
+}
+
+// The only function allowed to write into the real form for Talk and Fill —
+// always finishes through the tool's existing write/recalculate path
+// (applyFieldValues -> calc(), same as every other programmatic fill).
+function applyTalkAndFillCce(fields){
+  if (tafTarget.type === 'dealSetup'){
+    if (fields.processorName !== undefined) document.getElementById('processorName').value = fields.processorName;
+    if (fields.borrowerName !== undefined) document.getElementById('borrowerName').value = fields.borrowerName;
+    return;
+  }
+  const dest = tafTarget.container;
+  const values = {};
+  Object.keys(fields).forEach(k => { if (CCE_TAF_DEALSETUP_KEYS.indexOf(k) === -1) values[k] = fields[k]; });
+  // calc() treats whichever of downAmt/downPct/loanAmt ISN'T the active
+  // dpMode as a derived output and overwrites it — so a value we just set
+  // for the non-active mode would otherwise be silently clobbered right
+  // back to its calculated figure. Infer __dpMode from whichever of the
+  // three the parse actually gave us (a fields.dpMode from Tier 2 wins).
+  if (values.dpMode !== undefined){
+    values.__dpMode = values.dpMode;
+    delete values.dpMode;
+  } else if (values.downPct !== undefined){
+    values.__dpMode = 'percent';
+  } else if (values.downAmt !== undefined){
+    values.__dpMode = 'amount';
+  } else if (values.loanAmt !== undefined){
+    values.__dpMode = 'loan';
+  }
+  applyFieldValues(dest, values);
+  // Address was set programmatically, so its oninput debounce never fired —
+  // if the parse didn't already give us a state, let the existing
+  // address-parsing logic take a pass at whatever address text landed.
+  if (values.propertyAddress !== undefined && values.state === undefined){
+    parseAddress(dest);
+  }
 }
 
 // ===========================================================================
