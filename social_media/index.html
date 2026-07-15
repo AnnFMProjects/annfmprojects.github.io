@@ -133,6 +133,7 @@
   .rate-table td{ padding:4px; border-bottom:1px solid var(--slate-light); }
   .rate-table input{ width:100%; padding:5px 6px; border:1px solid var(--line); border-radius:4px; font-size:12px; }
   .rate-row-del{ background:none; border:none; color:var(--bad); cursor:pointer; font-size:15px; padding:2px 6px; }
+  .arrow-pick-btn{ width:20px; height:20px; border:1.5px solid; border-radius:3px; cursor:pointer; font-size:11px; font-weight:700; padding:0; line-height:1; font-family:inherit; }
   .add-row-btn{ margin-top:6px; font-size:11px; padding:5px 10px; border:1px solid var(--line); background:#fff; border-radius:5px; cursor:pointer; color:var(--slate); }
 
   .dropzone{
@@ -748,7 +749,13 @@ function parseRatesFromOcrText(){
 // Shared by the editable table and the design previews so the two can never
 // disagree: rate went down = green ↓ (good for the borrower), up = red ↑,
 // unchanged = grey –.
-function rateChangeMeta_(change){
+// direction: 'auto' (default, derived from the Change value's sign) or a
+// manual override ('down'/'up'/'flat') — Ann wants to be able to force the
+// arrow/color regardless of what the raw number says.
+function rateChangeMeta_(change, direction){
+  if (direction === 'down') return { color: '#2F6B4F', arrow: '↓' };
+  if (direction === 'up') return { color: '#B3261E', arrow: '↑' };
+  if (direction === 'flat') return { color: '#5B6472', arrow: '–' };
   const n = parseFloat(change);
   if (isNaN(n)) return { color: '#5B6472', arrow: '' };
   if (n < 0) return { color: '#2F6B4F', arrow: '↓' };
@@ -756,29 +763,51 @@ function rateChangeMeta_(change){
   return { color: '#5B6472', arrow: '–' };
 }
 
+function arrowPickerHtml_(i, r){
+  const meta = rateChangeMeta_(r.change, r.direction);
+  const btn = (dir, glyph, color) => {
+    const active = meta.arrow === (dir === 'down' ? '↓' : dir === 'up' ? '↑' : '–');
+    return '<button type="button" class="arrow-pick-btn" style="' +
+      (active ? 'background:' + color + '; color:#fff; border-color:' + color + ';' : 'background:#fff; color:' + color + '; border-color:' + color + ';') +
+      '" onclick="setRateDirection(' + i + ', \'' + dir + '\')" title="' + dir + '">' + glyph + '</button>';
+  };
+  return '<span id="rcArrowPicker_' + i + '" style="display:inline-flex; gap:2px;">' +
+    btn('down', '↓', '#2F6B4F') + btn('flat', '–', '#5B6472') + btn('up', '↑', '#B3261E') +
+    '</span>';
+}
+
 function renderRateTable(){
   const body = document.getElementById('rcRateTableBody');
-  body.innerHTML = rcRates.map((r, i) => {
-    const meta = rateChangeMeta_(r.change);
-    return '' +
+  body.innerHTML = rcRates.map((r, i) => '' +
       '<tr>' +
         '<td><input type="text" value="' + escapeAttr_(r.program) + '" oninput="updateRateRow(' + i + ', \'program\', this.value)"></td>' +
         '<td><input type="text" value="' + escapeAttr_(r.rate) + '" oninput="updateRateRow(' + i + ', \'rate\', this.value)"></td>' +
         '<td style="display:flex; align-items:center; gap:5px;">' +
-          '<input type="text" value="' + escapeAttr_(r.change) + '" oninput="updateRateRow(' + i + ', \'change\', this.value)">' +
-          '<span style="color:' + meta.color + '; font-weight:700; font-size:13px; width:12px;">' + meta.arrow + '</span>' +
+          '<input type="text" value="' + escapeAttr_(r.change) + '" oninput="updateRateRow(' + i + ', \'change\', this.value)" style="flex:1;">' +
+          arrowPickerHtml_(i, r) +
         '</td>' +
         '<td><button class="rate-row-del" onclick="removeRateRow(' + i + ')">&times;</button></td>' +
-      '</tr>';
-  }).join('');
+      '</tr>'
+  ).join('');
 }
 function addRateRow(program, rate, change){
-  rcRates.push({ program: program || '', rate: rate || '', change: change || '' });
+  rcRates.push({ program: program || '', rate: rate || '', change: change || '', direction: 'auto' });
   renderRateTable();
   renderRateDesigns();
 }
+// Text-input edits update the arrow picker for just that row in place
+// (rather than re-rendering the whole table) so the input doesn't lose
+// focus/cursor position mid-keystroke.
 function updateRateRow(i, field, value){
   rcRates[i][field] = value;
+  const picker = document.getElementById('rcArrowPicker_' + i);
+  if (picker) picker.outerHTML = arrowPickerHtml_(i, rcRates[i]);
+  renderRateDesigns();
+}
+function setRateDirection(i, dir){
+  rcRates[i].direction = (rcRates[i].direction === dir) ? 'auto' : dir;
+  const picker = document.getElementById('rcArrowPicker_' + i);
+  if (picker) picker.outerHTML = arrowPickerHtml_(i, rcRates[i]);
   renderRateDesigns();
 }
 function removeRateRow(i){
@@ -794,21 +823,23 @@ function removeRateRow(i){
 // Ann provided, not a generic placeholder.
 function rateDesignHtml(partner, rates, dateIso){
   const rowsHtml = (rates.length ? rates : [{ program: 'Add rates to preview', rate: '', change: '' }]).slice(0, 8).map(r => {
-    const meta = rateChangeMeta_(r.change);
+    const meta = rateChangeMeta_(r.change, r.direction);
     return '' +
       '<tr>' +
-        '<td style="padding:2px 4px; font-size:9px; color:#1E2430; border-bottom:1px solid #EDEFF3;">' + escapeHtml_(r.program) + '</td>' +
-        '<td style="padding:2px 4px; font-size:9px; font-weight:700; text-align:right; color:#1E2430; border-bottom:1px solid #EDEFF3;">' + escapeHtml_(r.rate ? r.rate + '%' : '') + '</td>' +
-        '<td style="padding:2px 4px; font-size:8.5px; text-align:right; color:' + meta.color + '; border-bottom:1px solid #EDEFF3;">' + escapeHtml_(r.change ? r.change + '%' : '') + ' ' + meta.arrow + '</td>' +
+        '<td style="padding:2px 4px; font-size:9px; color:#1E2430;">' + escapeHtml_(r.program) + '</td>' +
+        '<td style="padding:2px 4px; font-size:9px; font-weight:700; text-align:right; color:#1E2430;">' + escapeHtml_(r.rate ? r.rate + '%' : '') + '</td>' +
+        '<td style="padding:2px 4px; font-size:8.5px; text-align:right; color:' + meta.color + ';">' + escapeHtml_(r.change ? r.change + '%' : '') + ' ' + meta.arrow + '</td>' +
       '</tr>';
   }).join('');
 
+  // "General" (no realtor) still gets a real FM Home Loans logo — natural
+  // red-icon/black-text colors, no color-fill background behind it.
   const bannerHtml = partner.banner
     ? '<img src="' + partner.banner + '" style="width:100%; display:block;">'
     : '' +
-      '<div style="background:var(--navy); padding:12px 14px; display:flex; align-items:center; gap:8px;">' +
-        '<img src="' + FM_LOGO_SRC + '" style="height:16px; width:auto; filter:brightness(0) invert(1);">' +
-        '<span style="color:#F4D9A0; font-family:Cambria, Georgia, serif; font-size:11px; font-weight:700;">Today&rsquo;s Rates</span>' +
+      '<div style="background:#fff; padding:12px 14px; display:flex; align-items:center; gap:8px; border-bottom:1.5px solid #1E2430;">' +
+        '<img src="' + FM_LOGO_SRC + '" style="height:20px; width:auto;">' +
+        '<span style="color:var(--navy); font-family:Cambria, Georgia, serif; font-size:11px; font-weight:700;">Today&rsquo;s Rates</span>' +
       '</div>';
 
   return '' +
@@ -816,9 +847,9 @@ function rateDesignHtml(partner, rates, dateIso){
       bannerHtml +
       '<div style="padding:10px 14px 0;">' +
         '<table style="width:100%; border-collapse:collapse; border:1.5px solid #1E2430;"><thead><tr>' +
-          '<th style="text-align:left; font-size:7.5px; padding:2px 4px; color:#5B6472;">Program</th>' +
-          '<th style="text-align:right; font-size:7.5px; padding:2px 4px; color:#5B6472;">Rate</th>' +
-          '<th style="text-align:right; font-size:7.5px; padding:2px 4px; color:#5B6472;">Change</th>' +
+          '<th style="text-align:left; font-size:7.5px; padding:2px 4px; color:#5B6472; border-bottom:1.5px solid #1E2430;"></th>' +
+          '<th style="text-align:right; font-size:7.5px; padding:2px 4px; color:#5B6472; border-bottom:1.5px solid #1E2430;">Rate</th>' +
+          '<th style="text-align:right; font-size:7.5px; padding:2px 4px; color:#5B6472; border-bottom:1.5px solid #1E2430;">Change</th>' +
         '</tr></thead><tbody>' + rowsHtml + '</tbody></table>' +
         '<div style="text-align:right; margin-top:4px;"><img src="' + MND_SOURCE_LOGO_SRC + '" style="height:11px; width:auto;"></div>' +
       '</div>' +
@@ -831,7 +862,7 @@ function rateDesignHtml(partner, rates, dateIso){
         '</div>' +
         '<img src="' + FM_LOGO_SRC + '" style="height:16px; width:auto; flex-shrink:0;">' +
       '</div>' +
-      '<div style="display:flex; align-items:center; gap:6px; background:' + partner.color + '; color:' + partner.textColor + '; padding:5px 10px;">' +
+      '<div style="display:flex; align-items:center; gap:6px; background:#fff; color:#1E2430; padding:5px 10px;">' +
         '<img src="' + EQUAL_HOUSING_ICON_SRC + '" style="height:20px; width:auto; flex-shrink:0;">' +
         '<div style="font-size:4px; line-height:1.3;">' + escapeHtml_(COMPLIANCE_DISCLOSURE_TEXT) + '</div>' +
       '</div>' +
