@@ -478,23 +478,39 @@
     display:none;
     position:fixed;
     bottom:18px;
-    right:18px;
+    left:50%;
+    transform:translateX(-50%);
     z-index:1500;
     background:var(--navy);
     color:#fff;
     font-family:Calibri, Arial, sans-serif;
-    border-radius:8px;
+    border-radius:10px;
     box-shadow:0 4px 18px rgba(16,27,51,0.28);
     align-items:center;
+    gap:4px;
+    padding:5px;
+    max-width:calc(100vw - 20px);
+  }
+  .cce-nav-group{
+    display:flex;
+    align-items:center;
     gap:2px;
-    padding:4px;
+  }
+  .cce-nav-group-caption{
+    font-size:8.5px;
+    text-transform:uppercase;
+    letter-spacing:.5px;
+    color:#8892A8;
+    text-align:center;
+    display:block;
+    margin-bottom:1px;
   }
   #cceNavBar button{
     background:transparent;
     color:#fff;
     border:none;
     border-radius:5px;
-    padding:8px 10px;
+    padding:7px 9px;
     font-size:13px;
     cursor:pointer;
     font-family:Calibri, Arial, sans-serif;
@@ -502,18 +518,43 @@
   #cceNavBar button:hover{ background:rgba(255,255,255,0.14); }
   #cceNavBar button:disabled{ opacity:0.35; cursor:default; }
   #cceNavBar button:disabled:hover{ background:transparent; }
-  #cceNavLabel{
+  .cce-nav-label{
     font-size:11.5px;
     color:#C9CEDA;
-    padding:0 8px;
-    max-width:150px;
+    padding:0 6px;
+    max-width:130px;
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
   }
+  .cce-nav-divider{
+    width:1px;
+    align-self:stretch;
+    margin:4px 3px;
+    background:rgba(255,255,255,0.18);
+  }
+  #cceNavExportBtn{
+    display:flex;
+    align-items:center;
+    gap:5px;
+    background:var(--gold);
+    color:var(--navy-deep);
+    font-weight:600;
+    padding:8px 14px !important;
+  }
+  #cceNavExportBtn:hover{ background:#D9B76A !important; }
   @media (max-width: 880px){
-    #cceNavBar{ right:10px; bottom:10px; }
-    #cceNavLabel{ display:none; }
+    #cceNavBar{ left:auto; right:10px; transform:none; bottom:10px; }
+    .cce-nav-label{ display:none; }
+    .cce-nav-group-caption{ display:none; }
+  }
+  @keyframes cceNavHighlightFlash{
+    0%{ box-shadow:0 0 0 3px rgba(201,162,75,0.95); }
+    100%{ box-shadow:0 0 0 3px rgba(201,162,75,0); }
+  }
+  .cce-nav-highlight{
+    animation:cceNavHighlightFlash 1.5s ease-out;
+    border-radius:8px;
   }
   .footer-note{
     grid-column:1 / -1;
@@ -531,9 +572,29 @@
   <button onclick="location.reload()">Refresh Now</button>
 </div>
 <div id="cceNavBar">
-  <button id="cceNavPrevBtn" onclick="cceNavGo(-1)" title="Previous section">&#9664; Prev</button>
-  <span id="cceNavLabel"></span>
-  <button id="cceNavNextBtn" onclick="cceNavGo(1)" title="Next section">Next &#9654;</button>
+  <div class="cce-nav-group">
+    <div>
+      <span class="cce-nav-group-caption">Loan Estimate</span>
+      <div>
+        <button id="cceNavEstimatePrevBtn" onclick="cceNavEstimateGo(-1)" title="Previous loan estimate">&#9664;</button>
+        <span id="cceNavEstimateLabel" class="cce-nav-label"></span>
+        <button id="cceNavEstimateNextBtn" onclick="cceNavEstimateGo(1)" title="Next loan estimate">&#9654;</button>
+      </div>
+    </div>
+  </div>
+  <div class="cce-nav-divider"></div>
+  <div class="cce-nav-group">
+    <div>
+      <span class="cce-nav-group-caption">Section</span>
+      <div>
+        <button id="cceNavPrevBtn" onclick="cceNavGo(-1)" title="Previous section">&#9664;</button>
+        <span id="cceNavLabel" class="cce-nav-label"></span>
+        <button id="cceNavNextBtn" onclick="cceNavGo(1)" title="Next section">&#9654;</button>
+      </div>
+    </div>
+  </div>
+  <div class="cce-nav-divider"></div>
+  <button id="cceNavExportBtn" onclick="openExportPickModal()" title="Export"><svg class="dl-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v11m0 0l-4.5-4.5M12 14l4.5-4.5M5 19h14" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg> Export</button>
 </div>
 <div class="cce-wrap">
   <div class="cce-header">
@@ -645,9 +706,6 @@
     <button id="savedClientsToggleBtn" class="export-btn" onclick="toggleSidePanel('left')">&#9776; Saved Clients</button>
     <button id="addLoanEstimateBtn" class="export-btn" onclick="openLoanTypeModal()">+ Add Loan Estimate</button>
     <button id="talkAndFillBtn" class="export-btn" onclick="tafOpen()">&#127908; Talk and Fill</button>
-    <button class="export-btn" onclick="openExportSelectModal('pdf')"><svg class="dl-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v11m0 0l-4.5-4.5M12 14l4.5-4.5M5 19h14" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>PDF</button>
-    <button class="export-btn" onclick="openExportSelectModal('docx')"><svg class="dl-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v11m0 0l-4.5-4.5M12 14l4.5-4.5M5 19h14" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>DOCX</button>
-    <button class="export-btn" onclick="openExportSelectModal('xlsx')"><svg class="dl-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v11m0 0l-4.5-4.5M12 14l4.5-4.5M5 19h14" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>XLSX</button>
     <button id="saveThisClientBtn" class="export-btn" style="background:var(--navy); color:#fff;" onclick="saveThisClient()">Save This Client</button>
     <button id="saveAsDraftBtn" class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="saveThisClientAsDraftButton()">Save As Draft</button>
     <button id="newClientBtn" class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="newClient()">New Client</button>
@@ -954,12 +1012,28 @@
       <!-- EXPORT: SELECT WHICH LOANS MODAL -->
       <div id="exportSelectModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
         <div style="background:#fff; border-radius:10px; max-width:440px; width:100%; padding:24px; font-family:Calibri, Arial, sans-serif;">
-          <h3 style="margin-top:0; color:var(--navy);" id="exportSelectTitle">Select Loans to Export</h3>
-          <p style="font-size:12px; color:var(--slate);" id="exportSelectHint">Choose which loan estimates to include.</p>
+          <h3 style="margin-top:0; color:var(--navy);" id="exportSelectTitle">Select Loan Estimates to Export</h3>
+          <p style="font-size:12px; color:var(--slate);" id="exportSelectHint">Choose which loan estimates to include, then pick a format.</p>
           <div id="exportSelectList" style="max-height:280px; overflow-y:auto;"></div>
           <div style="margin-top:16px; display:flex; gap:8px; justify-content:flex-end;">
-            <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="closeExportSelectModal()">Cancel</button>
-            <button class="export-btn" style="background:var(--navy); color:#fff;" onclick="proceedFromExportSelect()">Continue</button>
+            <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="closeExportPickModal()">Cancel</button>
+            <button class="export-btn" style="background:var(--navy); color:#fff;" onclick="proceedFromExportPick()">Continue</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- EXPORT: PICK FORMAT MODAL (2nd step, after loans are selected) -->
+      <div id="exportFormatModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+        <div style="background:#fff; border-radius:10px; max-width:400px; width:100%; padding:24px; font-family:Calibri, Arial, sans-serif;">
+          <h3 style="margin-top:0; color:var(--navy);">Choose a Format</h3>
+          <p style="font-size:12px; color:var(--slate);" id="exportFormatHint"></p>
+          <div style="display:flex; flex-direction:column; gap:8px; margin-top:12px;">
+            <button class="export-btn" style="padding:14px;" onclick="chooseExportFormat('pdf')">PDF</button>
+            <button class="export-btn" style="padding:14px;" onclick="chooseExportFormat('docx')">DOCX</button>
+            <button class="export-btn" id="exportFormatXlsxBtn" style="padding:14px;" onclick="chooseExportFormat('xlsx')">XLSX</button>
+          </div>
+          <div style="margin-top:14px; text-align:right;">
+            <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="closeExportFormatModal()">Back</button>
           </div>
         </div>
       </div>
@@ -1263,7 +1337,7 @@
               <span class="calc-badge" data-fld="badge_title">Auto</span>
               <span class="hint" data-fld="hint_title"></span>
             </label>
-            <input type="text" inputmode="decimal" data-fld="t_title" value="0" disabled oninput="calc(this.closest('.loan-block'))">
+            <input type="text" inputmode="decimal" data-fld="t_title" value="0" oninput="calc(this.closest('.loan-block'))">
           </div>
           <div class="field-row" data-fld="row_titleOwner">
             <label>Owner's Policy Premium <span class="hint">Enter directly from title co. calculator if not auto-calculating</span></label>
@@ -1951,12 +2025,7 @@ function exportClientName(){
   return (el && el.value.trim()) || 'Client';
 }
 function buildExportFilename(ext){
-  const now = new Date();
-  const mm = String(now.getMonth()+1).padStart(2,'0');
-  const dd = String(now.getDate()).padStart(2,'0');
-  const yyyy = now.getFullYear();
-  const hh = String(now.getHours()).padStart(2,'0');
-  return 'CCE_' + sanitizeFilenamePart(exportClientName()) + '_' + mm + '-' + dd + '-' + yyyy + '_' + hh + '-00-00.' + ext;
+  return sanitizeFilenamePart(exportClientName()) + '.' + ext;
 }
 function buildEmailSubject(){
   const now = new Date();
@@ -2803,7 +2872,6 @@ function applyTitleInsurance(container, price, loanAmt){
 
   const hasTitleCalc = data && data.verified && typeof data.titleInsurance === 'function';
   const autoActive = govAuto.checked && hasTitleCalc;
-  totalInput.disabled = true; // always a computed display now — never directly editable
 
   if (autoActive){
     const countyInfo = (data.counties && data.counties[countyName]) ? data.counties[countyName] : {};
@@ -5149,10 +5217,14 @@ function confirmRemoveBlock(){
 }
 
 // ===========================================================================
-// EXPORT FLOW — one button per format in the header. Click it, pick which
-// loan(s) to include, see a preview, then Save / Print (PDF only) / Email.
+// EXPORT FLOW (0.22 — folded into the single footer Export button) — pick
+// which loan estimate(s) to include first, then pick a format, see a
+// preview, then Save / Print (PDF only) / Email. XLSX still only supports
+// one loan at a time (see export/xlsx-helpers.js) — the format step disables
+// that option with an explanation rather than round-tripping an error.
 // ===========================================================================
 let _exportKind = null;         // 'pdf' | 'docx' | 'xlsx'
+let _exportPickedBlocks = [];   // loan blocks chosen in step 1, read by step 2
 let _xlsxPendingContainer = null;
 // Set only when exportSavedClient('xlsx') is mid-flow (exporting a saved
 // client from the Saved Clients preview, not the main page) — holds the
@@ -5162,49 +5234,61 @@ let _xlsxPendingTempContainer = null;
 let _exportBlob = null;
 let _exportPreviewUrl = null;
 
-function openExportSelectModal(kind){
+function openExportPickModal(){
   const blocks = getAllLoanBlocks();
   if (!blocks.length){ alert('Add at least one loan estimate first.'); return; }
-  _exportKind = kind;
   blocks.forEach(b => calc(b));
 
-  const isSingle = kind === 'xlsx';
-  document.getElementById('exportSelectTitle').textContent = 'Select Loan' + (isSingle ? '' : 's') + ' to Export (' + kind.toUpperCase() + ')';
-  document.getElementById('exportSelectHint').textContent = isSingle
-    ? 'Excel export works with one loan at a time \u2014 choose which one.'
-    : 'Choose which loan estimates to include in the combined ' + kind.toUpperCase() + '.';
+  document.getElementById('exportSelectHint').textContent = 'Choose which loan estimates to include, then pick a format.';
 
   const listEl = document.getElementById('exportSelectList');
   listEl.innerHTML = blocks.map((b, i) => {
     const d = b._cceData;
     const label = (b.dataset.loanType || 'Loan') + ' \u2014 ' + fmt(d.price);
-    const inputType = isSingle ? 'radio' : 'checkbox';
     return '<label style="display:flex; align-items:center; gap:8px; padding:8px 2px; font-size:13px; border-bottom:1px dashed #E7E9EE;">' +
-      '<input type="'+inputType+'" name="exportSelectChoice" value="'+i+'"'+(i===0?' checked':'')+'> ' + xmlEsc(label) + '</label>';
+      '<input type="checkbox" name="exportSelectChoice" value="'+i+'"'+(i===0?' checked':'')+'> ' + xmlEsc(label) + '</label>';
   }).join('');
 
   document.getElementById('exportSelectModalOverlay').style.display = 'flex';
 }
-function closeExportSelectModal(){
+function closeExportPickModal(){
   document.getElementById('exportSelectModalOverlay').style.display = 'none';
 }
 
-async function proceedFromExportSelect(){
+function proceedFromExportPick(){
   const checkedEls = Array.from(document.querySelectorAll('input[name="exportSelectChoice"]:checked'));
   if (!checkedEls.length){ alert('Select at least one loan.'); return; }
   const blocks = getAllLoanBlocks();
-  const selected = checkedEls.map(el => blocks[+el.value]);
-  closeExportSelectModal();
+  _exportPickedBlocks = checkedEls.map(el => blocks[+el.value]);
+  closeExportPickModal();
 
-  if (_exportKind === 'xlsx'){
+  const xlsxBtn = document.getElementById('exportFormatXlsxBtn');
+  const multiple = _exportPickedBlocks.length > 1;
+  xlsxBtn.disabled = multiple;
+  document.getElementById('exportFormatHint').textContent = multiple
+    ? 'XLSX still supports one loan estimate at a time \u2014 go back and select just one to export as Excel.'
+    : '';
+
+  document.getElementById('exportFormatModalOverlay').style.display = 'flex';
+}
+function closeExportFormatModal(){
+  document.getElementById('exportFormatModalOverlay').style.display = 'none';
+}
+
+async function chooseExportFormat(kind){
+  _exportKind = kind;
+  closeExportFormatModal();
+  const selected = _exportPickedBlocks;
+
+  if (kind === 'xlsx'){
     _xlsxPendingContainer = selected[0];
     document.getElementById('xlsxModalOverlay').style.display = 'flex';
     return;
   }
-  if (_exportKind === 'pdf'){
+  if (kind === 'pdf'){
     const { blob } = buildPdfExport(selected);
     showExportPreview('pdf', blob, selected);
-  } else if (_exportKind === 'docx'){
+  } else if (kind === 'docx'){
     const { blob } = await buildDocxExport(selected);
     showExportPreview('docx', blob, selected);
   }
@@ -5538,10 +5622,11 @@ function emailDiscrepancyViaGmail(){
 }
 
 // ===========================================================================
-// PREV/NEXT SECTION NAV (0.18) — a small floating bar that jump-scrolls
-// through each loan block's panels in a fixed order. Flat list across every
-// loan block in DOM order, so "Next" past the last panel of one block lands
-// on the first panel of the next block if there is one.
+// PREV/NEXT NAV (0.18, restructured 0.22) — two independent groups in the
+// footer bar: "Loan Estimate" jumps between whole loan blocks, "Section"
+// jump-scrolls through the CURRENT loan estimate's panels only (no longer
+// spills into the next block, per Ann's 0.22 feedback). Both land precisely
+// on the target and flash-highlight it, instead of just scrolling nearby.
 // ===========================================================================
 const CCE_NAV_ORDER = ['loanBasics','loanSpecifics','lenderFees','thirdPartyFees','titleGovFees','monthlyEscrow','prepaidsEscrow','cashToClose','monthlyPayment'];
 const CCE_NAV_LABELS = {
@@ -5550,43 +5635,90 @@ const CCE_NAV_LABELS = {
   prepaidsEscrow: 'Prepaids / Escrow Setup', cashToClose: 'Cash to Close', monthlyPayment: 'Estimated Monthly Payment',
 };
 
-function getCceNavSections_(){
-  const sections = [];
-  getAllLoanBlocks().forEach(block => {
-    CCE_NAV_ORDER.forEach(key => {
-      const el = block.querySelector('[data-nav="' + key + '"]');
-      if (el) sections.push({ el, key });
-    });
-  });
-  return sections;
+// Briefly outlines an element (whole loan estimate, or one panel within it)
+// so clicking Prev/Next visibly confirms where you landed, not just a scroll.
+function cceNavFlashHighlight_(el){
+  el.classList.remove('cce-nav-highlight');
+  void el.offsetWidth; // force reflow so re-adding the class restarts the animation
+  el.classList.add('cce-nav-highlight');
+  el.addEventListener('animationend', () => el.classList.remove('cce-nav-highlight'), { once:true });
 }
 
-function cceNavCurrentIndex_(sections){
-  const threshold = 140; // px from viewport top — a section counts as "current" once it's scrolled near the top
+function cceNearestIndexByTop_(elements){
+  const threshold = 140; // px from viewport top — counts as "current" once scrolled near the top
   let idx = 0;
-  for (let i = 0; i < sections.length; i++){
-    if (sections[i].el.getBoundingClientRect().top <= threshold) idx = i; else break;
+  for (let i = 0; i < elements.length; i++){
+    if (elements[i].getBoundingClientRect().top <= threshold) idx = i; else break;
   }
   return idx;
 }
 
-function cceNavGo(direction){
-  const sections = getCceNavSections_();
-  if (!sections.length) return;
-  const idx = cceNavCurrentIndex_(sections);
-  const targetIdx = Math.min(sections.length - 1, Math.max(0, idx + direction));
-  sections[targetIdx].el.scrollIntoView({ behavior:'smooth', block:'start' });
+// --- Loan Estimate group ---------------------------------------------------
+function cceNavEstimateGo(direction){
+  const blocks = getAllLoanBlocks();
+  if (!blocks.length) return;
+  const idx = cceNearestIndexByTop_(blocks);
+  const targetIdx = Math.min(blocks.length - 1, Math.max(0, idx + direction));
+  const target = blocks[targetIdx];
+  target.scrollIntoView({ behavior:'smooth', block:'start' });
+  cceNavFlashHighlight_(target);
 }
 
-function updateCceNavBar_(){
-  const sections = getCceNavSections_();
-  const bar = document.getElementById('cceNavBar');
-  bar.style.display = sections.length ? 'flex' : 'none';
+function updateCceNavEstimateGroup_(blocks){
+  const idx = cceNearestIndexByTop_(blocks);
+  const label = blocks.length > 1
+    ? (idx + 1) + ' of ' + blocks.length + ' — ' + (blocks[idx].dataset.loanType || 'Loan')
+    : (blocks[idx].dataset.loanType || 'Loan');
+  document.getElementById('cceNavEstimateLabel').textContent = label;
+  document.getElementById('cceNavEstimatePrevBtn').disabled = idx === 0;
+  document.getElementById('cceNavEstimateNextBtn').disabled = idx === blocks.length - 1;
+}
+
+// --- Section group (scoped to whichever loan estimate is current) ---------
+function getCceNavSectionsForBlock_(block){
+  const sections = [];
+  CCE_NAV_ORDER.forEach(key => {
+    const el = block.querySelector('[data-nav="' + key + '"]');
+    if (el) sections.push({ el, key });
+  });
+  return sections;
+}
+
+function cceNavGo(direction){
+  const blocks = getAllLoanBlocks();
+  if (!blocks.length) return;
+  const block = blocks[cceNearestIndexByTop_(blocks)];
+  const sections = getCceNavSectionsForBlock_(block);
   if (!sections.length) return;
-  const idx = cceNavCurrentIndex_(sections);
+  const idx = cceNearestIndexByTop_(sections.map(s => s.el));
+  const targetIdx = Math.min(sections.length - 1, Math.max(0, idx + direction));
+  const targetEl = sections[targetIdx].el;
+  targetEl.scrollIntoView({ behavior:'smooth', block:'start' });
+  cceNavFlashHighlight_(targetEl);
+}
+
+function updateCceNavSectionGroup_(blocks){
+  const block = blocks[cceNearestIndexByTop_(blocks)];
+  const sections = getCceNavSectionsForBlock_(block);
+  if (!sections.length){
+    document.getElementById('cceNavLabel').textContent = '';
+    document.getElementById('cceNavPrevBtn').disabled = true;
+    document.getElementById('cceNavNextBtn').disabled = true;
+    return;
+  }
+  const idx = cceNearestIndexByTop_(sections.map(s => s.el));
   document.getElementById('cceNavLabel').textContent = CCE_NAV_LABELS[sections[idx].key] || '';
   document.getElementById('cceNavPrevBtn').disabled = idx === 0;
   document.getElementById('cceNavNextBtn').disabled = idx === sections.length - 1;
+}
+
+function updateCceNavBar_(){
+  const blocks = getAllLoanBlocks();
+  const bar = document.getElementById('cceNavBar');
+  bar.style.display = blocks.length ? 'flex' : 'none';
+  if (!blocks.length) return;
+  updateCceNavEstimateGroup_(blocks);
+  updateCceNavSectionGroup_(blocks);
 }
 
 let cceNavScrollTicking = false;
