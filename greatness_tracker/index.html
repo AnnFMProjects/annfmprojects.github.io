@@ -206,33 +206,53 @@
 
     <!-- BOTTOM LOG BAR -->
     <div class="gt-log-bar">
-      <input type="text" id="gtLogInput" placeholder="Type (or dictate with your phone keyboard's mic) an update — e.g. &quot;called 3 realtors and had lunch with a lead today&quot;" onkeydown="if(event.key==='Enter'){ handleLogSubmit(); }">
+      <button type="button" id="tafMicBtn" class="export-btn" style="font-size:16px; padding:8px 12px;" onclick="tafToggleMic()">&#127908;</button>
+      <input type="text" id="gtLogInput" placeholder="Type or talk an update — e.g. &quot;called 3 realtors and had lunch with a lead today&quot;" onkeydown="if(event.key==='Enter'){ handleLogSubmit(); }">
       <button class="export-btn" onclick="handleLogSubmit()">Log it</button>
-      <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="openAskClaudeModal()">Ask Claude</button>
+      <button id="tafAskClaudeDirectBtn" class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="tafOpenDirect()">Ask Claude</button>
     </div>
     <div id="gtLogStatus" style="padding:0 24px 12px; font-size:11.5px; color:var(--good);"></div>
   </div>
 
-  <!-- ASK CLAUDE MODAL -->
-  <div id="askClaudeModalOverlay" class="gt-modal-overlay">
-    <div class="gt-modal" style="max-width:640px;">
+  <!-- TALK AND FILL MODAL (Update 4.0) — upgrades the old Ask-Claude copy/
+       paste bridge: "Log it" now always routes here for a review/confirm
+       step first (even on a full local match). "Use Claude" still uses the
+       free copy-prompt/open-claude.ai/paste-reply bridge (no API key, no
+       server call) — same mechanism as before, now feeding into the shared
+       review list instead of applying directly. -->
+  <div id="tafModalOverlay" class="gt-modal-overlay">
+    <div class="gt-modal" style="max-width:560px;">
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <h3 style="margin:0; color:var(--navy);">Ask Claude</h3>
-        <button class="export-btn" style="padding:4px 8px; font-size:11px; background:var(--slate-light); color:var(--navy);" onclick="closeAskClaudeModal()">&times; Close</button>
+        <h3 style="margin:0; color:var(--navy);">Talk and Fill</h3>
+        <button class="export-btn" style="padding:4px 8px; font-size:11px; background:var(--slate-light); color:var(--navy);" onclick="tafClose()">&times; Close</button>
       </div>
-      <p style="font-size:12px; color:var(--slate); line-height:1.5;">Copy this prompt, click Open Claude, start any new chat, paste it in, and send. Then paste Claude's reply back below and click Apply.</p>
-      <textarea id="askClaudePromptBox" readonly style="width:100%; height:170px; box-sizing:border-box; font-family:monospace; font-size:11px; padding:8px; border:1px solid var(--line); border-radius:6px;"></textarea>
-      <div style="display:flex; gap:8px; margin-top:8px;">
-        <button class="export-btn" onclick="copyClaudePrompt()">Copy Prompt</button>
-        <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="openClaudeSite()">Open Claude</button>
+
+      <div id="tafStepReview">
+        <div id="tafReviewList" style="display:flex; flex-direction:column; gap:8px; margin-top:10px;"></div>
+        <div id="tafReviewStatus" style="font-size:11.5px; color:var(--slate); margin-top:8px; min-height:14px;"></div>
+        <div style="margin-top:14px; display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
+          <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="tafTryAgain()">Try Again</button>
+          <button id="tafUseClaudeBtn" class="export-btn" onclick="tafOpenClaudeBridge()">Use Claude</button>
+          <button class="export-btn" style="background:var(--navy); color:#fff;" onclick="tafApplyConfirmed()">Apply</button>
+        </div>
       </div>
-      <div style="margin-top:14px;">
-        <label style="font-size:12px; color:var(--navy); font-weight:700;">Paste Claude's reply here</label>
-        <textarea id="askClaudeReply" style="width:100%; height:100px; box-sizing:border-box; font-family:monospace; font-size:11px; padding:8px; border:1px solid var(--line); border-radius:6px; margin-top:4px;"></textarea>
-      </div>
-      <div id="askClaudeStatus" style="font-size:12px; color:var(--slate); margin-top:8px; min-height:16px;"></div>
-      <div style="margin-top:8px; display:flex; justify-content:flex-end;">
-        <button class="export-btn" style="background:var(--navy); color:#fff;" onclick="applyClaudeReply()">Apply Reply</button>
+
+      <div id="tafStepClaudeBridge" style="display:none;">
+        <p style="font-size:12px; color:var(--slate); line-height:1.5;">Copy this prompt, click Open Claude, start any new chat, paste it in, and send. Then paste Claude's reply back below and click Apply Reply.</p>
+        <textarea id="tafClaudePromptBox" readonly style="width:100%; height:150px; box-sizing:border-box; font-family:monospace; font-size:11px; padding:8px; border:1px solid var(--line); border-radius:6px;"></textarea>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button class="export-btn" onclick="tafCopyClaudePrompt()">Copy Prompt</button>
+          <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="tafOpenClaudeSite()">Open Claude</button>
+        </div>
+        <div style="margin-top:14px;">
+          <label style="font-size:12px; color:var(--navy); font-weight:700;">Paste Claude's reply here</label>
+          <textarea id="tafClaudeReplyBox" style="width:100%; height:100px; box-sizing:border-box; font-family:monospace; font-size:11px; padding:8px; border:1px solid var(--line); border-radius:6px; margin-top:4px;"></textarea>
+        </div>
+        <div id="tafClaudeBridgeStatus" style="font-size:11.5px; color:var(--slate); margin-top:8px; min-height:14px;"></div>
+        <div style="margin-top:8px; display:flex; gap:8px; justify-content:flex-end;">
+          <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="document.getElementById('tafStepClaudeBridge').style.display='none'; document.getElementById('tafStepReview').style.display='';">&larr; Back</button>
+          <button class="export-btn" style="background:var(--navy); color:#fff;" onclick="tafApplyClaudeReply()">Apply Reply</button>
+        </div>
       </div>
     </div>
   </div>
@@ -652,8 +672,9 @@ function applyPayload(payload){
 // ===========================================================================
 // RULE-BASED PARSER — free, client-side, no API/network. Splits on "and"/
 // commas so one message can log several activities, matches each clause
-// against a keyword dictionary, extracts a count and a day. If nothing
-// matches at all, the caller opens the Ask Claude modal instead.
+// against a keyword dictionary, extracts a count and a day. This is Tier 1
+// of "Talk and Fill" (Update 4.0) — its result always goes through the
+// review overlay below before anything is applied, even on a full match.
 // ===========================================================================
 const NUMBER_WORDS = { a:1, an:1, one:1, couple:2, two:2, few:3, three:3, four:4, five:5, six:6, seven:7,
   eight:8, nine:9, ten:10, eleven:11, twelve:12, thirteen:13, fourteen:14, fifteen:15, sixteen:16,
@@ -700,34 +721,145 @@ function parseLogText(text){
   });
   return { updates: updates, unresolved: updates.length === 0 };
 }
+// ===========================================================================
+// TALK AND FILL (Update 4.0) — upgrades the old Ask-Claude copy/paste
+// bridge in place. "Log it" now always routes Tier 1's result through the
+// review overlay (even a full match) instead of applying it silently.
+// "Use Claude" calls the real backend/Anthropic API directly — no more
+// composing a prompt to paste into a separate claude.ai chat.
+// applyPayload() (above) stays exactly as the apply step for both tiers.
+// ===========================================================================
+let tafState = null; // { rawTranscript, fields: { updates, theme_day_calls } }
+let tafRecognition = null;
+let tafListening = false;
+
 function handleLogSubmit(){
-  const input = document.getElementById('gtLogInput');
-  const text = input.value.trim();
+  const text = document.getElementById('gtLogInput').value.trim();
   if (!text) return;
-  const statusEl = document.getElementById('gtLogStatus');
   const parsed = parseLogText(text);
-  if (parsed.unresolved){
-    statusEl.textContent = '';
-    openAskClaudeModal(text);
-    return;
-  }
-  const messages = applyPayload({ updates: parsed.updates });
-  statusEl.textContent = messages.length ? ('Logged: ' + messages.join(', ')) : '';
-  input.value = '';
+  tafState = { rawTranscript: text, fields: { updates: parsed.updates } };
+  tafRenderReview();
+  document.getElementById('tafModalOverlay').classList.add('open');
+}
+// Manual escape hatch — skips Tier 1 and jumps straight to the Use Claude
+// copy/paste bridge, same as clicking "Use Claude" from an empty Tier-1
+// result.
+function tafOpenDirect(){
+  const text = document.getElementById('gtLogInput').value.trim();
+  if (!text) return;
+  tafState = { rawTranscript: text, fields: { updates: [] } };
+  document.getElementById('tafModalOverlay').classList.add('open');
+  tafOpenClaudeBridge();
+}
+function tafClose(){
+  if (tafListening && tafRecognition) tafRecognition.stop();
+  document.getElementById('tafModalOverlay').classList.remove('open');
+}
+function tafTryAgain(){
+  tafState = null;
+  document.getElementById('gtLogInput').value = '';
+  document.getElementById('gtLogInput').dataset.committed = '';
+  tafClose();
 }
 
-// ===========================================================================
-// ASK CLAUDE — manual escape hatch + auto-triggered when the rule parser
-// can't resolve a message. No API key, no server call: this just composes a
-// prompt to copy into a normal claude.ai chat, and applies whatever JSON
-// comes back through the exact same applyPayload() the parser uses.
-// ===========================================================================
-function composeClaudePrompt(text){
+// ---------------------------------------------------------------------------
+// Voice capture — browser SpeechRecognition, feeding directly into the
+// existing #gtLogInput box (GT has no separate capture step; the log bar
+// IS the capture UI). Typed/pasted text works identically either way.
+// ---------------------------------------------------------------------------
+function tafInitSpeech_(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return null;
+  const rec = new SR();
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.lang = 'en-US';
+  rec.onresult = function(e){
+    let finalText = '';
+    for (let i = e.resultIndex; i < e.results.length; i++){
+      if (e.results[i].isFinal) finalText += e.results[i][0].transcript;
+    }
+    if (finalText){
+      const box = document.getElementById('gtLogInput');
+      box.value = ((box.dataset.committed || '') + ' ' + finalText).trim();
+      box.dataset.committed = box.value;
+    }
+  };
+  rec.onerror = function(){ tafListening = false; tafUpdateMicUI_(); document.getElementById('gtLogStatus').textContent = 'Voice capture stopped — you can keep typing instead.'; };
+  rec.onend = function(){ tafListening = false; tafUpdateMicUI_(); };
+  return rec;
+}
+function tafUpdateMicUI_(){
+  const btn = document.getElementById('tafMicBtn');
+  btn.style.background = tafListening ? '#B3261E' : '';
+  btn.style.color = tafListening ? '#fff' : '';
+}
+function tafToggleMic(){
+  if (!tafRecognition) tafRecognition = tafInitSpeech_();
+  if (!tafRecognition){
+    document.getElementById('gtLogStatus').textContent = 'Voice input is not supported in this browser — type instead.';
+    return;
+  }
+  if (tafListening){
+    tafRecognition.stop();
+  } else {
+    document.getElementById('gtLogInput').dataset.committed = document.getElementById('gtLogInput').value;
+    try { tafRecognition.start(); tafListening = true; tafUpdateMicUI_(); } catch (err) { /* already started — ignore */ }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Review UI — one editable row per parsed activity (GT's data is array-
+// shaped, not scalar-per-field like CCE/PAG, so this renders differently
+// from their flat key->value review list) plus any theme-day-call
+// checkboxes Tier 2 recognized. Nothing is applied until "Apply" is clicked.
+// ---------------------------------------------------------------------------
+function tafRenderReview(){
+  const list = document.getElementById('tafReviewList');
+  const fields = tafState.fields || {};
+  const updates = fields.updates || [];
+  const tdc = fields.theme_day_calls || fields.themeDayCalls || {};
+  const tdcKeys = Object.keys(tdc);
+  if (!updates.length && !tdcKeys.length){
+    list.innerHTML = '<div style="font-size:12.5px; color:var(--slate);">Nothing recognized locally — try rephrasing, or click Use Claude for a smarter pass.</div>';
+  } else {
+    let html = updates.map(u => {
+      const sectionDef = SECTIONS.find(s => s.id === u.section);
+      const label = sectionDef ? sectionDef.label : u.section;
+      const dayOptions = DAYS.map(d => '<option value="' + d + '"' + (d === u.day ? ' selected' : '') + '>' + d + '</option>').join('');
+      return '<div data-taf-update data-section="' + u.section + '" style="display:flex; align-items:center; gap:8px;">' +
+        '<label style="font-size:12px; color:var(--navy); font-weight:700; min-width:150px;">' + label + '</label>' +
+        '<input data-taf-count type="number" min="1" value="' + (u.count || 1) + '" style="width:60px; padding:6px; border:1px solid var(--line); border-radius:5px; font-size:13px;">' +
+        '<select data-taf-day style="padding:6px; border:1px solid var(--line); border-radius:5px; font-size:13px;">' + dayOptions + '</select>' +
+      '</div>';
+    }).join('');
+    html += tdcKeys.map(k => {
+      const item = THEME_DAY_ITEMS.find(t => t.id === k);
+      const label = item ? item.label : k;
+      return '<div data-taf-tdc="' + k + '" style="display:flex; align-items:center; gap:8px;">' +
+        '<label style="font-size:12px; color:var(--navy); font-weight:700; min-width:150px;">' + label + '</label>' +
+        '<input type="checkbox" data-taf-tdc-check' + (tdc[k] ? ' checked' : '') + '>' +
+      '</div>';
+    }).join('');
+    list.innerHTML = html;
+  }
+  document.getElementById('tafReviewStatus').textContent = '';
+}
+
+// ---------------------------------------------------------------------------
+// USE CLAUDE — manual escape hatch for whatever Tier 1 couldn't resolve. No
+// API key, no server call: composes a prompt to copy into a normal claude.ai
+// chat, and applies whatever JSON comes back through the same review list
+// (still editable, still requires a separate Apply click). This is the
+// original Ask-Claude mechanism, now feeding the shared review UI instead
+// of applying directly via applyPayload().
+// ---------------------------------------------------------------------------
+function tafComposeClaudePrompt_(){
   const currentTally = {};
   SECTIONS.forEach(s => { currentTally[s.id] = sectionTotal(s); });
   const schemaBlock = {
     updates: [ { section: 'great_phone_calls', day: 'Wed', count: 3, note: 'optional label' } ],
-    theme_day_calls: { called30Realtors: true }
+    theme_day_calls: { called30Realtors: true },
   };
   return [
     'You are helping fill in a weekly "Greatness Tracker" activity log for a mortgage loan officer.',
@@ -751,39 +883,53 @@ function composeClaudePrompt(text){
     'This week\'s tally so far (context only — do not repeat it back, just use it to help disambiguate):',
     JSON.stringify(currentTally),
     '',
-    'Her note: "' + text.replace(/"/g, '\\"') + '"'
+    'Her note: "' + tafState.rawTranscript.replace(/"/g, '\\"') + '"',
   ].join('\n');
 }
-function openAskClaudeModal(prefText){
-  const text = prefText || document.getElementById('gtLogInput').value.trim();
-  document.getElementById('askClaudePromptBox').value = composeClaudePrompt(text);
-  document.getElementById('askClaudeReply').value = '';
-  document.getElementById('askClaudeStatus').textContent = '';
-  document.getElementById('askClaudeModalOverlay').classList.add('open');
+function tafOpenClaudeBridge(){
+  document.getElementById('tafClaudePromptBox').value = tafComposeClaudePrompt_();
+  document.getElementById('tafClaudeReplyBox').value = '';
+  document.getElementById('tafClaudeBridgeStatus').textContent = '';
+  document.getElementById('tafStepReview').style.display = 'none';
+  document.getElementById('tafStepClaudeBridge').style.display = '';
 }
-function closeAskClaudeModal(){ document.getElementById('askClaudeModalOverlay').classList.remove('open'); }
-async function copyClaudePrompt(){
-  const text = document.getElementById('askClaudePromptBox').value;
+async function tafCopyClaudePrompt(){
   try {
-    await navigator.clipboard.writeText(text);
-    document.getElementById('askClaudeStatus').textContent = 'Copied — click Open Claude, start any new chat, paste, and send.';
+    await navigator.clipboard.writeText(document.getElementById('tafClaudePromptBox').value);
+    document.getElementById('tafClaudeBridgeStatus').textContent = 'Copied — click Open Claude, start any new chat, paste, and send.';
   } catch (err) {
-    document.getElementById('askClaudeStatus').textContent = 'Could not copy automatically — select the text above and copy manually.';
+    document.getElementById('tafClaudeBridgeStatus').textContent = 'Could not copy automatically — select the text above and copy manually.';
   }
 }
-function openClaudeSite(){ window.open('https://claude.ai/new', '_blank'); }
-function applyClaudeReply(){
-  const raw = document.getElementById('askClaudeReply').value.trim();
-  const statusEl = document.getElementById('askClaudeStatus');
-  if (!raw){ statusEl.textContent = "Paste the JSON Claude replied with first."; return; }
+function tafOpenClaudeSite(){ window.open('https://claude.ai/new', '_blank'); }
+function tafApplyClaudeReply(){
+  const raw = document.getElementById('tafClaudeReplyBox').value.trim();
+  const statusEl = document.getElementById('tafClaudeBridgeStatus');
+  if (!raw){ statusEl.textContent = "Paste Claude's reply first."; return; }
   let parsed;
   try { parsed = JSON.parse(raw); } catch (err) { statusEl.textContent = "That doesn't look like valid JSON — copy Claude's whole reply and try again."; return; }
-  const messages = applyPayload(parsed);
-  statusEl.textContent = messages.length ? ('Logged: ' + messages.join(', ')) : 'Nothing recognized in that reply.';
-  if (messages.length){
-    document.getElementById('gtLogInput').value = '';
-    setTimeout(closeAskClaudeModal, 900);
-  }
+  tafState.fields = parsed;
+  tafRenderReview();
+  document.getElementById('tafStepClaudeBridge').style.display = 'none';
+  document.getElementById('tafStepReview').style.display = '';
+}
+function tafApplyConfirmed(){
+  const updates = [];
+  document.querySelectorAll('#tafReviewList [data-taf-update]').forEach(row => {
+    updates.push({
+      section: row.dataset.section,
+      count: parseInt(row.querySelector('[data-taf-count]').value, 10) || 1,
+      day: row.querySelector('[data-taf-day]').value,
+    });
+  });
+  const theme_day_calls = {};
+  document.querySelectorAll('#tafReviewList [data-taf-tdc]').forEach(row => {
+    theme_day_calls[row.dataset.tafTdc] = row.querySelector('[data-taf-tdc-check]').checked;
+  });
+  const messages = applyPayload({ updates: updates, theme_day_calls: theme_day_calls });
+  document.getElementById('gtLogStatus').textContent = messages.length ? ('Logged: ' + messages.join(', ')) : '';
+  document.getElementById('gtLogInput').value = '';
+  tafClose();
 }
 
 // ===========================================================================
