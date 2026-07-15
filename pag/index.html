@@ -238,7 +238,12 @@
 
   <!-- LOGIN GATE -->
   <div id="loginGateOverlay" style="display:flex; position:fixed; inset:0; background:var(--paper); z-index:3000; align-items:center; justify-content:center; padding:20px;">
-    <div style="background:#fff; border:1px solid var(--line); border-radius:10px; max-width:400px; width:100%; padding:28px; font-family:Calibri, Arial, sans-serif; box-shadow:0 6px 24px rgba(16,27,51,0.12);">
+    <div id="loginGateChecking" style="display:none; text-align:center; font-family:Calibri, Arial, sans-serif; color:var(--slate);">
+      <div style="width:28px; height:28px; margin:0 auto 12px; border:3px solid var(--line); border-top-color:var(--navy); border-radius:50%; animation:loginGateSpin 0.8s linear infinite;"></div>
+      Checking your session&hellip;
+    </div>
+    <style>@keyframes loginGateSpin { to { transform: rotate(360deg); } }</style>
+    <div id="loginGateForm" style="background:#fff; border:1px solid var(--line); border-radius:10px; max-width:400px; width:100%; padding:28px; font-family:Calibri, Arial, sans-serif; box-shadow:0 6px 24px rgba(16,27,51,0.12);">
       <h3 style="margin-top:0; color:var(--navy);">Pre-App Generator</h3>
       <div style="font-size:10px; color:#8A6A1F; background:rgba(201,162,75,0.16); border:1px solid rgba(201,162,75,0.45); padding:5px 9px; border-radius:4px; margin-bottom:14px;">Internal tool for FM Home Loans loan officers. Not a public FM Home Loans website or login.</div>
       <div class="field-row" style="align-items:flex-start; flex-direction:column; gap:4px;">
@@ -260,6 +265,16 @@
       </div>
     </div>
   </div>
+  <script>
+  (function(){
+    try {
+      if (localStorage.getItem('cce_session_token')) {
+        document.getElementById('loginGateForm').style.display = 'none';
+        document.getElementById('loginGateChecking').style.display = 'block';
+      }
+    } catch (e) {}
+  })();
+  </script>
 
   <!-- REQUEST LOGIN MODAL -->
   <div id="requestLoginModalOverlay" class="pag-modal-overlay" style="z-index:3001;">
@@ -521,8 +536,26 @@
       <div id="tafReviewStatus" style="font-size:11.5px; color:var(--slate); margin-top:8px; min-height:14px;"></div>
       <div style="margin-top:14px; display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
         <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="tafTryAgain()">Try Again</button>
-        <button id="tafUseClaudeBtn" class="export-btn" onclick="tafUseClaude()">Use Claude</button>
+        <button id="tafUseClaudeBtn" class="export-btn" onclick="tafOpenClaudeBridge()">Use Claude</button>
         <button class="export-btn" style="background:var(--navy); color:#fff;" onclick="tafApplyConfirmed()">Apply</button>
+      </div>
+    </div>
+
+    <div id="tafStepClaudeBridge" style="display:none;">
+      <p style="font-size:12px; color:var(--slate); line-height:1.5;">Copy this prompt, click Open Claude, start any new chat, paste it in, and send. Then paste Claude's reply back below and click Apply Reply.</p>
+      <textarea id="tafClaudePromptBox" readonly style="width:100%; height:150px; box-sizing:border-box; font-family:monospace; font-size:11px; padding:8px; border:1px solid var(--line); border-radius:6px;"></textarea>
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button class="export-btn" onclick="tafCopyClaudePrompt()">Copy Prompt</button>
+        <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="tafOpenClaudeSite()">Open Claude</button>
+      </div>
+      <div style="margin-top:14px;">
+        <label style="font-size:12px; color:var(--navy); font-weight:700;">Paste Claude's reply here</label>
+        <textarea id="tafClaudeReplyBox" style="width:100%; height:100px; box-sizing:border-box; font-family:monospace; font-size:11px; padding:8px; border:1px solid var(--line); border-radius:6px; margin-top:4px;"></textarea>
+      </div>
+      <div id="tafClaudeBridgeStatus" style="font-size:11.5px; color:var(--slate); margin-top:8px; min-height:14px;"></div>
+      <div style="margin-top:8px; display:flex; gap:8px; justify-content:flex-end;">
+        <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="document.getElementById('tafStepClaudeBridge').style.display='none'; document.getElementById('tafStepReview').style.display='';">&larr; Back</button>
+        <button class="export-btn" style="background:var(--navy); color:#fff;" onclick="tafApplyClaudeReply()">Apply Reply</button>
       </div>
     </div>
   </div>
@@ -597,13 +630,6 @@ const PAG_API = (function(){
       const data = await call('deletePag', { recordId: recordId });
       return data.deleted;
     },
-
-    // "Talk and Fill" Tier 2 — requires login (see backend handleAiFillForm_)
-    // since it's a paid call against a shared API key.
-    aiFillForm: async function(tool, transcript, context){
-      const data = await call('aiFillForm', { tool: tool, transcript: transcript, context: context || {} });
-      return data.fields;
-    },
   };
 })();
 
@@ -615,9 +641,10 @@ let guestMode = false;
 
 async function initSession(){
   if (!PAG_API.isLoggedIn()){
-    showLoginGate();
+    showLoginGate('form');
     return;
   }
+  showLoginGate('checking');
   try {
     currentAccount = await PAG_API.whoAmI();
     guestMode = false;
@@ -625,10 +652,15 @@ async function initSession(){
     hideLoginGate();
   } catch (err) {
     PAG_API.logout();
-    showLoginGate();
+    showLoginGate('form');
   }
 }
-function showLoginGate(){ document.getElementById('loginGateOverlay').style.display = 'flex'; }
+function showLoginGate(mode){
+  document.getElementById('loginGateOverlay').style.display = 'flex';
+  const checking = mode === 'checking';
+  document.getElementById('loginGateForm').style.display = checking ? 'none' : 'block';
+  document.getElementById('loginGateChecking').style.display = checking ? 'block' : 'none';
+}
 function hideLoginGate(){ document.getElementById('loginGateOverlay').style.display = 'none'; }
 function continueAsGuest(){
   guestMode = true;
@@ -1244,24 +1276,56 @@ function tafRenderReview(){
       '</div>'
     ).join('');
   }
-  const loggedIn = PAG_API.isLoggedIn();
-  const btn = document.getElementById('tafUseClaudeBtn');
-  btn.disabled = !loggedIn;
-  btn.title = loggedIn ? '' : 'Log in to use Claude for this.';
-  btn.style.opacity = loggedIn ? '1' : '0.5';
   document.getElementById('tafReviewStatus').textContent = '';
 }
-async function tafUseClaude(){
-  if (!PAG_API.isLoggedIn()) return;
-  const statusEl = document.getElementById('tafReviewStatus');
-  statusEl.textContent = 'Asking Claude…';
+
+// ---------------------------------------------------------------------------
+// USE CLAUDE — manual escape hatch for whatever Tier 1 couldn't resolve. No
+// API key, no server call: composes a prompt to copy into a normal claude.ai
+// chat, and applies whatever JSON comes back through the same review list
+// (still editable, still requires a separate Apply click).
+// ---------------------------------------------------------------------------
+function tafComposeClaudePrompt_(){
+  const exampleShape = {
+    fullName: 'John Smith', address: '123 Main St, Nyack, NY', purchasePrice: 350000,
+    downPaymentPercent: 10, downPaymentDollar: 35000, loanAmount: 315000, loanType: 'FHA',
+    taxesAndInsurance: 400, expirationDate: '2026-08-31', propertyType: '1-2 Family Home',
+    checklist: { creditReport: 'Yes', income: 'No', assets: 'Not Applicable', liabilities: 'Yes', cashToClose: 'Yes' },
+  };
+  return [
+    'You are helping fill in a mortgage pre-approval letter for a loan officer.',
+    'Given her raw note below, reply with ONLY a JSON object (no prose, no markdown fences) using ONLY the keys actually stated in her note — omit anything not mentioned, never guess or fabricate a value. Only include a "checklist" key/sub-key if she gives a real judgment call about it, not just because a related fact was mentioned. Example shape (not real data, just the keys/format):',
+    JSON.stringify(exampleShape, null, 2),
+    '',
+    'Her note: "' + tafState.rawTranscript.replace(/"/g, '\\"') + '"',
+  ].join('\n');
+}
+function tafOpenClaudeBridge(){
+  document.getElementById('tafClaudePromptBox').value = tafComposeClaudePrompt_();
+  document.getElementById('tafClaudeReplyBox').value = '';
+  document.getElementById('tafClaudeBridgeStatus').textContent = '';
+  document.getElementById('tafStepReview').style.display = 'none';
+  document.getElementById('tafStepClaudeBridge').style.display = '';
+}
+async function tafCopyClaudePrompt(){
   try {
-    const fields = await PAG_API.aiFillForm('pag', tafState.rawTranscript, {});
-    tafState.fields = fields;
-    tafRenderReview();
+    await navigator.clipboard.writeText(document.getElementById('tafClaudePromptBox').value);
+    document.getElementById('tafClaudeBridgeStatus').textContent = 'Copied — click Open Claude, start any new chat, paste, and send.';
   } catch (err) {
-    statusEl.textContent = err.message || 'Could not reach Claude — try again.';
+    document.getElementById('tafClaudeBridgeStatus').textContent = 'Could not copy automatically — select the text above and copy manually.';
   }
+}
+function tafOpenClaudeSite(){ window.open('https://claude.ai/new', '_blank'); }
+function tafApplyClaudeReply(){
+  const raw = document.getElementById('tafClaudeReplyBox').value.trim();
+  const statusEl = document.getElementById('tafClaudeBridgeStatus');
+  if (!raw){ statusEl.textContent = "Paste Claude's reply first."; return; }
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch (err) { statusEl.textContent = "That doesn't look like valid JSON — copy Claude's whole reply and try again."; return; }
+  tafState.fields = parsed;
+  tafRenderReview();
+  document.getElementById('tafStepClaudeBridge').style.display = 'none';
+  document.getElementById('tafStepReview').style.display = '';
 }
 function tafTryAgain(){
   tafState = null;
@@ -1665,3 +1729,4 @@ window.addEventListener('DOMContentLoaded', function(){
   initSession();
 });
 </script>
+
