@@ -1,0 +1,15 @@
+/* FM Home Loans internal tools — shared brand palette.
+   Only variables that are genuinely identical across every page live here.
+   --paper/--ink differ intentionally on the hub vs the tools, and each page
+   may declare its own extra vars (PAG's theme colors, Social's --bad) in its
+   own <style> block's :root — CSS custom properties merge across multiple
+   :root rules, so this file and each page's local :root combine cleanly. */
+:root{
+  --navy:#1B2A4A;
+  --navy-deep:#101B33;
+  --gold:#C9A24B;
+  --slate:#5B6472;
+  --slate-light:#EDEFF3;
+  --line:#D9DCE3;
+  --good:#2F6B4F;
+}
