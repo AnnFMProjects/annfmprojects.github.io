@@ -449,6 +449,75 @@
     border-radius:5px;
     margin-bottom:10px;
   }
+  #ccUpdateBanner{
+    display:none;
+    position:sticky;
+    top:0;
+    z-index:1900;
+    background:var(--navy-deep);
+    color:#fff;
+    font-family:Calibri, Arial, sans-serif;
+    font-size:13px;
+    padding:9px 16px;
+    text-align:center;
+    align-items:center;
+    justify-content:center;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  #ccUpdateBanner button{
+    background:var(--gold);
+    color:var(--navy-deep);
+    border:none;
+    border-radius:5px;
+    padding:5px 14px;
+    font-size:12.5px;
+    font-weight:600;
+    cursor:pointer;
+    font-family:Calibri, Arial, sans-serif;
+  }
+
+  #cceNavBar{
+    display:none;
+    position:fixed;
+    bottom:18px;
+    right:18px;
+    z-index:1500;
+    background:var(--navy);
+    color:#fff;
+    font-family:Calibri, Arial, sans-serif;
+    border-radius:8px;
+    box-shadow:0 4px 18px rgba(16,27,51,0.28);
+    align-items:center;
+    gap:2px;
+    padding:4px;
+  }
+  #cceNavBar button{
+    background:transparent;
+    color:#fff;
+    border:none;
+    border-radius:5px;
+    padding:8px 10px;
+    font-size:13px;
+    cursor:pointer;
+    font-family:Calibri, Arial, sans-serif;
+  }
+  #cceNavBar button:hover{ background:rgba(255,255,255,0.14); }
+  #cceNavBar button:disabled{ opacity:0.35; cursor:default; }
+  #cceNavBar button:disabled:hover{ background:transparent; }
+  #cceNavLabel{
+    font-size:11.5px;
+    color:#C9CEDA;
+    padding:0 8px;
+    max-width:150px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  @media (max-width: 880px){
+    #cceNavBar{ right:10px; bottom:10px; }
+    #cceNavLabel{ display:none; }
+  }
   .footer-note{
     grid-column:1 / -1;
     font-size:10.5px;
@@ -460,6 +529,15 @@
   }
 </style>
 
+<div id="ccUpdateBanner">
+  <span>A newer version of this tool is available.</span>
+  <button onclick="location.reload()">Refresh Now</button>
+</div>
+<div id="cceNavBar">
+  <button id="cceNavPrevBtn" onclick="cceNavGo(-1)" title="Previous section">&#9664; Prev</button>
+  <span id="cceNavLabel"></span>
+  <button id="cceNavNextBtn" onclick="cceNavGo(1)" title="Next section">Next &#9654;</button>
+</div>
 <div class="cce-wrap">
   <div class="cce-header">
     <div class="cce-header-left">
@@ -540,6 +618,28 @@
           <label>Name of Borrower / Client <span class="hint">Person receiving this estimate</span></label>
           <input type="text" id="borrowerName" placeholder="e.g. John & Jane Smith">
         </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span>Deal Info</span></div>
+      <div class="panel-body">
+        <div class="hint" style="margin-bottom:8px; font-size:10.5px; font-style:italic; color:var(--slate); line-height:1.4;">Shared across every Loan Estimate below — Property Address, State, and County are the same deal regardless of loan program.</div>
+        <div class="field-row" style="align-items:flex-start;">
+          <label style="padding-top:6px;">Property Address <span class="hint">Full address, "City, State", or just a ZIP all work</span></label>
+          <input type="text" id="sharedPropertyAddress" placeholder="e.g. 123 Main St, Nyack, NY 10960" style="max-width:220px;" oninput="onSharedAddressInput()">
+        </div>
+        <div class="hint" id="sharedAddressDetectNote" style="margin:2px 0 8px 0; line-height:1.4;"></div>
+
+        <div class="field-row">
+          <label>State</label>
+          <select id="sharedState" onchange="onSharedStateChange()"></select>
+        </div>
+        <div class="field-row">
+          <label>County</label>
+          <select id="sharedCounty" onchange="onSharedCountyChange()"></select>
+        </div>
+        <div class="hint" id="sharedStateRevisionNote" style="display:none;"></div>
       </div>
     </div>
   </div>
@@ -1016,23 +1116,20 @@
     </div>
     <div class="cce-body">
       <div>
-      <div class="panel">
-        <div class="panel-head"><span>Deal Info</span></div>
-        <div class="panel-body">
-          <div class="field-row" style="align-items:flex-start;">
-            <label style="padding-top:6px;">Property Address <span class="hint">Full address, "City, State", or just a ZIP all work</span></label>
-            <input type="text" data-fld="propertyAddress" placeholder="e.g. 123 Main St, Nyack, NY 10960" style="max-width:220px;" oninput="onAddressInput(this.closest('.loan-block'))">
-          </div>
-          <div class="hint" data-fld="addressDetectNote" style="margin:2px 0 8px 0; line-height:1.4;"></div>
+      <!-- Property Address / State / County live on the page-level "Deal Info"
+           panel (shared across every loan block for this deal) — these stay
+           here only as hidden fields so calc()/save-load/Talk-and-Fill's
+           existing per-block E(container,'state')-style lookups keep working
+           unchanged. Kept in sync by setSharedDealInfo(). -->
+      <input type="text" data-fld="propertyAddress" style="display:none;">
+      <select data-fld="state" style="display:none;"></select>
+      <select data-fld="county" style="display:none;"></select>
+      <div class="hint" data-fld="addressDetectNote" style="display:none;"></div>
+      <div class="hint" data-fld="stateRevisionNote" style="display:none;"></div>
 
-          <div class="field-row">
-            <label>State</label>
-            <select data-fld="state" onchange="onStateChange(this.closest('.loan-block'))"></select>
-          </div>
-          <div class="field-row">
-            <label>County</label>
-            <select data-fld="county" onchange="calc(this.closest('.loan-block'))"></select>
-          </div>
+      <div class="panel" data-nav="loanBasics">
+        <div class="panel-head"><span>Loan Basics</span></div>
+        <div class="panel-body">
           <div class="field-row">
             <label>Loan Program</label>
             <select data-fld="loanProgram" onchange="onProgramChange(this.closest('.loan-block'))">
@@ -1042,13 +1139,6 @@
               <option value="USDA">USDA</option>
             </select>
           </div>
-          <div class="hint" data-fld="stateRevisionNote" style="display:none;"></div>
-        </div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-head"><span>Loan Basics</span></div>
-        <div class="panel-body">
           <div class="field-row">
             <label>Purchase Price <span class="manual-badge">Manual</span></label>
             <input type="text" inputmode="decimal" data-fld="price" value="0" oninput="onPriceChange(this.closest('.loan-block'))">
@@ -1097,7 +1187,7 @@
         </div>
       </div>
 
-      <div class="panel">
+      <div class="panel" data-nav="loanSpecifics">
         <div class="panel-head"><span>Loan Specifics</span></div>
         <div class="panel-body">
           <div class="field-row">
@@ -1136,7 +1226,7 @@
         </div>
       </div>
 
-      <div class="panel">
+      <div class="panel" data-nav="lenderFees">
         <div class="panel-head"><span>Lender Fees</span><span class="tag" data-fld="g2total"></span></div>
         <div class="panel-body">
           <div class="field-row"><label>Application</label><input type="text" inputmode="decimal" data-fld="f_application" value="595" oninput="calc(this.closest('.loan-block'))"></div>
@@ -1147,7 +1237,7 @@
         </div>
       </div>
 
-      <div class="panel">
+      <div class="panel" data-nav="thirdPartyFees">
         <div class="panel-head"><span>3rd-Party Fees</span><span class="tag" data-fld="g2bTotal"></span></div>
         <div class="panel-body">
           <div class="field-row"><label>Bank Attorney</label><input type="text" inputmode="decimal" data-fld="f_attorney" value="1200" oninput="calc(this.closest('.loan-block'))"></div>
@@ -1157,7 +1247,9 @@
         </div>
       </div>
 
-      <div class="panel">
+    </div>
+      <div>
+      <div class="panel" data-nav="titleGovFees">
         <div class="panel-head"><span>Title &amp; Government Fees</span><span class="tag" data-fld="g3total"></span></div>
         <div class="panel-body">
           <div class="dev-banner-inline">Please check Title &amp; Government Fees, as this is in early development.</div>
@@ -1220,9 +1312,8 @@
           </div>
         </div>
       </div>
-    </div>
-      <div>
-      <div class="panel">
+
+      <div class="panel" data-nav="monthlyEscrow">
         <div class="panel-head"><span>Monthly Escrow Inputs</span></div>
         <div class="panel-body">
           <div class="hint" style="margin-bottom:8px; font-size:10.5px; font-style:italic; color:var(--slate); line-height:1.4;">Enter either the yearly total or the monthly payment — whichever you type drives the other, ÷ months (default 12).</div>
@@ -1247,7 +1338,7 @@
         </div>
       </div>
 
-      <div class="panel">
+      <div class="panel" data-nav="prepaidsEscrow">
         <div class="panel-head"><span>Prepaids / Escrow Setup</span><span class="tag" data-fld="g4total"></span></div>
         <div class="panel-body">
           <div class="field-row"><label>Per Diem Interest (<input type="text" inputmode="decimal" data-fld="perdiemDays" value="30" class="inline-num" oninput="calc(this.closest('.loan-block'))"> days) <span class="calc-badge">Auto</span></label><span class="summary-value" data-fld="out_perdiem"></span></div>
@@ -1256,7 +1347,7 @@
         </div>
       </div>
 
-      <div class="panel totals-panel">
+      <div class="panel totals-panel" data-nav="cashToClose">
         <div class="panel-head"><span>Cash to Close</span></div>
         <div class="panel-body">
           <div class="totals-row"><span>Down Payment</span><span class="amt" data-fld="out_dpEcho"></span></div>
@@ -1270,7 +1361,7 @@
         </div>
       </div>
 
-      <div class="panel monthly-panel">
+      <div class="panel monthly-panel" data-nav="monthlyPayment">
         <div class="panel-head"><span>Estimated Monthly Payment</span></div>
         <div class="monthly-big">
           <div class="num" data-fld="out_monthlyTotal">$0</div>
@@ -2607,12 +2698,13 @@ const FL_COUNTY_KEYWORDS = {
   'Glades': ['moore haven','palmdale, fl','glades county']
 };
 
-function parseAddress(container){
-  const raw = E(container,'propertyAddress').value;
+// Pure text -> {detectedState, detectedCounty, method, overlapNote} detection,
+// shared by the page-level Deal Info address field (0.18 moved Property
+// Address/State/County out of each loan block into one page-level panel,
+// since they're the same deal regardless of loan program — see
+// setSharedDealInfo below). Returns null if no state could be detected.
+function detectAddressLocation(raw){
   const text = raw.toLowerCase();
-  const noteEl = E(container,'addressDetectNote');
-  if (!text.trim()){ noteEl.textContent = ''; return; }
-
   let detectedState = null, detectedCounty = null, method = null, overlapNote = '';
 
   // 1. Pinned-county city/neighborhood name match (also implies state)
@@ -2655,28 +2747,127 @@ function parseAddress(container){
     }
   }
 
-  if (!detectedState){
+  if (!detectedState) return null;
+  return { detectedState, detectedCounty, method, overlapNote };
+}
+
+// ===========================================================================
+// SHARED DEAL INFO (0.18) — Property Address/State/County live once, on the
+// page-level "Deal Info" panel, since they're the same for every loan block
+// on a deal. Each loan block still carries its OWN hidden state/county/
+// propertyAddress fields (same data-fld names as before) purely so every
+// existing per-block calc()/save-load/duplicate/Talk-and-Fill code path
+// keeps working against E(container,'state') untouched — this layer's job
+// is just to keep those hidden fields in sync with the one visible source
+// of truth and recalculate every block when it changes.
+// ===========================================================================
+function populateSharedStateDropdown(){
+  const sel = document.getElementById('sharedState');
+  sel.innerHTML = '';
+  const grp1 = document.createElement('optgroup'); grp1.label = 'Pinned';
+  PINNED_STATES.forEach(code=>{
+    const o = document.createElement('option'); o.value = code; o.textContent = STATE_NAMES[code]; grp1.appendChild(o);
+  });
+  sel.appendChild(grp1);
+  const grp2 = document.createElement('optgroup'); grp2.label = 'All licensed states';
+  ALL_STATES.filter(c=>!PINNED_STATES.includes(c)).sort((a,b)=>STATE_NAMES[a].localeCompare(STATE_NAMES[b])).forEach(code=>{
+    const o = document.createElement('option'); o.value = code; o.textContent = STATE_NAMES[code]; grp2.appendChild(o);
+  });
+  sel.appendChild(grp2);
+  sel.value = 'NY';
+}
+
+function populateSharedCountyDropdown(){
+  const stateCode = document.getElementById('sharedState').value;
+  const data = STATE_DATA[stateCode];
+  const sel = document.getElementById('sharedCounty');
+  sel.innerHTML = '';
+  if (!data || !data.counties){
+    const o = document.createElement('option'); o.value=''; o.textContent = '(no county variation modeled)';
+    sel.appendChild(o);
+    sel.disabled = true;
+    return;
+  }
+  sel.disabled = false;
+  const pinned = data.pinnedCounties || [];
+  if (pinned.length){
+    const grp1 = document.createElement('optgroup'); grp1.label = 'Pinned counties';
+    pinned.forEach(name=>{ const o=document.createElement('option'); o.value=name; o.textContent=name; grp1.appendChild(o); });
+    sel.appendChild(grp1);
+  }
+  const grp2 = document.createElement('optgroup'); grp2.label = 'Other counties';
+  Object.keys(data.counties).filter(n=>!pinned.includes(n)).forEach(name=>{
+    const o=document.createElement('option'); o.value=name; o.textContent=name; grp2.appendChild(o);
+  });
+  sel.appendChild(grp2);
+  sel.value = pinned[0] || Object.keys(data.counties)[0];
+}
+
+// Pushes the current shared Property Address/State/County into every loan
+// block's hidden fields, then recalculates each — call after any shared
+// field changes, and once after creating a new block.
+function propagateDealInfoToBlocks(){
+  const address = document.getElementById('sharedPropertyAddress').value;
+  const state = document.getElementById('sharedState').value;
+  const county = document.getElementById('sharedCounty').value;
+  getAllLoanBlocks().forEach(block => {
+    E(block,'propertyAddress').value = address;
+    E(block,'state').value = state;
+    populateCountyDropdown(block);
+    E(block,'county').value = county;
+    calc(block);
+  });
+}
+
+function initSharedDealInfo(){
+  populateSharedStateDropdown();
+  populateSharedCountyDropdown();
+}
+
+// Seeds a newly-created block's hidden state/county/address fields from the
+// current shared values (rather than the per-block default of 'NY' that
+// populateStateDropdown/populateCountyDropdown would otherwise apply), so
+// every block starts in sync without a page-wide recalculate.
+function seedBlockDealInfo(container){
+  populateStateDropdown(container);
+  E(container,'propertyAddress').value = document.getElementById('sharedPropertyAddress').value;
+  E(container,'state').value = document.getElementById('sharedState').value;
+  populateCountyDropdown(container);
+  E(container,'county').value = document.getElementById('sharedCounty').value;
+}
+
+let sharedAddressDebounceTimer;
+function onSharedAddressInput(){
+  clearTimeout(sharedAddressDebounceTimer);
+  sharedAddressDebounceTimer = setTimeout(parseSharedAddress, 500);
+}
+
+function parseSharedAddress(){
+  const raw = document.getElementById('sharedPropertyAddress').value;
+  const noteEl = document.getElementById('sharedAddressDetectNote');
+  if (!raw.trim()){ noteEl.textContent = ''; return; }
+
+  const result = detectAddressLocation(raw);
+  if (!result){
     noteEl.textContent = "Couldn't detect a state from that — please pick manually below.";
     return;
   }
-
-  E(container,'state').value = detectedState;
-  populateCountyDropdown(container);
-  if (detectedCounty) E(container,'county').value = detectedCounty;
+  const { detectedState, detectedCounty, method, overlapNote } = result;
+  document.getElementById('sharedState').value = detectedState;
+  populateSharedCountyDropdown();
+  if (detectedCounty) document.getElementById('sharedCounty').value = detectedCounty;
   const label = detectedCounty ? (detectedCounty + ', ' + STATE_NAMES[detectedState]) : STATE_NAMES[detectedState];
   noteEl.textContent = 'Detected: ' + label + ' (via ' + method + ')' + overlapNote + ' — please confirm State/County below.';
-  calc(container);
+  propagateDealInfoToBlocks();
 }
 
-let addressDebounceTimer;
-function onAddressInput(container){
-  clearTimeout(addressDebounceTimer);
-  addressDebounceTimer = setTimeout(()=>parseAddress(container), 500);
+function onSharedStateChange(){
+  populateSharedCountyDropdown();
+  propagateDealInfoToBlocks();
 }
 
-function onStateChange(container){
-  populateCountyDropdown(container);
-  calc(container);
+function onSharedCountyChange(){
+  propagateDealInfoToBlocks();
 }
 
 function applyTitleInsurance(container, price, loanAmt){
@@ -4402,6 +4593,34 @@ async function buildDocxExport(blocks){
 
 const LAST_UPDATED = 'July 8, 2026'; // bump this whenever rate tables/defaults change
 
+// CCE_VERSION drives the "new version available" banner below — bump it
+// (and cce_version.json alongside this file on GitHub Pages) whenever a
+// deploy is ready for users to be notified about; skip the bump for
+// quiet/WIP pushes you don't want to nag anyone with.
+const CCE_VERSION = '0.17.0';
+const CCE_VERSION_CHECK_URL = 'cce_version.json';
+const CCE_VERSION_CHECK_INTERVAL_MS = 5 * 60 * 1000;
+
+async function checkForNewCceVersion(){
+  try{
+    const res = await fetch(CCE_VERSION_CHECK_URL + '?t=' + Date.now(), { cache:'no-store' });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.version && data.version !== CCE_VERSION){
+      const banner = document.getElementById('ccUpdateBanner');
+      if (banner) banner.style.display = 'flex';
+    }
+  } catch(e) {
+    // network hiccup or file not deployed yet — fail silently, never
+    // interrupt someone's work over a version check
+  }
+}
+
+function startCceVersionPolling(){
+  setTimeout(checkForNewCceVersion, 30 * 1000);
+  setInterval(checkForNewCceVersion, CCE_VERSION_CHECK_INTERVAL_MS);
+}
+
 function populateDateBar(){
   document.getElementById('todayDate').textContent = new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
   document.getElementById('lastUpdatedDate').textContent = LAST_UPDATED;
@@ -4447,8 +4666,7 @@ function getAllLoanBlocks(){
 
 function initLoanBlock(container){
   container._sourceNotes = { govFees:'', title:'' };
-  populateStateDropdown(container);
-  populateCountyDropdown(container);
+  seedBlockDealInfo(container);
   E(container,'chk_show_mansiontax').checked = (parseFloat(E(container,'price').value) || 0) >= 1000000;
   calc(container);
 }
@@ -4842,6 +5060,30 @@ function applyTalkAndFillCce(fields){
   const dest = tafTarget.container;
   const values = {};
   Object.keys(fields).forEach(k => { if (CCE_TAF_DEALSETUP_KEYS.indexOf(k) === -1) values[k] = fields[k]; });
+
+  // Property Address/State/County are shared page-level fields (0.18), not
+  // per-block — route them through the shared Deal Info panel so they land
+  // the same way whichever loan block was the Talk-and-Fill target, and
+  // propagate to every block instead of just the one that was selected.
+  const dealInfoValues = {};
+  ['propertyAddress', 'state', 'county'].forEach(k => { if (values[k] !== undefined){ dealInfoValues[k] = values[k]; delete values[k]; } });
+  if (Object.keys(dealInfoValues).length){
+    if (dealInfoValues.propertyAddress !== undefined) document.getElementById('sharedPropertyAddress').value = dealInfoValues.propertyAddress;
+    if (dealInfoValues.state !== undefined){
+      document.getElementById('sharedState').value = dealInfoValues.state;
+      populateSharedCountyDropdown();
+    }
+    if (dealInfoValues.county !== undefined) document.getElementById('sharedCounty').value = dealInfoValues.county;
+    // Address was set programmatically, so its oninput debounce never fired —
+    // if the parse didn't already give us a state, let the existing
+    // address-parsing logic take a pass at whatever address text landed.
+    if (dealInfoValues.propertyAddress !== undefined && dealInfoValues.state === undefined){
+      parseSharedAddress();
+    } else {
+      propagateDealInfoToBlocks();
+    }
+  }
+
   // calc() treats whichever of downAmt/downPct/loanAmt ISN'T the active
   // dpMode as a derived output and overwrites it — so a value we just set
   // for the non-active mode would otherwise be silently clobbered right
@@ -4857,13 +5099,7 @@ function applyTalkAndFillCce(fields){
   } else if (values.loanAmt !== undefined){
     values.__dpMode = 'loan';
   }
-  applyFieldValues(dest, values);
-  // Address was set programmatically, so its oninput debounce never fired —
-  // if the parse didn't already give us a state, let the existing
-  // address-parsing logic take a pass at whatever address text landed.
-  if (values.propertyAddress !== undefined && values.state === undefined){
-    parseAddress(dest);
-  }
+  if (Object.keys(values).length) applyFieldValues(dest, values);
 }
 
 // ===========================================================================
@@ -4896,6 +5132,23 @@ function loadPageFromData(data){
     const block = createLoanBlock(b.loanType || 'Loan', true);
     applyFieldValues(block, b.fields || {});
   });
+
+  // Sync the shared Deal Info panel from the first loaded block's own
+  // saved state/county/address (older saved records predate 0.18's shared
+  // Deal Info and may have per-block values — the first block wins as the
+  // new single source of truth going forward).
+  document.getElementById('sharedAddressDetectNote').textContent = '';
+  const firstBlock = getAllLoanBlocks()[0];
+  if (firstBlock){
+    document.getElementById('sharedPropertyAddress').value = E(firstBlock,'propertyAddress').value;
+    document.getElementById('sharedState').value = E(firstBlock,'state').value;
+    populateSharedCountyDropdown();
+    document.getElementById('sharedCounty').value = E(firstBlock,'county').value;
+  } else {
+    document.getElementById('sharedPropertyAddress').value = '';
+    populateSharedStateDropdown();
+    populateSharedCountyDropdown();
+  }
 }
 
 // ===========================================================================
@@ -4935,6 +5188,10 @@ function clearCurrentPage(){
   document.getElementById('processorName').value = '';
   document.getElementById('borrowerName').value = '';
   document.getElementById('loanBlocksContainer').innerHTML = '';
+  document.getElementById('sharedPropertyAddress').value = '';
+  document.getElementById('sharedAddressDetectNote').textContent = '';
+  populateSharedStateDropdown();
+  populateSharedCountyDropdown();
   currentRecordId = null;
 }
 
@@ -5440,7 +5697,78 @@ function emailDiscrepancyViaGmail(){
   window.open('https://mail.google.com/mail/?view=cm&fs=1&to=marketingfmhomeloans@gmail.com&su=' + subject + '&body=' + body, '_blank');
 }
 
+// ===========================================================================
+// PREV/NEXT SECTION NAV (0.18) — a small floating bar that jump-scrolls
+// through each loan block's panels in a fixed order. Flat list across every
+// loan block in DOM order, so "Next" past the last panel of one block lands
+// on the first panel of the next block if there is one.
+// ===========================================================================
+const CCE_NAV_ORDER = ['loanBasics','loanSpecifics','lenderFees','thirdPartyFees','titleGovFees','monthlyEscrow','prepaidsEscrow','cashToClose','monthlyPayment'];
+const CCE_NAV_LABELS = {
+  loanBasics: 'Loan Basics', loanSpecifics: 'Loan Specifics', lenderFees: 'Lender Fees',
+  thirdPartyFees: '3rd-Party Fees', titleGovFees: 'Title & Gov Fees', monthlyEscrow: 'Monthly Escrow Inputs',
+  prepaidsEscrow: 'Prepaids / Escrow Setup', cashToClose: 'Cash to Close', monthlyPayment: 'Estimated Monthly Payment',
+};
+
+function getCceNavSections_(){
+  const sections = [];
+  getAllLoanBlocks().forEach(block => {
+    CCE_NAV_ORDER.forEach(key => {
+      const el = block.querySelector('[data-nav="' + key + '"]');
+      if (el) sections.push({ el, key });
+    });
+  });
+  return sections;
+}
+
+function cceNavCurrentIndex_(sections){
+  const threshold = 140; // px from viewport top — a section counts as "current" once it's scrolled near the top
+  let idx = 0;
+  for (let i = 0; i < sections.length; i++){
+    if (sections[i].el.getBoundingClientRect().top <= threshold) idx = i; else break;
+  }
+  return idx;
+}
+
+function cceNavGo(direction){
+  const sections = getCceNavSections_();
+  if (!sections.length) return;
+  const idx = cceNavCurrentIndex_(sections);
+  const targetIdx = Math.min(sections.length - 1, Math.max(0, idx + direction));
+  sections[targetIdx].el.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+function updateCceNavBar_(){
+  const sections = getCceNavSections_();
+  const bar = document.getElementById('cceNavBar');
+  bar.style.display = sections.length ? 'flex' : 'none';
+  if (!sections.length) return;
+  const idx = cceNavCurrentIndex_(sections);
+  document.getElementById('cceNavLabel').textContent = CCE_NAV_LABELS[sections[idx].key] || '';
+  document.getElementById('cceNavPrevBtn').disabled = idx === 0;
+  document.getElementById('cceNavNextBtn').disabled = idx === sections.length - 1;
+}
+
+let cceNavScrollTicking = false;
+function cceNavOnScroll_(){
+  if (cceNavScrollTicking) return;
+  cceNavScrollTicking = true;
+  requestAnimationFrame(() => { updateCceNavBar_(); cceNavScrollTicking = false; });
+}
+
+function initCceNavBar(){
+  updateCceNavBar_();
+  // The page scrolls inside .cce-scroll-area (an inner overflow:auto div),
+  // not the window, so the scroll listener has to live there.
+  const scrollArea = document.querySelector('.cce-scroll-area');
+  if (scrollArea) scrollArea.addEventListener('scroll', cceNavOnScroll_, { passive:true });
+  new MutationObserver(updateCceNavBar_).observe(document.getElementById('loanBlocksContainer'), { childList:true });
+}
+
 populateDateBar();
+initSharedDealInfo();
+initCceNavBar();
 initSession();
+startCceVersionPolling();
 </script>
 
