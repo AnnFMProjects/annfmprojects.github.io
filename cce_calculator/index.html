@@ -961,6 +961,50 @@
         </div>
       </div>
 
+      <!-- ADD CUSTOM FIELD MODAL — per-group manual add/deduct line, asks
+           direction, which Total it should hit, then Save Permanently
+           (included when the client is saved) or Add Temporarily (this
+           page/session only, not persisted on Save). -->
+      <div id="cfModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:1050; align-items:center; justify-content:center; padding:20px;">
+        <div style="background:#fff; border-radius:10px; max-width:440px; width:100%; padding:24px; font-family:Calibri, Arial, sans-serif; max-height:88vh; overflow-y:auto;">
+          <h3 id="cfModalTitle" style="margin-top:0; color:var(--navy);">Add Field</h3>
+
+          <label style="font-size:12px; color:var(--slate); display:block; margin-bottom:4px;">Field label</label>
+          <input type="text" id="cfLabelInput" placeholder="e.g. Courier Fee" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:5px; box-sizing:border-box; font-size:13px; margin-bottom:12px;">
+
+          <label style="font-size:12px; color:var(--slate); display:block; margin-bottom:4px;">Amount</label>
+          <input type="text" inputmode="decimal" id="cfAmountInput" value="0" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:5px; box-sizing:border-box; font-size:13px; margin-bottom:12px;">
+
+          <label style="font-size:12px; color:var(--slate); display:block; margin-bottom:4px;">Is this adding or deducting?</label>
+          <div style="display:flex; gap:14px; margin-bottom:10px; font-size:12.5px;">
+            <label class="radio-opt"><input type="radio" name="cfDirection" value="add" checked onchange="cfOnDirectionChange()"> Add</label>
+            <label class="radio-opt"><input type="radio" name="cfDirection" value="deduct" onchange="cfOnDirectionChange()"> Deduct</label>
+            <label class="radio-opt"><input type="radio" name="cfDirection" value="both" onchange="cfOnDirectionChange()"> Both</label>
+          </div>
+
+          <div id="cfBothConventionRow" style="display:none; margin-bottom:12px; padding:8px 10px; background:var(--slate-light); border-radius:6px;">
+            <label style="font-size:11.5px; color:var(--slate); display:block; margin-bottom:4px;">Since this can go either way — does a negative amount add or deduct?</label>
+            <div style="display:flex; flex-direction:column; gap:4px; font-size:12px;">
+              <label class="radio-opt"><input type="radio" name="cfBothConvention" value="negDeducts" checked> A negative amount deducts, positive adds (normal)</label>
+              <label class="radio-opt"><input type="radio" name="cfBothConvention" value="negAdds"> A negative amount adds, positive deducts (reversed)</label>
+            </div>
+          </div>
+
+          <label style="font-size:12px; color:var(--slate); display:block; margin-bottom:4px;">Which Total should this affect?</label>
+          <select id="cfTargetTotal" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:5px; box-sizing:border-box; font-size:13px; margin-bottom:16px;">
+            <option value="own" id="cfTargetOwnOption">This group's Total</option>
+            <option value="totalCost">Overall Total Cost (skip this group's subtotal)</option>
+          </select>
+
+          <div style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
+            <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="closeAddCustomFieldModal()">Cancel</button>
+            <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="submitCustomField(false)">Add Temporarily</button>
+            <button class="export-btn" style="background:var(--navy); color:#fff;" onclick="submitCustomField(true)">Save Permanently</button>
+          </div>
+          <p style="font-size:10.5px; color:var(--slate); font-style:italic; margin:10px 0 0 0; line-height:1.4;">Temporary fields affect this estimate's numbers right now but are NOT included if you Save this Client — they won't come back after a reload. Permanent fields are saved with the client record.</p>
+        </div>
+      </div>
+
       <!-- LOAN TYPE MODAL (replaces native prompt() for Add Loan Estimate) -->
       <div id="loanTypeModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
         <div style="background:#fff; border-radius:10px; max-width:440px; width:100%; padding:24px; font-family:Calibri, Arial, sans-serif;">
@@ -1402,30 +1446,32 @@
       </div>
 
       <div class="panel" data-nav="lenderFees">
-        <div class="panel-head"><span>Lender Fees</span><span class="tag" data-fld="g2total"></span></div>
+        <div class="panel-head"><span>Lender Fees</span><span style="display:flex; align-items:center; gap:6px;"><span class="tag" data-fld="g2total"></span><button type="button" class="export-btn" style="padding:2px 8px; font-size:10px;" onclick="openAddCustomFieldModal(this.closest('.loan-block'), 'g2')">+ Field</button></span></div>
         <div class="panel-body">
           <div class="field-row"><label>Application</label><input type="text" inputmode="decimal" data-fld="f_application" value="595" oninput="calc(this.closest('.loan-block'))"></div>
           <div class="field-row"><label>Processing</label><input type="text" inputmode="decimal" data-fld="f_processing" value="0" oninput="calc(this.closest('.loan-block'))"></div>
           <div class="field-row"><label>Underwriting</label><input type="text" inputmode="decimal" data-fld="f_underwriting" value="0" oninput="calc(this.closest('.loan-block'))"></div>
           <div class="field-row"><label>Commitment</label><input type="text" inputmode="decimal" data-fld="f_commitment" value="995" oninput="calc(this.closest('.loan-block'))"></div>
           <div class="field-row"><label>Points ($) <span class="calc-badge">Auto</span></label><input type="text" inputmode="decimal" data-fld="f_points" value="0" disabled></div>
+          <div data-fld="customFieldsList_g2"></div>
         </div>
       </div>
 
       <div class="panel" data-nav="thirdPartyFees">
-        <div class="panel-head"><span>3rd-Party Fees</span><span class="tag" data-fld="g2bTotal"></span></div>
+        <div class="panel-head"><span>3rd-Party Fees</span><span style="display:flex; align-items:center; gap:6px;"><span class="tag" data-fld="g2bTotal"></span><button type="button" class="export-btn" style="padding:2px 8px; font-size:10px;" onclick="openAddCustomFieldModal(this.closest('.loan-block'), 'g2b')">+ Field</button></span></div>
         <div class="panel-body">
           <div class="field-row"><label>Bank Attorney</label><input type="text" inputmode="decimal" data-fld="f_attorney" value="1200" oninput="calc(this.closest('.loan-block'))"></div>
           <div class="field-row"><label>Buyer's Attorney</label><input type="text" inputmode="decimal" data-fld="f_buyersAttorney" value="0" oninput="calc(this.closest('.loan-block'))"></div>
           <div class="field-row"><label>Appraisal</label><input type="text" inputmode="decimal" data-fld="f_appraisal" value="650" oninput="calc(this.closest('.loan-block'))"></div>
           <div class="field-row"><label>Co-Op Condo Fee</label><input type="text" inputmode="decimal" data-fld="f_coopCondoFee" value="0" oninput="calc(this.closest('.loan-block'))"></div>
+          <div data-fld="customFieldsList_g2b"></div>
         </div>
       </div>
 
     </div>
       <div>
       <div class="panel" data-nav="titleGovFees">
-        <div class="panel-head"><span>Title &amp; Government Fees</span><span class="tag" data-fld="g3total"></span></div>
+        <div class="panel-head"><span>Title &amp; Government Fees</span><span style="display:flex; align-items:center; gap:6px;"><span class="tag" data-fld="g3total"></span><button type="button" class="export-btn" style="padding:2px 8px; font-size:10px;" onclick="openAddCustomFieldModal(this.closest('.loan-block'), 'g3')">+ Field</button></span></div>
         <div class="panel-body">
           <div class="dev-banner-inline">Please check Title &amp; Government Fees, as this is in early development.</div>
           <div class="field-row" style="justify-content:flex-start; gap:10px; flex-wrap:wrap;">
@@ -1485,6 +1531,7 @@
           <div class="field-row" style="justify-content:flex-start; gap:6px; padding-top:0;">
             <label class="radio-opt" style="font-size:11px;"><input type="checkbox" data-fld="chk_show_transfertax" onchange="calc(this.closest('.loan-block'))"> Show Transfer Tax (case-by-case per contract — manual only)</label>
           </div>
+          <div data-fld="customFieldsList_g3"></div>
         </div>
       </div>
 
@@ -1514,11 +1561,12 @@
       </div>
 
       <div class="panel" data-nav="prepaidsEscrow">
-        <div class="panel-head"><span>Prepaids / Escrow Setup</span><span class="tag" data-fld="g4total"></span></div>
+        <div class="panel-head"><span>Prepaids / Escrow Setup</span><span style="display:flex; align-items:center; gap:6px;"><span class="tag" data-fld="g4total"></span><button type="button" class="export-btn" style="padding:2px 8px; font-size:10px;" onclick="openAddCustomFieldModal(this.closest('.loan-block'), 'g4')">+ Field</button></span></div>
         <div class="panel-body">
           <div class="field-row"><label>Per Diem Interest (<input type="text" inputmode="decimal" data-fld="perdiemDays" value="30" class="inline-num" oninput="calc(this.closest('.loan-block'))"> days) <span class="calc-badge">Auto</span></label><span class="summary-value" data-fld="out_perdiem"></span></div>
           <div class="field-row"><label>Insurance Escrow (<input type="text" inputmode="decimal" data-fld="insEscrowMonths" value="15" class="inline-num" oninput="calc(this.closest('.loan-block'))"> mo) <span class="calc-badge">Auto</span></label><span class="summary-value" data-fld="out_insEscrow"></span></div>
           <div class="field-row"><label>Tax Escrow (<input type="text" inputmode="decimal" data-fld="taxEscrowMonths" value="12" class="inline-num" oninput="calc(this.closest('.loan-block'))"> mo) <span class="calc-badge">Auto</span></label><span class="summary-value" data-fld="out_taxEscrow"></span></div>
+          <div data-fld="customFieldsList_g4"></div>
         </div>
       </div>
 
@@ -3517,6 +3565,122 @@ function fmtNum(n){
   return n.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 
+// ===========================================================================
+// CUSTOM FIELDS — the "+ Field" button on Lender Fees / 3rd-Party Fees /
+// Title & Government Fees / Prepaids & Escrow Setup. Each field is a manual
+// add/deduct line; its dollar amount lives in a normal data-fld input (so
+// duplication/save-load reuse the existing extractFieldValues/applyFieldValues
+// machinery for free) but its label/direction/target-total metadata lives in
+// container._customFields, since that isn't something a plain input value
+// can carry. See openAddCustomFieldModal for the "Save Permanently vs Add
+// Temporarily" split — only permanent fields are written into
+// serializeCurrentPage()'s output, so temporary ones don't survive a
+// Save Client round-trip.
+// ===========================================================================
+const CF_GROUP_LABELS = { g2:'Lender Fees', g2b:'3rd-Party Fees', g3:'Title & Government Fees', g4:'Prepaids / Escrow Setup' };
+let cfModalTarget = null;
+
+function customFieldContribution_(cf, amt){
+  if (cf.direction === 'add') return Math.abs(amt);
+  if (cf.direction === 'deduct') return -Math.abs(amt);
+  // 'both' — the entered amount's own sign decides, per the chosen convention.
+  return cf.bothConvention === 'negAdds' ? -amt : amt;
+}
+function customFieldGroupSum_(container, group, targetTotal){
+  return (container._customFields || [])
+    .filter(f => f.group === group && f.targetTotal === targetTotal)
+    .reduce((s,f) => s + customFieldContribution_(f, numVal(container, f.id)), 0);
+}
+function cfDirectionSummary_(cf){
+  if (cf.direction === 'add') return 'adds';
+  if (cf.direction === 'deduct') return 'deducts';
+  return cf.bothConvention === 'negAdds' ? 'both, – adds' : 'both, – deducts';
+}
+function cfEsc_(s){
+  const d = document.createElement('div');
+  d.textContent = s == null ? '' : String(s);
+  return d.innerHTML;
+}
+
+// Recreates one custom field's DOM row inside its group's list container and
+// registers its metadata on container._customFields. Used both for a brand
+// new field (submitCustomField) and to rebuild rows when duplicating a block
+// or loading saved data (the amount itself is filled in afterward by the
+// normal applyFieldValues pass, since the input now has a matching data-fld).
+function addCustomFieldStructural(container, cf){
+  if (!container._customFields) container._customFields = [];
+  container._customFields.push(cf);
+  const list = E(container, 'customFieldsList_' + cf.group);
+  if (!list) return;
+  const totalLabel = cf.targetTotal === 'totalCost' ? 'Total Cost' : (CF_GROUP_LABELS[cf.group] || cf.group) + ' Total';
+  const row = document.createElement('div');
+  row.className = 'field-row';
+  row.setAttribute('data-cf-row', cf.id);
+  row.innerHTML =
+    '<label>' + cfEsc_(cf.label) +
+      ' <span class="hint">(' + cfDirectionSummary_(cf) + ' → ' + cfEsc_(totalLabel) + ')</span>' +
+      ' <button type="button" class="export-btn" style="padding:1px 6px; font-size:10px; margin-left:4px;" onclick="removeCustomField(this.closest(\'.loan-block\'), \'' + cf.id + '\')" title="Remove field">&times;</button>' +
+    '</label>' +
+    '<input type="text" inputmode="decimal" data-fld="' + cf.id + '" value="0" oninput="calc(this.closest(\'.loan-block\'))">';
+  list.appendChild(row);
+}
+
+// Keeps a block's cf id counter ahead of whatever ids it was just seeded
+// with (duplication or load-from-saved-data), so the NEXT field added via
+// the modal never collides with a restored one.
+function cfSyncCounterFromList_(container, list){
+  const maxN = (list || []).reduce((m,cf) => {
+    const n = parseInt(String(cf.id||'').split('_')[1], 10);
+    return isNaN(n) ? m : Math.max(m, n);
+  }, 0);
+  container._cfCounter = Math.max(container._cfCounter || 0, maxN);
+}
+
+function removeCustomField(container, id){
+  container._customFields = (container._customFields || []).filter(f => f.id !== id);
+  const row = container.querySelector('[data-cf-row="' + id + '"]');
+  if (row) row.remove();
+  calc(container);
+}
+
+function openAddCustomFieldModal(container, group){
+  cfModalTarget = { container, group };
+  const groupLabel = CF_GROUP_LABELS[group] || group;
+  document.getElementById('cfModalTitle').textContent = 'Add Field — ' + groupLabel;
+  document.getElementById('cfLabelInput').value = '';
+  document.getElementById('cfAmountInput').value = '0';
+  document.querySelector('input[name="cfDirection"][value="add"]').checked = true;
+  document.querySelector('input[name="cfBothConvention"][value="negDeducts"]').checked = true;
+  document.getElementById('cfTargetOwnOption').textContent = "This group's Total (" + groupLabel + ')';
+  document.getElementById('cfTargetTotal').value = 'own';
+  cfOnDirectionChange();
+  document.getElementById('cfModalOverlay').style.display = 'flex';
+}
+function closeAddCustomFieldModal(){
+  document.getElementById('cfModalOverlay').style.display = 'none';
+  cfModalTarget = null;
+}
+function cfOnDirectionChange(){
+  const dir = document.querySelector('input[name="cfDirection"]:checked').value;
+  document.getElementById('cfBothConventionRow').style.display = (dir === 'both') ? '' : 'none';
+}
+function submitCustomField(permanent){
+  if (!cfModalTarget) return;
+  const label = document.getElementById('cfLabelInput').value.trim();
+  if (!label){ alert('Enter a label for this field.'); return; }
+  const amount = parseFloat(document.getElementById('cfAmountInput').value) || 0;
+  const direction = document.querySelector('input[name="cfDirection"]:checked').value;
+  const bothConvention = document.querySelector('input[name="cfBothConvention"]:checked').value;
+  const targetTotal = document.getElementById('cfTargetTotal').value;
+  const { container, group } = cfModalTarget;
+  container._cfCounter = (container._cfCounter || 0) + 1;
+  const cf = { id: 'cf_' + container._cfCounter, group, label, direction, bothConvention, targetTotal, permanent: !!permanent };
+  addCustomFieldStructural(container, cf);
+  E(container, cf.id).value = fmtNum(amount);
+  closeAddCustomFieldModal();
+  calc(container);
+}
+
 function calc(container){
   const price = numVal(container,'price');
   const isRefi = (container.dataset.loanType || '').trim().toLowerCase() === 'refinance';
@@ -3611,13 +3775,15 @@ function calc(container){
   const hoaFee = numVal(container,'hoaFee');
 
   // Lender Fees
-  const g2 = ['f_application','f_processing','f_underwriting','f_commitment','f_points']
+  let g2 = ['f_application','f_processing','f_underwriting','f_commitment','f_points']
     .reduce((s,id)=> s + numVal(container,id), 0);
+  g2 += customFieldGroupSum_(container, 'g2', 'own');
   E(container,'g2total').textContent = 'Total: ' + fmt(g2);
 
   // 3rd-Party Fees
-  const g2b = ['f_attorney','f_buyersAttorney','f_appraisal','f_coopCondoFee']
+  let g2b = ['f_attorney','f_buyersAttorney','f_appraisal','f_coopCondoFee']
     .reduce((s,id)=> s + numVal(container,id), 0);
+  g2b += customFieldGroupSum_(container, 'g2b', 'own');
   E(container,'g2bTotal').textContent = 'Total: ' + fmt(g2b);
 
   // Title Insurance auto-calc, then government fee auto-calc (Mortgage/Mansion/Transfer tax)
@@ -3625,13 +3791,14 @@ function calc(container){
   applyGovernmentFees(container, price, loanAmt);
   const showMansion = E(container,'chk_show_mansiontax').checked;
   const showTransfer = E(container,'chk_show_transfertax').checked;
-  const g3 = numVal(container,'t_title')
+  let g3 = numVal(container,'t_title')
     + numVal(container,'t_recording')
     + numVal(container,'t_misc')
     + numVal(container,'t_condoFormation')
     + numVal(container,'t_mortgagetax')
     + (showMansion ? numVal(container,'t_mansiontax') : 0)
     + (showTransfer ? numVal(container,'t_transfertax') : 0);
+  g3 += customFieldGroupSum_(container, 'g3', 'own');
   E(container,'g3total').textContent = 'Total: ' + fmt(g3);
 
   // Escrows — Monthly is the primary figure used everywhere downstream;
@@ -3667,7 +3834,8 @@ function calc(container){
   const perdiem = loanAmt * rate / 365 * perdiemDays;
   const insEscrow = mIns * insEscrowMonths;
   const taxEscrow = mTaxes * taxEscrowMonths;
-  const g4 = perdiem + insEscrow + taxEscrow;
+  let g4 = perdiem + insEscrow + taxEscrow;
+  g4 += customFieldGroupSum_(container, 'g4', 'own');
 
   E(container,'out_perdiem').textContent = fmt(perdiem);
   E(container,'out_insEscrow').textContent = fmt(insEscrow);
@@ -3678,7 +3846,11 @@ function calc(container){
   const closingCosts = g2 + g2b + g3;
   const escrows = g4;
   const emd = numVal(container,'emd');
-  const totalCost = downAmt + closingCosts + escrows - sellerConcession - emd;
+  // Custom fields targeted at "totalCost" skip their group's own subtotal
+  // entirely and adjust Total Cost directly (see openAddCustomFieldModal).
+  const customTotalCostAdj = ['g2','g2b','g3','g4']
+    .reduce((s,g)=> s + customFieldGroupSum_(container, g, 'totalCost'), 0);
+  const totalCost = downAmt + closingCosts + escrows - sellerConcession - emd + customTotalCostAdj;
 
   E(container,'out_dpEcho').textContent = fmt(downAmt);
   E(container,'out_g23').textContent = fmt(closingCosts);
@@ -3820,7 +3992,11 @@ function calc(container){
     },
     escrow: { perdiem, insEscrow, taxEscrow, g4total: g4, perdiemDays, insEscrowMonths, taxEscrowMonths, yearlyTaxes, taxDivisorMonths, yearlyIns, insDivisorMonths },
     closingCosts, escrows, totalCost, emd, reservesMonths, reservesAmount, totalPlusReserves: totalCost + reservesAmount,
-    monthly: { pi, mTaxes, mIns, mi, pmi, hasMipMi, hoaFee, monthlyTotal, miRateLabel }
+    monthly: { pi, mTaxes, mIns, mi, pmi, hasMipMi, hoaFee, monthlyTotal, miRateLabel },
+    // Manual per-group custom fields (see openAddCustomFieldModal) — not yet
+    // rendered as their own line in the PDF/DOCX/XLSX exports, but their
+    // dollar effect IS already folded into g2/g2b/g3/g4/totalCost above.
+    customFields: (container._customFields || []).map(f => ({ ...f, amount: numVal(container, f.id), contribution: customFieldContribution_(f, numVal(container, f.id)) }))
   };
 }
 
@@ -5063,6 +5239,12 @@ function applyFieldValues(dest, values){
 }
 
 function copyLoanBlockData(src, dest){
+  // Structurally recreate the source block's custom fields (temporary AND
+  // permanent — duplication just copies whatever's on screen) BEFORE
+  // applyFieldValues, so their data-fld inputs already exist for the amount
+  // values in extractFieldValues(src) to land in.
+  (src._customFields || []).forEach(cf => addCustomFieldStructural(dest, Object.assign({}, cf)));
+  cfSyncCounterFromList_(dest, src._customFields);
   applyFieldValues(dest, extractFieldValues(src));
 }
 
@@ -5444,6 +5626,10 @@ function serializeCurrentPage(){
     loanBlocks: getAllLoanBlocks().map(b => ({
       loanType: b.dataset.loanType || 'Loan',
       fields: extractFieldValues(b),
+      // Only PERMANENT custom fields are saved — "Add Temporarily" fields
+      // are deliberately left out here so they don't come back after a
+      // Save Client + reload (see openAddCustomFieldModal).
+      customFields: (b._customFields || []).filter(f => f.permanent),
     })),
   };
 }
@@ -5458,6 +5644,10 @@ function loadPageFromData(data){
   document.getElementById('loanBlocksContainer').innerHTML = '';
   (data.loanBlocks || []).forEach(b => {
     const block = createLoanBlock(b.loanType || 'Loan', true);
+    // Recreate any saved permanent custom-field rows BEFORE applyFieldValues,
+    // so their data-fld amount inputs already exist for b.fields to fill in.
+    (b.customFields || []).forEach(cf => addCustomFieldStructural(block, cf));
+    cfSyncCounterFromList_(block, b.customFields);
     applyFieldValues(block, b.fields || {});
   });
 
