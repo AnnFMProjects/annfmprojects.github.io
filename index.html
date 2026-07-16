@@ -131,6 +131,14 @@
     color:var(--slate);
     font-style:italic;
   }
+  .card-mini{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:16px 24px;
+  }
+  .card-mini .card-title{ margin:0; font-size:16px; }
+  .card-mini .card-arrow{ margin-top:0; }
   .card-request .card-arrow{
     color:#8A6A1F;
     font-style:italic;
@@ -325,16 +333,15 @@
         <span class="card-arrow">Open tool →</span>
       </a>
 
-      <a class="card" href="admin/">
-        <div class="card-title">Admin App</div>
-        <p class="card-desc">One place for admin tasks — manage users and permissions, review App Requests, and check the live MYTURN.md coordination log.</p>
-        <span class="card-arrow">Open tool →</span>
-      </a>
-
       <a class="card card-request" href="#" onclick="openAppWizard(); return false;">
         <div class="card-title">Request an App</div>
         <p class="card-desc">Have an idea for a new internal tool? Answer a few questions and we'll turn it into a build-ready spec.</p>
         <span class="card-arrow">Request an app to build →</span>
+      </a>
+
+      <a class="card card-request card-mini" href="admin/">
+        <div class="card-title">Admin App</div>
+        <span class="card-arrow">Open tool →</span>
       </a>
     </div>
   </div>
