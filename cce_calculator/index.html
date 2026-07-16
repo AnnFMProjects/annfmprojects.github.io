@@ -211,6 +211,67 @@
     .cce-body{ grid-template-columns:1fr; }
   }
 
+  /* ---- Alt View (PAG-style left editors / center display / right editors) ----
+     No DOM reparenting: the 2 existing wrapper divs inside .cce-body become
+     display:contents (their children act as direct grid items without
+     moving in the DOM), and each panel gets an explicit grid-column/row via
+     its existing data-nav attribute — same live inputs, same calc()/E()
+     lookups, zero risk of the two views' data drifting apart. */
+  body.cce-alt-mode .loan-block:not(.cce-alt-current){ display:none; }
+  body.cce-alt-mode .loan-block > .loan-block-header:last-child{ display:none; }
+  body.cce-alt-mode .cce-body{
+    grid-template-columns: 1fr 1.3fr 1fr;
+    gap:18px;
+    align-items:start;
+  }
+  body.cce-alt-mode .cce-body > div{ display:contents; }
+  body.cce-alt-mode .panel[data-nav="loanBasics"]{ grid-column:1; grid-row:1; }
+  body.cce-alt-mode .panel[data-nav="loanSpecifics"]{ grid-column:1; grid-row:2; }
+  body.cce-alt-mode .panel[data-nav="lenderFees"]{ grid-column:1; grid-row:3; }
+  body.cce-alt-mode .panel[data-nav="thirdPartyFees"]{ grid-column:1; grid-row:4; }
+  body.cce-alt-mode .panel[data-nav="points"]{ grid-column:1; grid-row:5; }
+  body.cce-alt-mode .panel[data-nav="titleGovFees"]{ grid-column:3; grid-row:1; }
+  body.cce-alt-mode .panel[data-nav="monthlyEscrow"]{ grid-column:3; grid-row:2; }
+  body.cce-alt-mode .panel[data-nav="prepaidsEscrow"]{ grid-column:3; grid-row:3; }
+  body.cce-alt-mode .panel[data-nav="cashToClose"]{ grid-column:2; grid-row:1; }
+  body.cce-alt-mode .panel[data-nav="monthlyPayment"]{ grid-column:2; grid-row:2; }
+  body.cce-alt-mode .panel[data-nav="cashToClose"],
+  body.cce-alt-mode .panel[data-nav="monthlyPayment"]{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:10px;
+    box-shadow:0 2px 14px rgba(27,42,74,0.08);
+  }
+  body.cce-alt-mode .panel[data-nav="cashToClose"] .panel-head span:first-child,
+  body.cce-alt-mode .panel[data-nav="monthlyPayment"] .panel-head span:first-child{
+    font-family:Cambria, Georgia, serif;
+    font-size:16px;
+    letter-spacing:.2px;
+  }
+  @media (max-width: 1080px){
+    body.cce-alt-mode .cce-body{ grid-template-columns:1fr; }
+    body.cce-alt-mode .panel[data-nav]{ grid-column:1 !important; }
+  }
+
+  .alt-pencil-btn{ display:none; }
+  body.cce-alt-mode .alt-pencil-btn,
+  .xlsx-preview-tab-pane .alt-pencil-btn,
+  #exportPreviewBody .alt-pencil-btn{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:16px; height:16px; border:none; background:var(--slate-light);
+    color:var(--navy); border-radius:4px; cursor:pointer; padding:0;
+    margin-left:6px; vertical-align:middle;
+  }
+  .alt-pencil-btn:hover{ background:var(--gold); color:#fff; }
+
+  .xlsx-preview-tabs{ display:flex; gap:6px; border-bottom:1px solid var(--line); padding-bottom:0; }
+  .xlsx-preview-tab-btn{
+    border:1px solid var(--line); border-bottom:none; background:var(--slate-light);
+    color:var(--navy); font-weight:700; font-size:12px; padding:7px 14px;
+    border-radius:6px 6px 0 0; cursor:pointer; font-family:Calibri, Arial, sans-serif;
+  }
+  .xlsx-preview-tab-btn.active{ background:#fff; color:var(--navy); border-bottom:1px solid #fff; margin-bottom:-1px; }
+
   .cce-home{
     background:#fff;
     border:1px solid var(--line);
@@ -605,7 +666,9 @@
     </div>
   </div>
   <div class="cce-nav-divider"></div>
-  <button id="cceNavExportBtn" onclick="openExportPickModal()" title="Export"><svg class="dl-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v11m0 0l-4.5-4.5M12 14l4.5-4.5M5 19h14" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg> Export</button>
+  <button id="cceNavAltViewBtn" onclick="toggleAltView()" title="Switch to a PAG-style left/center/right editor layout for the current estimate">ALT VIEW</button>
+  <div class="cce-nav-divider"></div>
+  <button id="cceNavExportBtn" onclick="cceNavExportBtnClick()" title="Export"><svg class="dl-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v11m0 0l-4.5-4.5M12 14l4.5-4.5M5 19h14" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg> Export</button>
 </div>
 <div class="cce-wrap">
   <div class="cce-header">
@@ -4046,6 +4109,8 @@ function calc(container){
     // dollar effect IS already folded into g2/g2b/g3/g4/totalCost above.
     customFields: (container._customFields || []).map(f => ({ ...f, amount: numVal(container, f.id), contribution: customFieldContribution_(f, numVal(container, f.id)) }))
   };
+
+  altViewInjectPencils_(container);
 }
 
 // Builds a combined PDF for the given list of loan blocks and returns
@@ -4437,8 +4502,14 @@ async function buildXlsxEstimateData_(container, dpMode, mathTabName, colOffset)
   blank();
 
   section('CALCULATED — LOAN BASICS');
-  R.ufmip = push('Upfront MIP', null);
-  R.totalLoan = push('Total Loan Amount', null);
+  // Real computed values (from the same calc() output the live UI shows) are
+  // stored here even on rows that also get an Excel formula below (F[R.x]) —
+  // cellXml() already supports v+f together on numeric cells, so this is a
+  // free accuracy upgrade for the real file (no more stale-0-until-recalc)
+  // AND is what makes the Alt View export preview table possible: it reads
+  // this same `rows` array (returned below) instead of re-deriving values.
+  R.ufmip = push('Upfront MIP', d.ufmip);
+  R.totalLoan = push('Total Loan Amount', d.totalLoan);
   R.pointsPct = push('Discount Points', d.pointsPct/100);
   blank();
 
@@ -4447,8 +4518,8 @@ async function buildXlsxEstimateData_(container, dpMode, mathTabName, colOffset)
   R.processing = push('Processing', +d.fees.processing);
   R.underwriting = push('Underwriting', +d.fees.underwriting);
   R.commitment = push('Commitment', +d.fees.commitment);
-  R.feePoints = push('Points ($)', null);
-  R.g2total = push('Lender Fees Total', null);
+  R.feePoints = push('Points ($)', d.fees.points);
+  R.g2total = push('Lender Fees Total', d.fees.g2total);
   blank();
 
   section('3RD-PARTY FEES (inputs)');
@@ -4456,7 +4527,7 @@ async function buildXlsxEstimateData_(container, dpMode, mathTabName, colOffset)
   R.buyersAttorney = push("Buyer's Attorney", +d.fees3rdParty.buyersAttorney);
   R.appraisal = push('Appraisal', +d.fees3rdParty.appraisal);
   R.coopCondoFee = push('Co-Op Condo Fee', +d.fees3rdParty.coopCondoFee);
-  R.g2bTotal = push('3rd-Party Fees Total', null);
+  R.g2bTotal = push('3rd-Party Fees Total', d.fees3rdParty.g2bTotal);
   blank();
 
   const stateCode = E(container,'state').value;
@@ -4468,10 +4539,10 @@ async function buildXlsxEstimateData_(container, dpMode, mathTabName, colOffset)
   R.recording = push('Recording Fees', +d.title.recording);
   R.misc = push('Misc. / Ancillary Title Fees', +d.title.misc);
   R.condoFormation = push('Condo Formation Fee', +d.title.condoFormation);
-  R.titleIns = push('Title Insurance', 0, container._sourceNotes.title);
-  R.mortgageTax = push('Mortgage / Recordation Tax', 0, container._sourceNotes.govFees);
-  R.mansionTax = push('Mansion / Supplemental Tax', 0);
-  R.transferTax = push('Transfer / Excise Tax', 0);
+  R.titleIns = push('Title Insurance', d.title.title, container._sourceNotes.title);
+  R.mortgageTax = push('Mortgage / Recordation Tax', d.title.mortgagetax, container._sourceNotes.govFees);
+  R.mansionTax = push('Mansion / Supplemental Tax', d.title.mansiontax);
+  R.transferTax = push('Transfer / Excise Tax', d.title.transfertax);
   R.g3total = push('Title & Government Fees Total', null);
   blank();
 
@@ -4675,31 +4746,31 @@ async function buildXlsxEstimateData_(container, dpMode, mathTabName, colOffset)
   R.perdiemDays = push('Per Diem Interest Days', d.escrow.perdiemDays);
   R.insEscrowMonths = push('Insurance Escrow Months', d.escrow.insEscrowMonths);
   R.taxEscrowMonths = push('Tax Escrow Months', d.escrow.taxEscrowMonths);
-  R.perdiem = push('Per Diem Interest', null);
-  R.insEscrow = push('Insurance Escrow', null);
-  R.taxEscrow = push('Tax Escrow', null);
-  R.escrowTotal = push('Escrows Total', null);
+  R.perdiem = push('Per Diem Interest', d.escrow.perdiem);
+  R.insEscrow = push('Insurance Escrow', d.escrow.insEscrow);
+  R.taxEscrow = push('Tax Escrow', d.escrow.taxEscrow);
+  R.escrowTotal = push('Escrows Total', d.escrow.g4total);
   blank();
 
   section('CASH TO CLOSE');
-  R.ctcDown = push('Down Payment', null);
-  R.ctcClosing = push('Closing Costs', null);
-  R.ctcEscrows = push('Escrows', null);
-  R.ctcSeller = push("Seller's Concession", null);
-  R.ctcEmd = push('Deposit', null);
-  R.ctcTotal = push('Total Cost', null);
+  R.ctcDown = push('Down Payment', d.downAmt);
+  R.ctcClosing = push('Closing Costs', d.closingCosts);
+  R.ctcEscrows = push('Escrows', d.escrows);
+  R.ctcSeller = push("Seller's Concession", d.sellerConcession);
+  R.ctcEmd = push('Deposit', d.emd);
+  R.ctcTotal = push('Total Cost', d.totalCost);
   R.reservesMonths = push('Reserves Months', d.reservesMonths);
-  R.reservesAmount = push('Reserves Needed', null);
-  R.totalPlusReserves = push('Total Cost + Reserves', null);
+  R.reservesAmount = push('Reserves Needed', d.reservesAmount);
+  R.totalPlusReserves = push('Total Cost + Reserves', d.totalPlusReserves);
   blank();
 
   section('MONTHLY PAYMENT');
-  R.pi = push('Principal & Interest', null);
-  R.ltv = push('LTV', null);
-  R.miRate = push('Mortgage Insurance Rate (annual)', null);
+  R.pi = push('Principal & Interest', d.monthly.pi);
+  R.ltv = push('LTV', (d.price ? (d.loanAmt / d.price) : 0));
+  R.miRate = push('Mortgage Insurance Rate (annual)', (d.loanAmt ? ((d.monthly.mi || 0) * 12 / d.loanAmt) : 0));
   R.mi = push('MI (Mortgage Insurance — FHA/USDA/VA)', d.monthly.mi);
   R.pmi = push('PMI (Private Mortgage Insurance — Conventional, manual)', d.monthly.pmi);
-  R.monthlyTotal = push('Total Monthly Payment', null);
+  R.monthlyTotal = push('Total Monthly Payment', d.monthly.monthlyTotal);
 
   // ---- Patch in formulas now that every row number is known ----
   if (dpMode === 'amount'){
@@ -4950,7 +5021,58 @@ async function buildXlsxEstimateData_(container, dpMode, mathTabName, colOffset)
     }
   });
 
-  return { mathCells, frontCells, mathTabName: MATH };
+  // Resolve every front-tab row to its real, already-known value (instead of
+  // the Excel formula string) for the Alt View export preview table — every
+  // fref() formula is always "'<Math tab>'!B<row>", so parsing that row
+  // number back out and looking it up in `rows` (the Math tab's own values,
+  // all real per the comment above) means the preview can never disagree
+  // with the real file, without re-deriving anything.
+  const frontPreviewRows = front.map((row, i) => {
+    const rowNum = i+1;
+    const rawLabel = row[0];
+    if (rawLabel && typeof rawLabel === 'object' && rawLabel.hideIfZero){
+      const m = /!B(\d+)/.exec(rawLabel.mathRef);
+      const mathVal = m ? (rows[+m[1]-1] || [])[1] : 0;
+      return (!mathVal) ? [] : [rawLabel.label, mathVal];
+    }
+    if (FF[rowNum] !== undefined){
+      const m = /!B(\d+)/.exec(FF[rowNum]);
+      const mathVal = m ? (rows[+m[1]-1] || [])[1] : null;
+      return [rawLabel, mathVal];
+    }
+    return row;
+  });
+
+  // Row-number -> Alt View pencil-icon target, for the raw INPUT rows only
+  // (the ones actually worth jumping back to an editor for) — reuses the
+  // same altFocusField()/'fld:x' convention as the center-display pencils.
+  const MATH_PENCIL_TARGETS_ = {
+    price:'fld:price', downAmt:'fld:downAmt', downPct:'fld:downPct', loanAmt:'fld:loanAmt',
+    term:'fld:term', rate:'fld:rate', sellerConcession:'fld:sellerConcession', hoaFee:'fld:hoaFee', emd:'fld:emd',
+    application:'fld:f_application', processing:'fld:f_processing', underwriting:'fld:f_underwriting', commitment:'fld:f_commitment', feePoints:'fld:f_points',
+    attorney:'fld:f_attorney', buyersAttorney:'fld:f_buyersAttorney', appraisal:'fld:f_appraisal', coopCondoFee:'fld:f_coopCondoFee',
+    recording:'fld:t_recording', misc:'fld:t_misc', condoFormation:'fld:t_condoFormation'
+  };
+  const mathPencilTargets = {};
+  Object.keys(MATH_PENCIL_TARGETS_).forEach(k => { if (R[k] !== undefined) mathPencilTargets[R[k]] = MATH_PENCIL_TARGETS_[k]; });
+
+  // Row-number -> display-kind maps, reusing the exact same classification
+  // already used to style the real cells (pctRows/intRows/textRows above,
+  // pctFrontRowsSet/textFrontRowsSet below) so the preview table's number
+  // formatting (%, whole number, plain text vs. currency) can never disagree
+  // with the real file's.
+  const mathPreviewKinds = {};
+  rows.forEach((row, i) => {
+    const rr = i+1;
+    mathPreviewKinds[rr] = pctRows.has(rr) ? 'percent' : intRows.has(rr) ? 'integer' : textRows.has(rr) ? 'text' : 'currency';
+  });
+  const frontPreviewKinds = {};
+  front.forEach((row, i) => {
+    const rr = i+1;
+    frontPreviewKinds[rr] = pctFrontRowsSet.has(rr) ? 'percent' : textFrontRowsSet.has(rr) ? 'text' : plainFrontRowsSet.has(rr) ? 'plain' : 'currency';
+  });
+
+  return { mathCells, frontCells, mathTabName: MATH, mathPreviewRows: rows, frontPreviewRows, mathPreviewKinds, frontPreviewKinds, mathPencilTargets };
 }
 
 // Builds the actual .xlsx from 1 or 2 { container, dpMode } pairs — 1 is the
@@ -5039,7 +5161,7 @@ async function buildXlsxExport(pairs){
   });
 
   const blob = await zip.generateAsync({ type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  return { blob };
+  return { blob, estimates };
 }
 
 // ===========================================================================
@@ -5907,6 +6029,7 @@ let _xlsxChosenPairs = [];      // { container, dpMode } collected so far this e
 let _xlsxPendingTempContainer = null;
 let _exportBlob = null;
 let _exportPreviewUrl = null;
+let _exportPreviewBlock = null;  // the loan block a preview's pencil icons jump back to
 
 function openExportPickModal(){
   const blocks = getAllLoanBlocks();
@@ -6001,20 +6124,99 @@ async function onXlsxDpModeChosen(dpMode){
   }
 
   document.getElementById('xlsxModalOverlay').style.display = 'none';
-  const { blob } = await buildXlsxExport(_xlsxChosenPairs);
-  showExportPreview('xlsx', blob, _xlsxChosenPairs.map(p => p.container));
+  const { blob, estimates } = await buildXlsxExport(_xlsxChosenPairs);
+  showExportPreview('xlsx', blob, _xlsxChosenPairs.map(p => p.container), estimates);
   if (_xlsxPendingTempContainer){
     _xlsxPendingTempContainer.remove();
     _xlsxPendingTempContainer = null;
   }
 }
 
+// Small edit-pencil icon, shown next to a preview line/cell \u2014 reused for the
+// Alt View center display AND every export preview so "for all the previews"
+// is one shared icon/behavior, not several.
+const ALT_PENCIL_SVG = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+function altPencilBtnHtml_(target, title){
+  if (!target) return '';
+  return '<button type="button" class="alt-pencil-btn" title="'+xmlEsc(title||'Edit')+'" onclick="event.stopPropagation(); altFocusFieldFromPreview(\''+target+'\')">'+ALT_PENCIL_SVG+'</button>';
+}
+
+// Renders one XLSX sheet's real row data (the same `rows`/`front` arrays that
+// get written into the actual .xlsx, per buildXlsxEstimateData_'s comments)
+// as an HTML table \u2014 guaranteed to match the downloaded file since it's the
+// same data, not a re-derived summary. `kinds`/`pencilTargets` are the
+// row-number -> format/pencil-target maps returned alongside the rows.
+function renderXlsxSheetPreviewTable_(rowsArray, kinds, pencilTargets){
+  kinds = kinds || {};
+  pencilTargets = pencilTargets || {};
+  let html = '<table style="width:100%; border-collapse:collapse; font-size:12px; background:#fff;">';
+  rowsArray.forEach((row, i) => {
+    const rowNum = i+1;
+    if (!row || !row.length){
+      html += '<tr><td colspan="2" style="height:8px; border:none;"></td></tr>';
+      return;
+    }
+    if (row.length === 1 || row[1] === undefined){
+      html += '<tr><td colspan="2" style="font-weight:700; font-size:10.5px; text-transform:uppercase; letter-spacing:.5px; color:var(--navy); background:var(--slate-light); padding:5px 8px; border:1px solid var(--line);">'+xmlEsc(String(row[0]))+'</td></tr>';
+      return;
+    }
+    const label = row[0];
+    const value = row[1];
+    const kind = kinds[rowNum] || 'currency';
+    let displayVal;
+    if (value === null || value === undefined || value === '') displayVal = '';
+    else if (typeof value === 'boolean') displayVal = value ? 'TRUE' : 'FALSE';
+    else if (typeof value === 'number'){
+      displayVal = kind === 'percent' ? (value*100).toFixed(3)+'%'
+        : (kind === 'integer' || kind === 'plain' || kind === 'text') ? String(Math.round(value*1000)/1000)
+        : fmt(value);
+    } else {
+      displayVal = String(value);
+    }
+    const pencil = altPencilBtnHtml_(pencilTargets[rowNum], 'Edit ' + label);
+    html += '<tr><td style="padding:3px 8px; border:1px solid var(--line);">'+xmlEsc(String(label))+pencil+'</td>'+
+      '<td style="padding:3px 8px; border:1px solid var(--line); text-align:right;">'+xmlEsc(displayVal)+'</td></tr>';
+  });
+  html += '</table>';
+  return html;
+}
+
+// Tab-switchable, value-accurate XLSX preview \u2014 one tab per real sheet
+// (front "Closing Cost Estimate" + each estimate's Math tab). Only used for
+// single-estimate exports (Alt View is always single-estimate; classic-view
+// single-loan XLSX exports get the same upgrade for free); the classic
+// two-loan side-by-side XLSX export keeps the older renderLoanSummaryHtml
+// fallback below, since its front-tab rows are column-offset per estimate
+// and merging that into one faithful table is out of scope here.
+function renderXlsxTabbedPreviewHtml_(estimate){
+  const tabs = [
+    { key:'front', label:'Closing Cost Estimate', rows: estimate.frontPreviewRows, kinds: estimate.frontPreviewKinds, pencils:{} },
+    { key:'math', label: estimate.mathTabName, rows: estimate.mathPreviewRows, kinds: estimate.mathPreviewKinds, pencils: estimate.mathPencilTargets }
+  ];
+  let html = '<div class="xlsx-preview-tabs">';
+  tabs.forEach((t, i) => {
+    html += '<button type="button" class="xlsx-preview-tab-btn'+(i===0?' active':'')+'" onclick="switchXlsxPreviewTab_(\''+t.key+'\')" data-xlsx-tab-btn="'+t.key+'">'+xmlEsc(t.label)+'</button>';
+  });
+  html += '</div>';
+  tabs.forEach((t, i) => {
+    html += '<div class="xlsx-preview-tab-pane" data-xlsx-tab-pane="'+t.key+'" style="'+(i===0?'':'display:none;')+' margin-top:10px;">'+
+      renderXlsxSheetPreviewTable_(t.rows, t.kinds, t.pencils) + '</div>';
+  });
+  return html;
+}
+
+function switchXlsxPreviewTab_(key){
+  document.querySelectorAll('[data-xlsx-tab-btn]').forEach(el => el.classList.toggle('active', el.dataset.xlsxTabBtn === key));
+  document.querySelectorAll('[data-xlsx-tab-pane]').forEach(el => el.style.display = (el.dataset.xlsxTabPane === key ? '' : 'none'));
+}
+
 // Lightweight but data-accurate HTML preview for DOCX/XLSX, since neither
 // format can be rendered pixel-for-pixel in a browser \u2014 this shows exactly
 // the numbers that will be in the real file, just not its native formatting.
 function renderLoanSummaryHtml(d){
-  function row(label, value, bold){
-    return '<div style="display:flex; justify-content:space-between; padding:3px 0; font-size:12.5px;'+(bold?' font-weight:700;':'')+'"><span>'+xmlEsc(label)+'</span><span>'+xmlEsc(value)+'</span></div>';
+  function row(label, value, bold, pencilTarget){
+    return '<div style="display:flex; justify-content:space-between; padding:3px 0; font-size:12.5px;'+(bold?' font-weight:700;':'')+'"><span>'+xmlEsc(label)+altPencilBtnHtml_(pencilTarget, 'Edit '+label)+'</span><span>'+xmlEsc(value)+'</span></div>';
   }
   function section(title){
     return '<div style="font-weight:700; font-size:10.5px; text-transform:uppercase; letter-spacing:.5px; color:var(--navy); background:var(--slate-light); padding:5px 8px; margin:12px 0 4px 0; border-radius:4px;">'+xmlEsc(title)+'</div>';
@@ -6025,9 +6227,9 @@ function renderLoanSummaryHtml(d){
   if (d.clientName) h += '<div style="font-size:12px; color:var(--slate); margin-bottom:6px;">Prepared for: '+xmlEsc(d.clientName)+(d.processorName?' &nbsp;|&nbsp; By: '+xmlEsc(d.processorName):'')+'</div>';
 
   h += section('Loan Basics');
-  h += row('Purchase Price', fmt(d.price));
-  h += row('Down Payment', fmt(d.downAmt)+' ('+d.downPct.toFixed(2)+'%)');
-  h += row('Base Loan Amount', fmt(d.loanAmt));
+  h += row('Purchase Price', fmt(d.price), false, 'fld:price');
+  h += row('Down Payment', fmt(d.downAmt)+' ('+d.downPct.toFixed(2)+'%)', false, 'fld:downAmt');
+  h += row('Base Loan Amount', fmt(d.loanAmt), false, 'fld:loanAmt');
   h += row('Total Loan Amount', fmt(d.totalLoan), true);
 
   h += section('Lender Fees');
@@ -6044,29 +6246,30 @@ function renderLoanSummaryHtml(d){
 
   h += section('Funds Needed to Close');
   h += row('Down Payment', fmt(d.downAmt));
-  h += row('Closing Costs', fmt(d.closingCosts));
-  h += row('Escrows', fmt(d.escrows));
-  h += row("Seller's Concession", '-'+fmt(d.sellerConcession));
-  h += row('Deposit', '-'+fmt(d.emd));
+  h += row('Closing Costs', fmt(d.closingCosts), false, 'lenderFees');
+  h += row('Escrows', fmt(d.escrows), false, 'prepaidsEscrow');
+  h += row("Seller's Concession", '-'+fmt(d.sellerConcession), false, 'fld:sellerConcession');
+  h += row('Deposit', '-'+fmt(d.emd), false, 'fld:emd');
   h += row('Total Funds', fmt(d.totalCost), true);
   h += row('Reserves Needed', fmt(d.reservesAmount));
   h += '<div style="font-size:11px; font-style:italic; color:var(--slate); padding:2px 0 4px 0;">Total Cost + Reserves = '+xmlEsc(fmt(d.totalPlusReserves))+'</div>';
 
   h += section('Monthly Payment');
-  h += row('Principal & Interest', fmt(d.monthly.pi));
-  h += row('Property Taxes', fmt(d.monthly.mTaxes));
-  h += row('Homeowners Insurance', fmt(d.monthly.mIns));
-  h += d.monthly.hasMipMi ? row('MI (Mortgage Insurance)', fmt(d.monthly.mi)) : row('PMI (Private Mortgage Insurance)', fmt(d.monthly.pmi));
-  if (d.hoaFee) h += row('HOA / Monthly Fee', fmt(d.monthly.hoaFee));
+  h += row('Principal & Interest', fmt(d.monthly.pi), false, 'loanBasics');
+  h += row('Property Taxes', fmt(d.monthly.mTaxes), false, 'monthlyEscrow');
+  h += row('Homeowners Insurance', fmt(d.monthly.mIns), false, 'monthlyEscrow');
+  h += d.monthly.hasMipMi ? row('MI (Mortgage Insurance)', fmt(d.monthly.mi), false, 'loanSpecifics') : row('PMI (Private Mortgage Insurance)', fmt(d.monthly.pmi), false, 'loanSpecifics');
+  if (d.hoaFee) h += row('HOA / Monthly Fee', fmt(d.monthly.hoaFee), false, 'fld:hoaFee');
   h += row('Total Monthly Payment', fmt(d.monthly.monthlyTotal), true);
 
   h += '</div>';
   return h;
 }
 
-function showExportPreview(kind, blob, blocks){
+function showExportPreview(kind, blob, blocks, xlsxEstimates){
   _exportKind = kind;
   _exportBlob = blob;
+  _exportPreviewBlock = blocks && blocks[0]; // read by altFocusFieldFromPreview()
   if (_exportPreviewUrl) URL.revokeObjectURL(_exportPreviewUrl);
   _exportPreviewUrl = URL.createObjectURL(blob);
 
@@ -6081,6 +6284,13 @@ function showExportPreview(kind, blob, blocks){
     printBtn.style.display = '';
     whatsappBtn.style.display = '';
     noteEl.textContent = '';
+  } else if (kind === 'xlsx' && xlsxEstimates && xlsxEstimates.length === 1){
+    // Real, tab-switchable, value-accurate preview (same rows the actual
+    // sheets are built from) \u2014 see renderXlsxTabbedPreviewHtml_.
+    bodyEl.innerHTML = renderXlsxTabbedPreviewHtml_(xlsxEstimates[0]);
+    printBtn.style.display = 'none';
+    whatsappBtn.style.display = 'none';
+    noteEl.textContent = 'This reflects the real values and sheet layout of the downloaded file \u2014 flip between tabs above to see each sheet.';
   } else {
     bodyEl.innerHTML = blocks.map(b => renderLoanSummaryHtml(b._cceData)).join('');
     printBtn.style.display = 'none';
@@ -6355,6 +6565,11 @@ function cceNavFlashHighlight_(el){
 }
 
 function cceNearestIndexByTop_(elements){
+  // Alt View shows exactly one block at a time (the rest are display:none,
+  // so their bounding rects are meaningless) — every nav function that asks
+  // "which block is current" routes through here, so this one short-circuit
+  // is enough to make all of them alt-view-aware without touching each.
+  if (altViewActive) return Math.max(0, Math.min(altViewBlockIndex, elements.length - 1));
   const threshold = 140; // px from viewport top — counts as "current" once scrolled near the top
   // Scans every element rather than breaking at the first miss: sections like Title & Gov Fees
   // sit in a second column alongside Lender/3rd-Party Fees, so their tops aren't in strict
@@ -6376,6 +6591,15 @@ function cceNearestIndexByTop_(elements){
 function cceNavEstimateGo(direction){
   const blocks = getAllLoanBlocks();
   if (!blocks.length) return;
+  if (altViewActive){
+    const targetIdx = altViewBlockIndex + direction;
+    if (targetIdx < 0 || targetIdx > blocks.length - 1) return;
+    altViewBlockIndex = targetIdx;
+    updateCceNavBar_();
+    const heading = blocks[altViewBlockIndex].querySelector('.loan-block-title');
+    if (heading) cceNavFlashHighlight_(heading);
+    return;
+  }
   const idx = cceNearestIndexByTop_(blocks);
   const targetIdx = idx + direction;
   if (targetIdx < 0){
@@ -6492,6 +6716,7 @@ function updateCceNavBar_(){
   const bar = document.getElementById('cceNavBar');
   bar.style.display = blocks.length ? 'flex' : 'none';
   if (!blocks.length) return;
+  if (altViewActive) altViewApplyCurrent_(blocks);
   updateCceNavEstimateGroup_(blocks);
   updateCceNavSectionGroup_(blocks);
 }
@@ -6515,6 +6740,151 @@ function initCceNavBar(){
   new MutationObserver(updateCceNavBar_).observe(document.getElementById('loanBlocksContainer'), { childList:true });
   document.getElementById('loanBlocksContainer').addEventListener('focusin', cceSectionInteractionHandler_);
   document.getElementById('loanBlocksContainer').addEventListener('click', cceSectionInteractionHandler_);
+}
+
+// ===========================================================================
+// ALT VIEW — PAG-style left editors / center display / right editors, for
+// Menachem's "make CCE look more like the Pre-App" request. One loan
+// estimate at a time; the floating nav bar's existing Loan Estimate Prev/
+// Next buttons (see cceNavEstimateGo above) switch which one is current.
+// Pure CSS re-layout (see body.cce-alt-mode rules) — the panels never leave
+// their .loan-block, so calc()/E()/the nav bar's data-nav lookups all keep
+// working completely unmodified.
+// ===========================================================================
+let altViewActive = false;
+let altViewBlockIndex = 0;
+let altViewLastAppliedIndex = -1;
+
+function toggleAltView(){
+  if (altViewActive) exitAltView(); else enterAltView();
+}
+
+function enterAltView(){
+  const blocks = getAllLoanBlocks();
+  if (!blocks.length){
+    openExportNoDataModal('Add a loan estimate first, then switch to Alt View.');
+    return;
+  }
+  altViewActive = true;
+  altViewLastAppliedIndex = -1;
+  document.body.classList.add('cce-alt-mode');
+  const btn = document.getElementById('cceNavAltViewBtn');
+  if (btn) btn.textContent = 'CLASSIC VIEW';
+  const exportBtn = document.getElementById('cceNavExportBtn');
+  if (exportBtn) exportBtn.title = 'Export this estimate';
+  updateCceNavBar_();
+}
+
+function exitAltView(){
+  altViewActive = false;
+  document.body.classList.remove('cce-alt-mode');
+  const btn = document.getElementById('cceNavAltViewBtn');
+  if (btn) btn.textContent = 'ALT VIEW';
+  const exportBtn = document.getElementById('cceNavExportBtn');
+  if (exportBtn) exportBtn.title = 'Export';
+  getAllLoanBlocks().forEach(b => b.classList.remove('cce-alt-current'));
+  updateCceNavBar_();
+}
+
+// Idempotent — safe to call from updateCceNavBar_ on every scroll/mutation
+// tick while Alt View is active; only actually toggles classes/recalcs when
+// the current index genuinely changed.
+function altViewApplyCurrent_(blocks){
+  blocks = blocks || getAllLoanBlocks();
+  if (!blocks.length) return;
+  altViewBlockIndex = Math.max(0, Math.min(altViewBlockIndex, blocks.length - 1));
+  if (altViewBlockIndex === altViewLastAppliedIndex && blocks[altViewBlockIndex].classList.contains('cce-alt-current')) return;
+  altViewLastAppliedIndex = altViewBlockIndex;
+  blocks.forEach((b, i) => b.classList.toggle('cce-alt-current', i === altViewBlockIndex));
+  calc(blocks[altViewBlockIndex]);
+}
+
+// Scrolls to + flashes the editor field/panel a pencil icon points at.
+// `target` is either "fld:<data-fld name>" (a specific input) or a bare
+// data-nav panel name (aggregate lines with no single source field).
+function altFocusField(block, target){
+  if (!block || !target) return;
+  let el;
+  if (target.indexOf('fld:') === 0){
+    el = E(block, target.slice(4));
+  } else {
+    el = block.querySelector('[data-nav="' + target + '"]');
+  }
+  if (!el) return;
+  el.scrollIntoView({ behavior:'smooth', block:'center' });
+  cceNavFlashHighlight_(el);
+  if (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA') el.focus();
+}
+
+// Same as altFocusField, but for pencil icons inside the Export Preview
+// modal (PDF/DOCX/XLSX) — closes the modal first so the editor underneath
+// is actually visible to scroll to.
+function altFocusFieldFromPreview(target){
+  closeExportPreviewModal();
+  if (_exportPreviewBlock) altFocusField(_exportPreviewBlock, target);
+}
+
+// Center-display (Cash to Close / Monthly Payment) line -> editor target.
+// Aggregate lines with no single source field point at the whole panel;
+// direct fields point at the exact input. Grand-total lines (Total Cost,
+// Reserves Needed, Total Monthly Payment) are deliberately omitted — they're
+// pure aggregates with no single "the" place to edit.
+const ALT_PENCIL_MAP = [
+  { fld:'out_dpEcho', target:'loanBasics', title:"Edit down payment" },
+  { fld:'out_g23', target:'lenderFees', title:'Edit fees' },
+  { fld:'out_g4', target:'prepaidsEscrow', title:'Edit escrow setup' },
+  { fld:'out_sellerConcessionEcho', target:'fld:sellerConcession', title:"Edit seller's concession" },
+  { fld:'out_emdEcho', target:'fld:emd', title:'Edit deposit' },
+  { fld:'out_pi', target:'loanBasics', title:'Edit rate / term / loan amount' },
+  { fld:'out_taxesEcho', target:'monthlyEscrow', title:'Edit property taxes' },
+  { fld:'out_insEcho', target:'monthlyEscrow', title:'Edit homeowners insurance' },
+  { fld:'out_mi', target:'loanSpecifics', title:'Edit MI' },
+  { fld:'out_pmiEcho', target:'loanSpecifics', title:'Edit PMI' },
+  { fld:'out_hoaEcho', target:'fld:hoaFee', title:'Edit HOA fee' }
+];
+
+// Called at the end of calc() (idempotent — bails per-row once already
+// injected) so every block, new or loaded, always has pencils ready; they
+// stay display:none outside Alt View via CSS.
+function altViewInjectPencils_(container){
+  ALT_PENCIL_MAP.forEach(m => {
+    const valueEl = E(container, m.fld);
+    if (!valueEl) return;
+    const row = valueEl.closest('.totals-row');
+    if (!row || row.querySelector('.alt-pencil-btn')) return;
+    const labelSpan = row.querySelector('span:first-child');
+    if (!labelSpan) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'alt-pencil-btn';
+    btn.title = m.title;
+    btn.innerHTML = ALT_PENCIL_SVG;
+    btn.onclick = (e) => { e.stopPropagation(); altFocusField(container, m.target); };
+    labelSpan.appendChild(btn);
+  });
+}
+
+// Alt View's own Export trigger — always exports just the current estimate
+// (per Ann's spec: "one loan estimate at a time"), so it skips the classic
+// multi-select checkbox step and goes straight to the format-choice modal
+// that chooseExportFormat() already drives.
+function altViewExport(){
+  const blocks = getAllLoanBlocks();
+  if (!blocks.length) return;
+  const block = blocks[altViewBlockIndex];
+  calc(block);
+  _exportPickedBlocks = [block];
+  const xlsxBtn = document.getElementById('exportFormatXlsxBtn');
+  if (xlsxBtn) xlsxBtn.disabled = false;
+  const hintEl = document.getElementById('exportFormatHint');
+  if (hintEl) hintEl.textContent = '';
+  document.getElementById('exportFormatModalOverlay').style.display = 'flex';
+}
+
+// Routes the shared nav-bar Export button to the right flow depending on
+// which view is active.
+function cceNavExportBtnClick(){
+  if (altViewActive) altViewExport(); else openExportPickModal();
 }
 
 // Loads the shared PMI table once at startup (works in guest mode too, same
