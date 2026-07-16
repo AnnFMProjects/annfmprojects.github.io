@@ -189,6 +189,7 @@
       <div class="adm-tab" data-tab="users" onclick="switchAdmTab('users')">Users</div>
       <div class="adm-tab" data-tab="requests" onclick="switchAdmTab('requests')">App Requests</div>
       <div class="adm-tab" data-tab="myturn" onclick="switchAdmTab('myturn')">MYTURN Live View</div>
+      <div class="adm-tab" data-tab="messages" onclick="switchAdmTab('messages')">Messages</div>
       <div class="adm-tab" data-tab="suite" onclick="switchAdmTab('suite')">Suite Controls</div>
     </div>
 
@@ -251,6 +252,24 @@
         <div class="adm-mtv-nav" id="myturnNav"></div>
         <pre class="adm-mtv-pre" id="myturnContent">Nothing synced yet — a Claude Code session needs to call syncMyturnSnapshot after its next MYTURN.md edit.</pre>
       </div>
+    </div>
+
+    <!-- MESSAGES — converse with Claude Code sessions in this project with
+         no Anthropic API/billing. A message you send here sits 'pending'
+         until the next Claude Code session opened anywhere in this project
+         reads it (via the SessionStart hook) and replies with replyMessage. -->
+    <div id="panel-messages" class="adm-panel">
+      <div class="adm-toolbar">
+        <button class="export-btn" onclick="loadMessages()">Refresh</button>
+      </div>
+      <div id="messagesError" class="adm-error"></div>
+      <div style="max-width:640px; background:#fff; border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px;">
+        <textarea id="messageComposeText" placeholder="Write a message for Claude — it'll be picked up and replied to the next time a Claude Code session opens in this project." style="width:100%; min-height:90px; box-sizing:border-box; padding:9px 10px; border:1px solid var(--line); border-radius:6px; font-family:inherit; font-size:13px;"></textarea>
+        <div style="margin-top:8px;">
+          <button class="export-btn" onclick="submitMessageNote()">Send</button>
+        </div>
+      </div>
+      <div id="messagesThread" style="max-width:640px;"></div>
     </div>
 
     <!-- SUITE CONTROLS -->
@@ -396,6 +415,14 @@ const ADMIN_API = (function(){
     getAdminSummary: async function(){
       return core.call('getAdminSummary', {});
     },
+    submitMessage: async function(text, sourceTool){
+      const data = await core.call('submitMessage', { text: text, sourceTool: sourceTool || 'admin' });
+      return data.message;
+    },
+    listMessages: async function(){
+      const data = await core.call('listMessages', {});
+      return data.messages;
+    },
     triggerBroadcast: async function(){
       const data = await core.call('triggerBroadcast', {});
       return data.broadcastAt;
@@ -485,6 +512,7 @@ function switchAdmTab(tab){
   if (tab === 'users' && !usersCache.length) loadUsers();
   if (tab === 'requests' && !adminRequestsCache.length) openAdminPanel();
   if (tab === 'myturn') loadMyturnSnapshot();
+  if (tab === 'messages') loadMessages();
 }
 
 // ===========================================================================
@@ -985,6 +1013,59 @@ function scrollMyturnTo(i){
   const charOffset = window._myturnLines.slice(0, h.lineIndex).join('\n').length;
   const ratio = charOffset / pre.textContent.length;
   pre.scrollTop = ratio * pre.scrollHeight;
+}
+
+// ===========================================================================
+// MESSAGES — converse with Claude Code sessions in this project, no
+// Anthropic API/billing. Sending calls submitMessage (status 'pending');
+// replyMessage is only ever called by a Claude Code session (via the
+// SessionStart hook's instructions, or manually), never from this UI.
+// ===========================================================================
+async function loadMessages(){
+  const errEl = document.getElementById('messagesError');
+  errEl.textContent = '';
+  document.getElementById('messagesThread').innerHTML = '<div style="font-size:12.5px; color:var(--slate);">Loading…</div>';
+  try {
+    const messages = await ADMIN_API.listMessages();
+    renderMessages(messages);
+  } catch (err) {
+    document.getElementById('messagesThread').innerHTML = '';
+    errEl.textContent = err.message;
+  }
+}
+function renderMessages(messages){
+  const el = document.getElementById('messagesThread');
+  if (!messages.length){
+    el.innerHTML = '<div style="font-size:12.5px; color:var(--slate);">No messages yet — write one above.</div>';
+    return;
+  }
+  el.innerHTML = messages.map(function(m){
+    const replyHtml = m.Status === 'replied'
+      ? '<div style="margin-top:8px; padding-left:14px; border-left:3px solid var(--gold);">' +
+          '<div style="font-size:11px; color:var(--slate); margin-bottom:2px;">Claude &middot; ' + escapeHtml_(dateOnlyAdm_(m.RepliedAt)) + '</div>' +
+          '<div style="font-size:13px; white-space:pre-wrap;">' + escapeHtml_(m.ReplyText) + '</div>' +
+        '</div>'
+      : '<div style="margin-top:8px; font-size:11.5px; color:var(--slate); font-style:italic;">Waiting for Claude\'s next session in this project&hellip;</div>';
+    return '<div style="background:#fff; border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-bottom:12px;">' +
+      '<div style="font-size:11px; color:var(--slate); margin-bottom:2px;">You (' + escapeHtml_(m.SourceTool || 'admin') + ') &middot; ' + escapeHtml_(dateOnlyAdm_(m.CreatedAt)) + '</div>' +
+      '<div style="font-size:13px; white-space:pre-wrap;">' + escapeHtml_(m.Text) + '</div>' +
+      replyHtml +
+    '</div>';
+  }).join('');
+}
+async function submitMessageNote(){
+  const errEl = document.getElementById('messagesError');
+  errEl.textContent = '';
+  const textEl = document.getElementById('messageComposeText');
+  const text = textEl.value.trim();
+  if (!text) return;
+  try {
+    await ADMIN_API.submitMessage(text, 'admin');
+    textEl.value = '';
+    loadMessages();
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
 }
 
 // ===========================================================================
