@@ -1470,17 +1470,23 @@
 
     </div>
       <div>
-      <div class="panel" data-nav="titleGovFees">
-        <div class="panel-head"><span>Title &amp; Government Fees</span><span style="display:flex; align-items:center; gap:6px;"><span class="tag" data-fld="g3total"></span><button type="button" class="export-btn" style="padding:2px 8px; font-size:10px;" onclick="openAddCustomFieldModal(this.closest('.loan-block'), 'g3')">+ Field</button></span></div>
+      <div class="panel" data-nav="points">
+        <div class="panel-head"><span>Points</span></div>
         <div class="panel-body">
           <div class="field-row">
             <label>Discount Points <span class="hint">Synced with Loan Basics (decimals OK)</span></label>
-            <input type="number" step="0.01" data-fld="ratePoints_title" value="0" oninput="onPointsEdit(this, 'pct')">
+            <input type="number" step="0.01" data-fld="ratePoints2" value="0" oninput="onPointsEdit(this, 'pct')">
           </div>
           <div class="field-row">
             <label>Point Fee ($) <span class="hint">Synced with Points ($) in Lender Fees</span></label>
-            <input type="text" inputmode="decimal" data-fld="f_points_title" value="0" oninput="onPointsEdit(this, 'dollar')">
+            <input type="text" inputmode="decimal" data-fld="f_points2" value="0" oninput="onPointsEdit(this, 'dollar')">
           </div>
+        </div>
+      </div>
+
+      <div class="panel" data-nav="titleGovFees">
+        <div class="panel-head"><span>Title &amp; Government Fees</span><span style="display:flex; align-items:center; gap:6px;"><span class="tag" data-fld="g3total"></span><button type="button" class="export-btn" style="padding:2px 8px; font-size:10px;" onclick="openAddCustomFieldModal(this.closest('.loan-block'), 'g3')">+ Field</button></span></div>
+        <div class="panel-body">
           <div class="dev-banner-inline">Please check Title &amp; Government Fees, as this is in early development.</div>
           <div class="field-row" style="justify-content:flex-start; gap:10px; flex-wrap:wrap;">
             <label class="radio-opt" style="font-size:12px; font-weight:700; color:var(--navy);"><input type="checkbox" data-fld="chk_govauto" checked onchange="onGovAutoChange(this.closest('.loan-block'))"> Auto-calculate government fees &amp; title insurance</label>
@@ -3537,8 +3543,8 @@ function onProgramChange(container){
   calc(container);
 }
 
-// Discount Points (%, in Loan Basics + mirrored in Title & Gov Fees) and
-// Points ($, in Lender Fees + mirrored in Title & Gov Fees) are two views of
+// Discount Points (%, in Loan Basics + mirrored in the Points panel) and
+// Points ($, in Lender Fees + mirrored in the Points panel) are two views of
 // the same value — editing either recomputes the other. `kind` says which
 // side was just typed into ('pct' or 'dollar'); container.dataset.pointsMode
 // records that so calc() knows which field is the source of truth this pass,
@@ -3785,7 +3791,7 @@ function calc(container){
   // from the loan amount. 1 point = 1% of the Base Loan Amount. Positive points
   // cost the borrower (added to Cash to Close via Lender Fees below); negative
   // points are a lender credit (reduces Cash to Close). Editable from either
-  // side (Discount Points % or Points $), each mirrored in Title & Gov Fees —
+  // side (Discount Points % or Points $), each mirrored in the Points panel —
   // whichever was just typed into (dataset.pointsMode/pointsActiveFld, set by
   // onPointsEdit) is the source of truth this pass; the other three fields
   // recompute from it. Points can be fractional either way (e.g. 1.375 pt or
@@ -3794,20 +3800,20 @@ function calc(container){
   const activeFld = container.dataset.pointsActiveFld || 'ratePoints';
   let pointsPct, pointsCost;
   if (pointsMode === 'dollar'){
-    const dollarSrc = (activeFld === 'f_points_title') ? 'f_points_title' : 'f_points';
+    const dollarSrc = (activeFld === 'f_points2') ? 'f_points2' : 'f_points';
     pointsCost = numVal(container, dollarSrc);
     pointsPct = loanAmt ? (pointsCost / loanAmt) * 100 : 0;
   } else {
-    const pctSrc = (activeFld === 'ratePoints_title') ? 'ratePoints_title' : 'ratePoints';
+    const pctSrc = (activeFld === 'ratePoints2') ? 'ratePoints2' : 'ratePoints';
     pointsPct = parseFloat(E(container, pctSrc).value) || 0;
     pointsCost = loanAmt * (pointsPct / 100);
   }
   const pointsPctRounded = Math.round(pointsPct * 10000) / 10000;
   const pointsCostFixed = pointsCost.toFixed(2);
   if (activeFld !== 'ratePoints') E(container,'ratePoints').value = pointsPctRounded;
-  if (activeFld !== 'ratePoints_title') E(container,'ratePoints_title').value = pointsPctRounded;
+  if (activeFld !== 'ratePoints2') E(container,'ratePoints2').value = pointsPctRounded;
   if (activeFld !== 'f_points') E(container,'f_points').value = pointsCostFixed;
-  if (activeFld !== 'f_points_title') E(container,'f_points_title').value = pointsCostFixed;
+  if (activeFld !== 'f_points2') E(container,'f_points2').value = pointsCostFixed;
   const pointsCostFmt = pointsCost >= 0 ? ('+' + fmt(pointsCost)) : ('-' + fmt(Math.abs(pointsCost)));
   E(container,'pointsHint').textContent = pointsPctRounded
     ? ('(' + pointsPctRounded + ' pt = ' + pointsCostFmt + (pointsCost >= 0 ? ' to' : ' credit to') + ' Cash to Close)')
@@ -4117,9 +4123,16 @@ function renderPdfLoanPage(doc, d, navy, gold, slate, pageW, logoDataUrl){
     doc.text(l.text, leftMargin, l.y);
   });
 
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
+  doc.setFont('helvetica','bold'); doc.setFontSize(9.5);
+  doc.setTextColor(255,255,255);
+  doc.text('Ann Zeilingold', pageW-40, 46, {align:'right'});
+
+  doc.setFont('helvetica','normal'); doc.setFontSize(7);
   doc.setTextColor(210,214,224);
-  doc.text(ANN_CONTACT_LINE, pageW-40, 46, {align:'right'});
+  doc.text('NMLS# 41850', pageW-40, 56, {align:'right'});
+
+  doc.setFontSize(6.5);
+  doc.text('P: 845-354-9700 | C: 914-260-9000', pageW-40, 65, {align:'right'});
 
   doc.setFont('helvetica','italic'); doc.setFontSize(7.5);
   doc.setTextColor(210,214,224);
@@ -5143,7 +5156,7 @@ const LAST_UPDATED = 'July 8, 2026'; // bump this whenever rate tables/defaults 
 // (and cce_version.json alongside this file on GitHub Pages) whenever a
 // deploy is ready for users to be notified about; skip the bump for
 // quiet/WIP pushes you don't want to nag anyone with.
-const CCE_VERSION = '0.24.0';
+const CCE_VERSION = '0.25.0';
 const CCE_VERSION_CHECK_URL = 'cce_version.json';
 const CCE_VERSION_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -6317,10 +6330,10 @@ function emailDiscrepancyViaGmail(){
 // spills into the next block, per Ann's 0.22 feedback). Both land precisely
 // on the target and flash-highlight it, instead of just scrolling nearby.
 // ===========================================================================
-const CCE_NAV_ORDER = ['loanBasics','loanSpecifics','lenderFees','thirdPartyFees','titleGovFees','monthlyEscrow','prepaidsEscrow','cashToClose','monthlyPayment'];
+const CCE_NAV_ORDER = ['loanBasics','loanSpecifics','lenderFees','thirdPartyFees','points','titleGovFees','monthlyEscrow','prepaidsEscrow','cashToClose','monthlyPayment'];
 const CCE_NAV_LABELS = {
   loanBasics: 'Loan Basics', loanSpecifics: 'Loan Specifics', lenderFees: 'Lender Fees',
-  thirdPartyFees: '3rd-Party Fees', titleGovFees: 'Title & Gov Fees', monthlyEscrow: 'Monthly Escrow Inputs',
+  thirdPartyFees: '3rd-Party Fees', points: 'Points', titleGovFees: 'Title & Gov Fees', monthlyEscrow: 'Monthly Escrow Inputs',
   prepaidsEscrow: 'Prepaids / Escrow Setup', cashToClose: 'Cash to Close', monthlyPayment: 'Estimated Monthly Payment',
 };
 
