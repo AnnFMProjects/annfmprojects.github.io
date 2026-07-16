@@ -135,6 +135,10 @@
   .rate-row-del{ background:none; border:none; color:var(--bad); cursor:pointer; font-size:15px; padding:2px 6px; }
   .arrow-pick-btn{ width:20px; height:20px; border:1.5px solid; border-radius:3px; cursor:pointer; font-size:11px; font-weight:700; padding:0; line-height:1; font-family:inherit; }
   .add-row-btn{ margin-top:6px; font-size:11px; padding:5px 10px; border:1px solid var(--line); background:#fff; border-radius:5px; cursor:pointer; color:var(--slate); }
+  .mu-card-editor{ border:1px solid var(--line); border-radius:8px; padding:10px; margin-top:10px; background:var(--slate-light); }
+  .mu-card-editor-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+  .mu-card-editor select, .mu-card-editor input[type="text"], .mu-card-editor textarea{ width:100%; padding:6px 8px; border:1px solid var(--line); border-radius:5px; font-size:12px; font-family:Calibri, Arial, sans-serif; margin-bottom:6px; }
+  .mu-card-editor label{ font-size:10px; font-weight:700; color:var(--slate); text-transform:uppercase; letter-spacing:.3px; display:block; margin-bottom:2px; }
 
   .dropzone{
     border:2px dashed var(--line); border-radius:8px; padding:18px; text-align:center;
@@ -244,7 +248,7 @@
       <button class="export-btn" id="viewSavedBtn" onclick="openSavedModal()">Saved Records</button>
     </div>
   </div>
-  <div class="sm-dev-banner">Rate Changes designs are the real co-branded pack. Market Update designs are still placeholders — Ann's icon pack for that template isn't ready yet.</div>
+  <div class="sm-dev-banner">Market Update's icons are hand-built approximations (swap for the real icon pack once Ann has it) and the photo reuses the Rate Changes headshot — everything else matches the real reference layout.</div>
   <div id="smSaveStatus" class="save-status"></div>
 
   <div id="smNotAuthorized" style="display:none; padding:48px 24px; text-align:center; color:var(--slate);">
@@ -273,12 +277,15 @@
               <button class="export-btn" onclick="reformatMarketUpdate()">Reformat for FM Home Loans</button>
             </div>
 
-            <label>Headline (editable)</label>
-            <input type="text" id="muHeadline">
-
-            <label>Summary body (editable)</label>
-            <textarea id="muBody" rows="6" oninput="renderMarketDesigns()"></textarea>
+            <label>Pull quote (speech bubble)</label>
+            <textarea id="muQuote" rows="2" oninput="updateMuQuote(this.value)"></textarea>
             <div class="panel-hint">Reformatting is a first pass — always review the wording before exporting.</div>
+
+            <label style="display:flex; justify-content:space-between; align-items:center;">
+              <span>Topic cards (up to 6)</span>
+              <button class="add-row-btn" onclick="addMuCard()" id="muAddCardBtn">+ Add Card</button>
+            </label>
+            <div id="muCardEditor"></div>
 
             <div style="margin-top:12px; display:flex; gap:8px;">
               <button class="export-btn" onclick="saveSocialRecord('market_update')">Save</button>
@@ -539,67 +546,205 @@ const RATE_PARTNERS = [
 const COMPLIANCE_DISCLOSURE_TEXT = 'FM Home Loans – 56 Congers Road, New City, NY 10956 | 718-377-9900 | | NMLS ID # 2212 | Licensed Mortgage Banker AZ Mortgage Banker License #0909583, CA - Loans made or arranged pursuant to the California Financing Law and Licensed by the Department of Financial Protection and Innovation under the California Residential Mortgage Lending Act, CT, DC, FL, GA, IL - For licensing information, go to: www.nmlsconsumeraccess.org , MA Mortgage Lender and Broker Licenses # MC2212, MD, MN, | Licensed by the N.J. Department of Banking and Insurance, Licensed Mortgage Banker - NYS Department of Financial Services, PA, TX, VA - NMLS ID #2212 (www.nmlsconsumeraccess.org)';
 
 const MU_DESIGNS = [
-  { id: 'mu_navy_headline', name: 'Navy Headline Card' },
-  { id: 'mu_gold_quote', name: 'Gold Quote Card' },
+  { id: 'mu_today', name: "Today's Market Move" },
 ];
 let muSelectedDesigns = {}; // default: none selected (view-only)
+
+// Hand-built line-art icons (navy stroke, no fill) — Ann's real reference
+// image ("Today's Market Move") uses its own icon pack she doesn't have on
+// hand yet; these are approximations in the same style, swap for the real
+// ones once she has them. Cycled in order onto whichever topic cards get
+// populated (the reference's own icon-to-topic mapping doesn't look
+// semantically strict either — e.g. "Oil Prices" uses a people icon).
+const MU_ICONS = {
+  bank: '<svg viewBox="0 0 40 40" width="20" height="20" fill="none" stroke="#1B2A4A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15 L20 6 L34 15"/><line x1="4" y1="15" x2="36" y2="15"/><line x1="8" y1="18" x2="8" y2="31"/><line x1="16" y1="18" x2="16" y2="31"/><line x1="24" y1="18" x2="24" y2="31"/><line x1="32" y1="18" x2="32" y2="31"/><line x1="4" y1="34" x2="36" y2="34"/><path d="M27 11 L34 4 M34 4 L34 9 M34 4 L29 4"/></svg>',
+  people: '<svg viewBox="0 0 40 40" width="20" height="20" fill="none" stroke="#1B2A4A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="12" r="4"/><path d="M4 26 C4 19 16 19 16 26"/><circle cx="22" cy="9" r="4.5"/><path d="M14.5 25 C14.5 17 29.5 17 29.5 25"/><circle cx="33" cy="13" r="4"/><path d="M27 27 C27 20 39 20 39 27"/><path d="M28 8 L36 2 M36 2 L36 7 M36 2 L31 2"/></svg>',
+  house: '<svg viewBox="0 0 40 40" width="20" height="20" fill="none" stroke="#1B2A4A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20 L20 8 L34 20 L34 34 L6 34 Z"/><line x1="16" y1="34" x2="16" y2="24"/><line x1="16" y1="24" x2="24" y2="24"/><line x1="24" y1="24" x2="24" y2="34"/><path d="M26 12 L34 4 M34 4 L34 9 M34 4 L29 4"/></svg>',
+  house_circle: '<svg viewBox="0 0 40 40" width="20" height="20" fill="none" stroke="#1B2A4A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="20" cy="20" r="17"/><path d="M12 22 L20 14 L28 22 L28 29 L12 29 Z"/><line x1="20" y1="29" x2="20" y2="23"/></svg>',
+  toolbox: '<svg viewBox="0 0 40 40" width="20" height="20" fill="none" stroke="#1B2A4A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="14" width="32" height="20" rx="2"/><path d="M14 14 L14 9 C14 7 15 6 17 6 L23 6 C25 6 26 7 26 9 L26 14"/><line x1="4" y1="22" x2="36" y2="22"/><circle cx="28" cy="28" r="5"/><line x1="26" y1="26" x2="30" y2="30"/><line x1="30" y1="26" x2="26" y2="30"/></svg>',
+  calendar: '<svg viewBox="0 0 40 40" width="20" height="20" fill="none" stroke="#1B2A4A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="26" height="24" rx="2"/><line x1="4" y1="15" x2="30" y2="15"/><line x1="11" y1="4" x2="11" y2="11"/><line x1="23" y1="4" x2="23" y2="11"/><circle cx="27" cy="27" r="7"/><line x1="32" y1="32" x2="36" y2="36"/></svg>',
+};
+const MU_ICON_OPTIONS = [
+  { key: 'bank', label: 'Bank / Institution' },
+  { key: 'people', label: 'People / Group' },
+  { key: 'house', label: 'House' },
+  { key: 'house_circle', label: 'House in Circle' },
+  { key: 'toolbox', label: 'Toolbox / Gears' },
+  { key: 'calendar', label: 'Calendar / Search' },
+];
 
 // Rule-based local reformatter — no live AI backend is configured for this
 // tool (same "free Tier 1" philosophy as Talk-and-Fill elsewhere in this
 // project), so this is a heuristic first pass Ann/Menachem should always
-// review before exporting, not a finished caption.
-const MARKET_KEYWORD_RE = /\b(mortgage rate|treasury|yield|bond|MBS|fed(eral reserve)?|fomc|powell|inflation|cpi|jobs report|payrolls|unemployment|rate cut|rate hike|housing market|home sales|refinanc)/i;
+// review before exporting, not a finished caption. Sentences are grouped
+// into up to 6 topic cards by category keyword, matching the structure of
+// Ann's real "Today's Market Move" reference (icon + headline + bullets +
+// "What it means:" takeaway per card), not a single free-text blob.
 const MARKET_BOILERPLATE_RE = /(mbs highway|unsubscribe|view (this|in) (browser|email)|copyright|all rights reserved|www\.|http:\/\/|https:\/\/|^-{2,}$)/i;
+const MARKET_TOPIC_CATEGORIES = [
+  { id: 'inflation', icon: 'bank', re: /\b(inflation|cpi|core cpi|consumer price|price index)\b/i, whatItMeans: 'Lower inflation is supportive of lower mortgage rates.' },
+  { id: 'energy', icon: 'people', re: /\b(oil|energy|gasoline|opec|strait of hormuz)\b/i, whatItMeans: 'Energy costs remain one of the biggest risks to the inflation outlook.' },
+  { id: 'fed', icon: 'house', re: /\b(fed(eral reserve)?|fomc|powell|waller|warsh|williams|central bank|rate cut|rate hike)\b/i, whatItMeans: "Fed commentary continues to drive short-term volatility in mortgage rates." },
+  { id: 'housing', icon: 'house_circle', re: /\b(housing market|home sales|rent|shelter|housing inflation)\b/i, whatItMeans: 'Housing costs remain one of the biggest drivers of inflation, so continued improvement is encouraging.' },
+  { id: 'jobs', icon: 'toolbox', re: /\b(jobs report|payrolls|unemployment|labor market)\b/i, whatItMeans: "Labor market data continues to shape the Fed's rate path." },
+  { id: 'rates', icon: 'calendar', re: /\b(mortgage rate|mortgage bond|treasury|yield|\bbond\b|\bmbs\b)\b/i, whatItMeans: 'Rate improvements are welcome, but volatility remains elevated.' },
+];
+
+let muCards = []; // [{ icon, title, bulletsText, whatItMeans }]
+let muQuote = '';
+
+// MBS Highway-style updates are structured as one story per paragraph
+// (headline + supporting facts), which is what Ann's real reference image
+// mirrors 1:1 — NOT one card per keyword topic. Splitting by topic keyword
+// (the first version of this) collapsed distinct stories that happen to
+// share a common word like "inflation" into the same card, losing stories.
+// Paragraph = the actual segmentation unit; MARKET_TOPIC_CATEGORIES below
+// is only consulted per-paragraph to suggest that card's icon/takeaway.
+function splitMarketParagraphs_(raw){
+  const clean = raw.replace(/\r\n/g, '\n');
+  let paras = clean.split(/\n\s*\n+/).map(p => p.trim()).filter(Boolean);
+  if (paras.length < 2) {
+    paras = clean.split(/\n/).map(p => p.trim()).filter(Boolean);
+  }
+  paras = paras.filter(p => !MARKET_BOILERPLATE_RE.test(p));
+  if (paras.length < 2) {
+    // No line breaks at all in the paste — fall back to chunking sentences
+    // 2-at-a-time so it still produces multiple cards instead of one blob.
+    const sentences = clean.split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(Boolean);
+    paras = [];
+    for (let i = 0; i < sentences.length; i += 2) paras.push(sentences.slice(i, i + 2).join(' '));
+  }
+  return paras;
+}
 
 function reformatMarketUpdate(){
   const raw = document.getElementById('muSourceText').value;
-  const dateIso = document.getElementById('muDate').value || todayIso();
+  const paragraphs = splitMarketParagraphs_(raw).slice(0, 6);
 
-  const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(l => l && !MARKET_BOILERPLATE_RE.test(l));
-  const text = lines.join(' ');
-  const sentences = text.split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(Boolean);
+  // Same-topic paragraphs are common on a heavy news day (most sentences on
+  // an inflation-report day mention "inflation" somewhere) — cycle to an
+  // unused icon so the card grid still reads visually varied, like Ann's
+  // reference image, instead of every card getting the same one.
+  const iconRotation = ['bank', 'people', 'house', 'house_circle', 'toolbox', 'calendar'];
+  const usedIcons = [];
+  let cards = paragraphs.map((p, idx) => {
+    const sentences = p.split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(Boolean);
+    const cat = MARKET_TOPIC_CATEGORIES.find(c => c.re.test(p));
+    let icon = (cat && usedIcons.indexOf(cat.icon) === -1) ? cat.icon : iconRotation.find(k => usedIcons.indexOf(k) === -1);
+    if (!icon) icon = iconRotation[idx % iconRotation.length];
+    usedIcons.push(icon);
+    return {
+      icon: icon,
+      title: sentences[0] || p,
+      bulletsText: sentences.slice(1, 3).join('\n'),
+      whatItMeans: cat ? cat.whatItMeans : 'Reach out with any questions about how this affects your rate.',
+    };
+  });
+  if (!cards.length) {
+    cards = [{ icon: 'bank', title: 'Market Update', bulletsText: '', whatItMeans: 'Reach out with any questions about how this affects your rate.' }];
+  }
 
-  let takeaways = sentences.filter(s => MARKET_KEYWORD_RE.test(s));
-  if (!takeaways.length) takeaways = sentences.slice(0, 3);
-  takeaways = takeaways.slice(0, 4);
+  muCards = cards;
+  muQuote = cards.length > 1
+    ? (cards[0].title + ' — but ' + cards[cards.length - 1].title.charAt(0).toLowerCase() + cards[cards.length - 1].title.slice(1))
+    : cards[0].title;
+  document.getElementById('muQuote').value = muQuote;
 
-  const headline = 'Market Update — ' + formatDateLong(dateIso);
-  const body = takeaways.map(s => '• ' + s).join('\n') +
-    (takeaways.length ? '\n\n' : '') +
-    'Questions about how this affects your rate? Reach out — happy to walk you through it.';
-
-  document.getElementById('muHeadline').value = headline;
-  document.getElementById('muBody').value = body;
+  renderMuCardEditor();
   renderMarketDesigns();
 }
 
-function marketDesignHtml(design, headline, body, dateIso){
-  const bodyHtml = (body || 'Your reformatted summary will appear here.').split('\n').map(l => l ? ('<div>' + escapeHtml_(l) + '</div>') : '<div>&nbsp;</div>').join('');
-  if (design.id === 'mu_gold_quote') {
+function renderMuCardEditor(){
+  const container = document.getElementById('muCardEditor');
+  container.innerHTML = muCards.map((c, i) => '' +
+    '<div class="mu-card-editor">' +
+      '<div class="mu-card-editor-head"><strong style="font-size:11px; color:var(--navy);">Card ' + (i + 1) + '</strong><button class="rate-row-del" onclick="removeMuCard(' + i + ')">&times;</button></div>' +
+      '<label>Icon</label>' +
+      '<select onchange="setMuCardIcon(' + i + ', this.value)">' + MU_ICON_OPTIONS.map(o => '<option value="' + o.key + '"' + (o.key === c.icon ? ' selected' : '') + '>' + escapeHtml_(o.label) + '</option>').join('') + '</select>' +
+      '<label>Title</label>' +
+      '<input type="text" value="' + escapeAttr_(c.title) + '" oninput="updateMuCard(' + i + ', \'title\', this.value)">' +
+      '<label>Bullets (one per line)</label>' +
+      '<textarea rows="2" oninput="updateMuCard(' + i + ', \'bulletsText\', this.value)">' + escapeHtml_(c.bulletsText) + '</textarea>' +
+      '<label>What it means</label>' +
+      '<textarea rows="2" oninput="updateMuCard(' + i + ', \'whatItMeans\', this.value)">' + escapeHtml_(c.whatItMeans) + '</textarea>' +
+    '</div>'
+  ).join('');
+  document.getElementById('muAddCardBtn').disabled = muCards.length >= 6;
+}
+function updateMuCard(i, field, value){
+  muCards[i][field] = value;
+  renderMarketDesigns();
+}
+function updateMuQuote(value){
+  muQuote = value;
+  renderMarketDesigns();
+}
+function addMuCard(){
+  if (muCards.length >= 6) return;
+  muCards.push({ icon: 'bank', title: 'New Topic', bulletsText: '', whatItMeans: '' });
+  renderMuCardEditor();
+  renderMarketDesigns();
+}
+function removeMuCard(i){
+  muCards.splice(i, 1);
+  renderMuCardEditor();
+  renderMarketDesigns();
+}
+function setMuCardIcon(i, iconKey){
+  muCards[i].icon = iconKey;
+  renderMuCardEditor();
+  renderMarketDesigns();
+}
+
+// "Today's Market Move" template — teal header/footer, up to 6 white topic
+// cards in a 2-column grid, footer with social handles + pull-quote speech
+// bubble + Ann's contact card. Matches the real reference image Ann sent;
+// the icons are approximations (see MU_ICONS note above) and the photo
+// reuses her Rate Changes headshot, not the exact on-the-phone photo from
+// the reference (that image was only ever pasted into chat, not saved as
+// a file this session could read).
+function marketDesignHtml(design, cards, quote, dateIso){
+  const list = cards.length ? cards : [{ icon: 'bank', title: 'Add topic cards to preview', bulletsText: '', whatItMeans: '' }];
+  const cardsHtml = list.slice(0, 6).map(c => {
+    const bullets = (c.bulletsText || '').split('\n').map(b => b.trim()).filter(Boolean);
+    const bulletsHtml = bullets.map(b => '<div style="font-size:6px; color:#3A4150; margin-bottom:2px; line-height:1.3;">&bull; ' + escapeHtml_(b) + '</div>').join('');
     return '' +
-      '<div style="width:270px; height:270px; background:linear-gradient(160deg, var(--gold) 0%, #A9832F 100%); color:#fff; display:flex; flex-direction:column; justify-content:space-between; padding:20px; font-family:Calibri, Arial, sans-serif;">' +
-        '<img src="' + FM_LOGO_SRC + '" style="height:22px; width:auto; filter:brightness(0) invert(1); align-self:flex-start;">' +
-        '<div style="font-size:11px; line-height:1.45; overflow:hidden; max-height:150px;">' + bodyHtml + '</div>' +
-        '<div>' +
-          '<div style="font-family:Cambria, Georgia, serif; font-size:13px; font-weight:700;">' + escapeHtml_(headline || 'Market Update') + '</div>' +
-          '<div style="font-size:9px; opacity:.85; margin-top:2px;">FM Home Loans</div>' +
-        '</div>' +
+      '<div style="background:#fff; border-radius:6px; padding:8px; min-height:66px;">' +
+        '<div style="margin-bottom:3px;">' + (MU_ICONS[c.icon] || MU_ICONS.bank) + '</div>' +
+        '<div style="font-weight:700; font-size:7.5px; color:#0B4A45; margin-bottom:3px; line-height:1.25;">' + escapeHtml_(c.title) + '</div>' +
+        bulletsHtml +
+        (c.whatItMeans ? '<div style="font-size:6px; margin-top:3px; line-height:1.3; color:#1E2430;"><span style="font-weight:700;">What it means: </span><span style="font-weight:700;">' + escapeHtml_(c.whatItMeans) + '</span></div>' : '') +
       '</div>';
-  }
+  }).join('');
+
   return '' +
-    '<div style="width:270px; height:270px; background:linear-gradient(160deg, var(--navy) 0%, var(--navy-deep) 100%); color:#fff; display:flex; flex-direction:column; justify-content:space-between; padding:20px; font-family:Calibri, Arial, sans-serif;">' +
-      '<img src="' + FM_LOGO_SRC + '" style="height:22px; width:auto; filter:brightness(0) invert(1); align-self:flex-start;">' +
-      '<div>' +
-        '<div style="font-family:Cambria, Georgia, serif; font-size:15px; font-weight:700; color:#F4D9A0; margin-bottom:8px;">' + escapeHtml_(headline || 'Market Update') + '</div>' +
-        '<div style="font-size:11px; line-height:1.45; overflow:hidden; max-height:120px;">' + bodyHtml + '</div>' +
+    '<div style="width:270px; background:#5FA79C; font-family:Calibri, Arial, sans-serif; overflow:hidden;">' +
+      '<div style="background:#0B4A45; padding:12px 14px; text-align:center;">' +
+        '<div style="color:#fff; font-family:Cambria, Georgia, serif; font-weight:700; font-size:12px; letter-spacing:.3px;">TODAY&rsquo;S MARKET MOVE:</div>' +
+        '<div style="color:#DCEDEA; font-size:8px; margin-top:2px;">' + escapeHtml_((list[0] && list[0].title) || '') + '</div>' +
       '</div>' +
-      '<div style="font-size:9px; opacity:.8;">FM Home Loans &middot; ' + escapeHtml_(formatDateLong(dateIso)) + '</div>' +
+      '<div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:8px;">' + cardsHtml + '</div>' +
+      '<div style="background:#0B4A45; padding:10px 12px;">' +
+        '<div style="display:flex; justify-content:space-between; align-items:flex-end; gap:6px;">' +
+          '<div style="display:flex; flex-direction:column; gap:3px;">' +
+            '<div style="display:flex; align-items:center; gap:3px; font-size:5.5px; color:#fff;"><span style="display:inline-flex; align-items:center; justify-content:center; width:10px; height:10px; border-radius:3px; border:1px solid #fff;">IG</span>Ann.Zeilingold.lo</div>' +
+            '<div style="display:flex; align-items:center; gap:3px; font-size:5.5px; color:#fff;"><span style="display:inline-flex; align-items:center; justify-content:center; width:10px; height:10px; border-radius:50%; border:1px solid #fff; font-weight:700;">f</span>Ann Zeilingold</div>' +
+          '</div>' +
+          '<div style="flex:1; background:#fff; border:1.5px solid #0B4A45; border-radius:6px; padding:5px 7px; font-size:5.5px; color:#0B4A45; font-weight:700; line-height:1.3; text-align:center;">' + escapeHtml_(quote || '') + '</div>' +
+          '<div style="display:flex; align-items:center; gap:4px;">' +
+            '<img src="' + ANN_HEADSHOT_SRC + '" style="width:22px; height:30px; object-fit:cover; border-radius:2px; flex-shrink:0;">' +
+            '<div style="font-size:5px; color:#fff; line-height:1.4;">' +
+              '<div style="font-weight:700;">ANN ZEILINGOLD</div>' +
+              '<div>NMLS ID: 41850</div>' +
+              '<div>914-260-9000</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
     '</div>';
 }
 
 function renderMarketDesigns(){
-  const headline = document.getElementById('muHeadline').value;
-  const body = document.getElementById('muBody').value;
   const dateIso = document.getElementById('muDate').value || todayIso();
   const grid = document.getElementById('muDesignsGrid');
   grid.innerHTML = MU_DESIGNS.map(d => {
@@ -610,7 +755,7 @@ function renderMarketDesigns(){
           '<input type="checkbox" ' + (checked ? 'checked' : '') + ' tabindex="-1">' +
           '<span>' + escapeHtml_(d.name) + '</span>' +
         '</div>' +
-        '<div class="design-canvas-wrap"><div class="design-node" id="node_' + d.id + '">' + marketDesignHtml(d, headline, body, dateIso) + '</div></div>' +
+        '<div class="design-canvas-wrap"><div class="design-node" id="node_' + d.id + '">' + marketDesignHtml(d, muCards, muQuote, dateIso) + '</div></div>' +
       '</div>';
   }).join('');
 }
@@ -935,8 +1080,8 @@ async function saveSocialRecord(type){
         data: {
           date: dateIso,
           sourceText: document.getElementById('muSourceText').value,
-          headline: document.getElementById('muHeadline').value,
-          body: document.getElementById('muBody').value,
+          cards: muCards,
+          quote: muQuote,
           selectedDesigns: muSelectedDesigns,
         },
       };
@@ -993,9 +1138,11 @@ async function loadSavedRecord(recordId){
       currentMarketRecordId = recordId;
       document.getElementById('muDate').value = data.date || todayIso();
       document.getElementById('muSourceText').value = data.sourceText || '';
-      document.getElementById('muHeadline').value = data.headline || '';
-      document.getElementById('muBody').value = data.body || '';
+      muCards = data.cards || [];
+      muQuote = data.quote || '';
+      document.getElementById('muQuote').value = muQuote;
       muSelectedDesigns = data.selectedDesigns || {};
+      renderMuCardEditor();
       renderMarketDesigns();
       switchTab('market');
     } else {
