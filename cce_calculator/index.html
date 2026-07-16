@@ -1346,16 +1346,15 @@
             <label>Rate (%) <span class="manual-badge">Manual</span></label>
             <input type="number" step="0.001" data-fld="rate" value="0" oninput="calc(this.closest('.loan-block'))">
           </div>
-          <div class="field-row">
-            <label>Discount Points (%) <span class="manual-badge">Manual</span> <span class="hint">Deducts this % from the Total Loan Amount below</span></label>
-            <input type="number" step="0.01" data-fld="ratePoints" value="0" oninput="calc(this.closest('.loan-block'))">
-          </div>
-
           <div class="field-row" data-fld="row_ufmip">
             <label>Upfront MIP <span class="calc-badge" data-fld="badge_ufmip">Auto</span> <span class="hint" data-fld="ufmipHint"></span></label>
             <input type="text" inputmode="decimal" data-fld="ufmip" value="0" oninput="calc(this.closest('.loan-block'))">
           </div>
-          <div class="field-row"><label>Total Loan Amount <span class="calc-badge">Auto</span> <span class="hint" data-fld="pointsHint"></span></label><span class="summary-value" data-fld="out_totalLoan"></span></div>
+          <div class="field-row"><label>Total Loan Amount <span class="calc-badge">Auto</span></label><span class="summary-value" data-fld="out_totalLoan"></span></div>
+          <div class="field-row">
+            <label>Discount Points <span class="manual-badge">Manual</span> <span class="hint">+/- number of points. 1 point = 1% of Base Loan Amount, added to Cash to Close. Negative = lender credit, deducts from Cash to Close. <span data-fld="pointsHint"></span></span></label>
+            <input type="number" step="0.01" data-fld="ratePoints" value="0" oninput="calc(this.closest('.loan-block'))">
+          </div>
         </div>
       </div>
 
@@ -1409,7 +1408,7 @@
           <div class="field-row"><label>Processing</label><input type="text" inputmode="decimal" data-fld="f_processing" value="0" oninput="calc(this.closest('.loan-block'))"></div>
           <div class="field-row"><label>Underwriting</label><input type="text" inputmode="decimal" data-fld="f_underwriting" value="0" oninput="calc(this.closest('.loan-block'))"></div>
           <div class="field-row"><label>Commitment</label><input type="text" inputmode="decimal" data-fld="f_commitment" value="995" oninput="calc(this.closest('.loan-block'))"></div>
-          <div class="field-row"><label>Points ($)</label><input type="text" inputmode="decimal" data-fld="f_points" value="0" oninput="calc(this.closest('.loan-block'))"></div>
+          <div class="field-row"><label>Points ($) <span class="calc-badge">Auto</span></label><input type="text" inputmode="decimal" data-fld="f_points" value="0" disabled></div>
         </div>
       </div>
 
@@ -3594,12 +3593,19 @@ function calc(container){
     E(container,'ufmipHint').textContent = '';
   }
 
-  const loanBeforePoints = loanAmt + ufmip;
-  const pointsDeduction = loanBeforePoints * (pointsPct/100);
-  const totalLoan = loanBeforePoints - pointsDeduction;
-
+  const totalLoan = loanAmt + ufmip;
   E(container,'out_totalLoan').textContent = fmt(totalLoan);
-  E(container,'pointsHint').textContent = pointsPct ? ('(after ' + pointsPct + '% points: -' + fmt(pointsDeduction) + ')') : '';
+
+  // Discount Points: a dollar cost/credit toward Cash to Close, NOT a deduction
+  // from the loan amount. 1 point = 1% of the Base Loan Amount. Positive points
+  // cost the borrower (added to Cash to Close via Lender Fees below); negative
+  // points are a lender credit (reduces Cash to Close).
+  const pointsCost = loanAmt * (pointsPct/100);
+  E(container,'f_points').value = pointsCost.toFixed(2);
+  const pointsCostFmt = pointsCost >= 0 ? ('+' + fmt(pointsCost)) : ('-' + fmt(Math.abs(pointsCost)));
+  E(container,'pointsHint').textContent = pointsPct
+    ? ('(' + pointsPct + ' pt = ' + pointsCostFmt + (pointsCost >= 0 ? ' to' : ' credit to') + ' Cash to Close)')
+    : '';
 
   const sellerConcession = numVal(container,'sellerConcession');
   const hoaFee = numVal(container,'hoaFee');
@@ -3785,7 +3791,7 @@ function calc(container){
     address: E(container,'propertyAddress').value,
     county: (countyName ? countyName + ', ' : '') + (STATE_NAMES[stateCode] || stateCode),
     program, price, downAmt, downPct, loanAmt, term, rate: rate*100,
-    pointsPct, pointsDeduction, ufmip, totalLoan, sellerConcession, hoaFee, mipAuto,
+    pointsPct, pointsCost, ufmip, totalLoan, sellerConcession, hoaFee, mipAuto,
     fees: {
       application: numVal(container,'f_application'),
       processing: numVal(container,'f_processing'),
@@ -3943,8 +3949,8 @@ function renderPdfLoanPage(doc, d, navy, gold, slate, pageW, logoDataUrl){
   row('Base Loan Amount', fmt(d.loanAmt));
   row('Rate / Term', d.rate.toFixed(3) + '% / ' + d.term + ' yrs');
   if (d.monthly.hasMipMi) row('Upfront MIP', fmt(d.ufmip));
-  if (d.pointsPct) row('Points Deduction (' + d.pointsPct + '%)', '-' + fmt(d.pointsDeduction));
   row('Total Loan Amount', fmt(d.totalLoan), {bold:true, rule:true});
+  if (d.pointsPct) row('Discount Points (' + d.pointsPct + ')', (d.pointsCost >= 0 ? '+' + fmt(d.pointsCost) : '-' + fmt(Math.abs(d.pointsCost))) + ' to CTC');
   row("Seller's Concession", '-' + fmt(d.sellerConcession));
   gap(8);
 
@@ -4193,7 +4199,6 @@ async function buildXlsxEstimateData_(container, dpMode, mathTabName, colOffset)
   R.loanAmt = push('Base Loan Amount ($)', dpMode === 'loan' ? d.loanAmt : 0);
   R.term = push('Loan Term (years)', d.term);
   R.rate = push('Rate (%)', d.rate/100);
-  R.pointsPct = push('Discount Points (%)', d.pointsPct/100);
   R.program = push('Loan Program', d.program);
   R.sellerConcession = push("Seller's Concession ($)", d.sellerConcession);
   R.hoaFee = push('HOA / Monthly Fee ($)', d.hoaFee);
@@ -4202,9 +4207,8 @@ async function buildXlsxEstimateData_(container, dpMode, mathTabName, colOffset)
 
   section('CALCULATED — LOAN BASICS');
   R.ufmip = push('Upfront MIP', null);
-  R.loanBeforePoints = push('Loan Before Points', null);
-  R.pointsDeduction = push('Points Deduction', null);
   R.totalLoan = push('Total Loan Amount', null);
+  R.pointsPct = push('Discount Points', d.pointsPct/100);
   blank();
 
   section('LENDER FEES (inputs)');
@@ -4212,7 +4216,7 @@ async function buildXlsxEstimateData_(container, dpMode, mathTabName, colOffset)
   R.processing = push('Processing', +d.fees.processing);
   R.underwriting = push('Underwriting', +d.fees.underwriting);
   R.commitment = push('Commitment', +d.fees.commitment);
-  R.feePoints = push('Points ($)', +d.fees.points);
+  R.feePoints = push('Points ($)', null);
   R.g2total = push('Lender Fees Total', null);
   blank();
 
@@ -4485,9 +4489,8 @@ async function buildXlsxEstimateData_(container, dpMode, mathTabName, colOffset)
   } else {
     F[R.ufmip] = 'IF(OR(B' + R.program + '="FHA",B' + R.program + '="USDA",B' + R.program + '="VA"),B' + R.loanAmt + '*0.0175,0)';
   }
-  F[R.loanBeforePoints] = 'B' + R.loanAmt + '+B' + R.ufmip;
-  F[R.pointsDeduction] = 'B' + R.loanBeforePoints + '*B' + R.pointsPct;
-  F[R.totalLoan] = 'B' + R.loanBeforePoints + '-B' + R.pointsDeduction;
+  F[R.totalLoan] = 'B' + R.loanAmt + '+B' + R.ufmip;
+  F[R.feePoints] = 'B' + R.loanAmt + '*B' + R.pointsPct;
 
   F[R.g2total] = 'SUM(B' + R.application + ':B' + R.feePoints + ')';
   F[R.g2bTotal] = 'SUM(B' + R.attorney + ':B' + R.coopCondoFee + ')';
@@ -4637,8 +4640,8 @@ async function buildXlsxEstimateData_(container, dpMode, mathTabName, colOffset)
     fref('Base Loan Amount', R.loanAmt);
   }
   fref('Upfront MIP', R.ufmip);
-  fref('Points Deduction', R.pointsDeduction);
   fref('Total Loan Amount', R.totalLoan, { alwaysShow:true, bold:true });
+  fr = fref('Discount Points', R.pointsPct); pctFrontRowsSet.add(fr);
   fblank();
 
   fsection('LENDER FEES');
@@ -4834,10 +4837,10 @@ function buildDocxLoanSection(d){
     ['Down Payment', fmt(d.downAmt) + ' (' + d.downPct.toFixed(2) + '%)'],
     ['Base Loan Amount', fmt(d.loanAmt)],
     ['Rate / Term', d.rate.toFixed(3) + '% / ' + d.term + ' yrs']
-  ].concat(d.monthly.hasMipMi ? [['Upfront MIP', fmt(d.ufmip)]] : [])
-   .concat(d.pointsPct ? [['Points Deduction (' + d.pointsPct + '%)', '-' + fmt(d.pointsDeduction)]] : []),
+  ].concat(d.monthly.hasMipMi ? [['Upfront MIP', fmt(d.ufmip)]] : []),
    'Total Loan Amount', fmt(d.totalLoan),
-   [["Seller's Concession", '-' + fmt(d.sellerConcession)]]);
+   [["Seller's Concession", '-' + fmt(d.sellerConcession)]]
+   .concat(d.pointsPct ? [['Discount Points (' + d.pointsPct + ')', (d.pointsCost >= 0 ? '+' + fmt(d.pointsCost) : '-' + fmt(Math.abs(d.pointsCost))) + ' to CTC']] : []));
 
   body += docxGroupSection('Lender Fees', [
     ['Application', fmt(+d.fees.application)],
@@ -4922,7 +4925,7 @@ const LAST_UPDATED = 'July 8, 2026'; // bump this whenever rate tables/defaults 
 // (and cce_version.json alongside this file on GitHub Pages) whenever a
 // deploy is ready for users to be notified about; skip the bump for
 // quiet/WIP pushes you don't want to nag anyone with.
-const CCE_VERSION = '0.17.0';
+const CCE_VERSION = '0.23.0';
 const CCE_VERSION_CHECK_URL = 'cce_version.json';
 const CCE_VERSION_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
