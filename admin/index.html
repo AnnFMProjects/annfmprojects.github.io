@@ -1,0 +1,1009 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin App — FM Home Loans</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="../assets/api.js"></script>
+<script src="../assets/broadcast.js"></script>
+<script src="../export/docx-helpers.js"></script>
+<script src="../export/xlsx-helpers.js"></script>
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+  :root{
+    --paper:#FBFAF7;
+    --ink:#1E2430;
+    --good:#2F6B4F;
+    --bad:#B3261E;
+  }
+  *{box-sizing:border-box;}
+  html, body{ height:100%; margin:0; }
+  .adm-wrap{
+    font-family: Calibri, "Segoe UI", Arial, sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    width:100%;
+    margin:0;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+  }
+  .export-btn{
+    background:var(--gold);
+    color:var(--navy-deep);
+    border:none;
+    font-weight:700;
+    font-size:12px;
+    padding:8px 14px;
+    border-radius:6px;
+    cursor:pointer;
+    font-family:Calibri, Arial, sans-serif;
+    transition:transform .1s ease, box-shadow .15s ease;
+    white-space:nowrap;
+  }
+  .export-btn:hover{ box-shadow:0 4px 14px rgba(0,0,0,.25); transform:translateY(-1px); }
+  .export-btn:active{ transform:translateY(0); }
+  .export-btn-outline{ background:var(--slate-light); color:var(--navy); }
+  .export-btn-danger{ background:var(--bad); color:#fff; }
+  .export-btn[disabled]{ opacity:.5; cursor:not-allowed; }
+
+  .adm-header{
+    background:linear-gradient(135deg,var(--navy) 0%, var(--navy-deep) 100%);
+    color:#fff;
+    padding:14px 24px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+  .adm-header-left{ display:flex; align-items:center; gap:14px; }
+  .adm-header-left a{ color:#F4D9A0; font-size:12px; text-decoration:none; }
+  .adm-header-title{ font-family:Cambria, Georgia, serif; font-size:19px; font-weight:700; }
+  .adm-header-right{ display:flex; align-items:center; gap:10px; font-size:12px; flex-wrap:wrap; }
+  .adm-header-right a{ color:#F4D9A0; }
+
+  .adm-tabs{ display:flex; gap:4px; padding:10px 24px 0; background:#fff; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .adm-tab{ padding:9px 16px; font-size:12.5px; font-weight:700; color:var(--slate); cursor:pointer; border-bottom:3px solid transparent; }
+  .adm-tab.active{ color:var(--navy); border-bottom-color:var(--gold); }
+  .adm-panel{ display:none; padding:20px 24px 40px; }
+  .adm-panel.active{ display:block; }
+
+  .adm-stat-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:14px; max-width:900px; }
+  .adm-stat-tile{ background:#fff; border:1px solid var(--line); border-radius:10px; padding:18px; text-align:center; }
+  .adm-stat-value{ font-size:30px; font-weight:700; color:var(--navy); font-family:Cambria, Georgia, serif; }
+  .adm-stat-label{ font-size:11.5px; color:var(--slate); margin-top:4px; text-transform:uppercase; letter-spacing:.4px; }
+
+  .adm-toolbar{ display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; align-items:center; }
+  .adm-table{ border-collapse:collapse; width:100%; font-size:12px; background:#fff; }
+  .adm-table th, .adm-table td{ border:1px solid var(--line); padding:7px 9px; text-align:left; vertical-align:top; }
+  .adm-table thead th{ background:var(--navy); color:#fff; font-size:11px; position:sticky; top:0; }
+  .adm-table tbody tr:nth-child(even){ background:var(--slate-light); }
+  .adm-row-actions{ display:flex; gap:5px; flex-wrap:wrap; }
+  .adm-row-actions .export-btn{ padding:4px 8px; font-size:10.5px; }
+  .adm-status-badge{ font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; padding:3px 7px; border-radius:9px; background:var(--slate-light); color:var(--slate); }
+  .adm-status-badge[data-status="approved"]{ background:rgba(47,107,79,0.14); color:var(--good); }
+  .adm-status-badge[data-status="disabled"]{ background:rgba(179,38,30,0.12); color:var(--bad); }
+  .adm-status-badge[data-status="pending"]{ background:rgba(201,162,75,0.18); color:#8A6A1F; }
+  .adm-perm-pill{ display:inline-block; font-size:9.5px; background:var(--slate-light); color:var(--navy); padding:2px 6px; border-radius:8px; margin:1px; }
+
+  .adm-scroll{ overflow-x:auto; }
+
+  #admNotAuthorized{ padding:48px 24px; text-align:center; color:var(--slate); }
+
+  .adm-mtv-body{ display:flex; gap:16px; align-items:flex-start; }
+  .adm-mtv-nav{ width:200px; flex:0 0 200px; font-size:11.5px; max-height:70vh; overflow-y:auto; border:1px solid var(--line); border-radius:8px; background:#fff; }
+  .adm-mtv-nav a{ display:block; padding:6px 10px; color:var(--navy); text-decoration:none; border-bottom:1px solid var(--slate-light); }
+  .adm-mtv-nav a:hover{ background:var(--slate-light); }
+  .adm-mtv-pre{ flex:1; background:#fff; border:1px solid var(--line); border-radius:8px; padding:16px; font-family:Consolas, Monaco, monospace; font-size:11px; line-height:1.5; white-space:pre-wrap; max-height:70vh; overflow-y:auto; margin:0; }
+
+  /* MODALS */
+  .adm-modal-overlay{
+    display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:2000;
+    align-items:center; justify-content:center; padding:20px;
+  }
+  .adm-modal-overlay.open{ display:flex; }
+  .adm-modal{
+    background:#fff; border-radius:10px; max-width:480px; width:100%; max-height:86vh;
+    overflow-y:auto; padding:22px; font-family:Calibri, Arial, sans-serif;
+  }
+  .adm-field{ display:flex; flex-direction:column; gap:4px; margin-top:10px; }
+  .adm-field label{ font-size:12px; font-weight:600; color:var(--ink); }
+  .adm-field input, .adm-field select{ width:100%; box-sizing:border-box; padding:9px 10px; border:1px solid var(--line); border-radius:6px; font-family:inherit; font-size:13px; }
+  .adm-error{ color:var(--bad); font-size:12px; margin-top:10px; min-height:14px; }
+  .adm-success{ color:var(--good); font-size:12px; margin-top:10px; min-height:14px; }
+  .adm-perm-check-row{ display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--slate-light); font-size:12.5px; }
+  .adm-perm-check-row label{ flex:1; }
+
+  .hub-request-row{ border:1px solid var(--line); border-radius:8px; padding:14px 16px; margin-bottom:12px; background:#fff; }
+  .hub-request-row h4{ margin:0 0 4px 0; color:var(--navy); font-size:14px; }
+  .hub-request-meta{ font-size:11px; color:var(--slate); margin-bottom:8px; }
+  .hub-request-actions{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .hub-request-status-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:8px 0; }
+  .hub-status-badge{ font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; padding:3px 8px; border-radius:10px; background:var(--slate-light); color:var(--slate); }
+  .hub-status-badge[data-status="Approved"]{ background:rgba(47,107,79,0.14); color:var(--good); }
+  .hub-status-badge[data-status="Denied"]{ background:rgba(179,38,30,0.12); color:var(--bad); }
+  .hub-status-badge[data-status="Done"]{ background:rgba(27,42,74,0.14); color:var(--navy); }
+  .hub-btn{ border:none; border-radius:6px; padding:8px 13px; font-size:11.5px; font-weight:600; cursor:pointer; font-family:inherit; }
+  .hub-btn-primary{ background:var(--navy); color:#fff; }
+  .hub-btn-secondary{ background:var(--slate-light); color:var(--navy); }
+  .hub-btn-status.active{ background:var(--gold); color:var(--navy-deep); }
+</style>
+
+<div class="adm-wrap">
+
+  <!-- LOGIN GATE -->
+  <div id="loginGateOverlay" style="display:flex; position:fixed; inset:0; background:var(--paper); z-index:3000; align-items:center; justify-content:center; padding:20px;">
+    <div id="loginGateChecking" style="display:none; text-align:center; font-family:Calibri, Arial, sans-serif; color:var(--slate);">
+      <div style="width:28px; height:28px; margin:0 auto 12px; border:3px solid var(--line); border-top-color:var(--navy); border-radius:50%; animation:loginGateSpin 0.8s linear infinite;"></div>
+      Checking your session&hellip;
+    </div>
+    <style>@keyframes loginGateSpin { to { transform: rotate(360deg); } }</style>
+    <div id="loginGateForm" style="background:#fff; border:1px solid var(--line); border-radius:10px; max-width:400px; width:100%; padding:28px; font-family:Calibri, Arial, sans-serif; box-shadow:0 6px 24px rgba(16,27,51,0.12);">
+      <h3 style="margin-top:0; color:var(--navy);">Admin App</h3>
+      <div style="font-size:10px; color:#8A6A1F; background:rgba(201,162,75,0.16); border:1px solid rgba(201,162,75,0.45); padding:5px 9px; border-radius:4px; margin-bottom:14px;">Internal tool for FM Home Loans admins. Not a public FM Home Loans website or login.</div>
+      <div class="adm-field">
+        <label>Email</label>
+        <input type="email" id="loginEmail" autocomplete="username">
+      </div>
+      <div class="adm-field">
+        <label>Password</label>
+        <input type="password" id="loginPassword" autocomplete="current-password" onkeydown="if(event.key==='Enter') attemptLogin();">
+      </div>
+      <div id="loginError" class="adm-error"></div>
+      <button class="export-btn" style="width:100%; margin-top:14px; background:var(--navy); color:#fff; padding:11px;" onclick="attemptLogin()">Login</button>
+      <div style="text-align:center; margin-top:10px; padding-top:10px; border-top:1px solid var(--line); font-size:10.5px; color:var(--slate);">
+        This tool is restricted to accounts with at least one admin permission — logging in doesn't guarantee access.
+      </div>
+    </div>
+  </div>
+  <script>
+  (function(){
+    try {
+      if (localStorage.getItem('cce_session_token')) {
+        document.getElementById('loginGateForm').style.display = 'none';
+        document.getElementById('loginGateChecking').style.display = 'block';
+      }
+    } catch (e) {}
+  })();
+  </script>
+
+  <!-- TOP BAR -->
+  <div class="adm-header">
+    <div class="adm-header-left">
+      <a href="../">&larr; Back to Home</a>
+      <div class="adm-header-title">Admin App</div>
+    </div>
+    <div class="adm-header-right">
+      <span id="accountNote"></span>
+    </div>
+  </div>
+
+  <div id="admNotAuthorized" style="display:none;">
+    This tool isn't enabled for your account — you need at least one admin permission. Contact Ann if you think that's wrong.
+  </div>
+
+  <div id="admMain" style="display:none; flex:1; flex-direction:column;">
+    <div class="adm-tabs">
+      <div class="adm-tab active" data-tab="dashboard" onclick="switchAdmTab('dashboard')">Dashboard</div>
+      <div class="adm-tab" data-tab="users" onclick="switchAdmTab('users')">Users</div>
+      <div class="adm-tab" data-tab="requests" onclick="switchAdmTab('requests')">App Requests</div>
+      <div class="adm-tab" data-tab="myturn" onclick="switchAdmTab('myturn')">MYTURN Live View</div>
+      <div class="adm-tab" data-tab="suite" onclick="switchAdmTab('suite')">Suite Controls</div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div id="panel-dashboard" class="adm-panel active">
+      <div class="adm-toolbar">
+        <button class="export-btn" onclick="loadDashboard()">Refresh</button>
+        <button class="export-btn export-btn-outline" onclick="exportDashboardImage('png')">Export PNG</button>
+        <button class="export-btn export-btn-outline" onclick="exportDashboardImage('jpeg')">Export JPEG</button>
+      </div>
+      <div id="dashboardError" class="adm-error"></div>
+      <div id="dashboardNode" class="adm-stat-grid" style="background:var(--paper); padding:4px;">
+        <div class="adm-stat-tile"><div class="adm-stat-value" id="statTotalUsers">—</div><div class="adm-stat-label">Total Users</div></div>
+        <div class="adm-stat-tile"><div class="adm-stat-value" id="statPending">—</div><div class="adm-stat-label">Pending Approvals</div></div>
+        <div class="adm-stat-tile"><div class="adm-stat-value" id="statOpenRequests">—</div><div class="adm-stat-label">Open App Requests</div></div>
+        <div class="adm-stat-tile"><div class="adm-stat-value" id="statMyturnSync" style="font-size:15px;">—</div><div class="adm-stat-label">MYTURN Last Synced</div></div>
+      </div>
+    </div>
+
+    <!-- USERS -->
+    <div id="panel-users" class="adm-panel">
+      <div class="adm-toolbar">
+        <button class="export-btn" onclick="loadUsers()">Refresh</button>
+        <button class="export-btn export-btn-outline" onclick="exportUsersAs('pdf')">PDF</button>
+        <button class="export-btn export-btn-outline" onclick="exportUsersAs('docx')">Word</button>
+        <button class="export-btn export-btn-outline" onclick="exportUsersAs('xlsx')">Excel</button>
+        <button class="export-btn export-btn-outline" onclick="exportUsersAs('csv')">CSV</button>
+        <button class="export-btn export-btn-outline" onclick="exportUsersAs('json')">JSON</button>
+      </div>
+      <div id="usersError" class="adm-error"></div>
+      <div class="adm-scroll"><table class="adm-table">
+        <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Status</th><th>Permissions</th><th>Created</th><th>Approved</th><th>Last Login</th><th>Actions</th></tr></thead>
+        <tbody id="usersTableBody"></tbody>
+      </table></div>
+    </div>
+
+    <!-- APP REQUESTS (ported from the hub's former admin modal) -->
+    <div id="panel-requests" class="adm-panel">
+      <div class="adm-toolbar">
+        <button class="export-btn" onclick="openAdminPanel()">Refresh</button>
+        <button class="export-btn export-btn-outline" onclick="exportRequestsAs('pdf')">PDF</button>
+        <button class="export-btn export-btn-outline" onclick="exportRequestsAs('docx')">Word</button>
+        <button class="export-btn export-btn-outline" onclick="exportRequestsAs('xlsx')">Excel</button>
+        <button class="export-btn export-btn-outline" onclick="exportRequestsAs('csv')">CSV</button>
+        <button class="export-btn export-btn-outline" onclick="exportRequestsAs('json')">JSON</button>
+      </div>
+      <div id="adminRequestsError" class="adm-error"></div>
+      <div id="adminRequestsEmpty" style="display:none; font-size:12.5px; color:var(--slate); padding:20px 0;">No requests submitted yet.</div>
+      <div id="adminRequestsList"></div>
+    </div>
+
+    <!-- MYTURN LIVE VIEW -->
+    <div id="panel-myturn" class="adm-panel">
+      <div class="adm-toolbar">
+        <button class="export-btn" onclick="loadMyturnSnapshot()">Refresh</button>
+        <span id="myturnSyncedAtLabel" style="font-size:11.5px; color:var(--slate);"></span>
+      </div>
+      <div id="myturnError" class="adm-error"></div>
+      <div class="adm-mtv-body">
+        <div class="adm-mtv-nav" id="myturnNav"></div>
+        <pre class="adm-mtv-pre" id="myturnContent">Nothing synced yet — a Claude Code session needs to call syncMyturnSnapshot after its next MYTURN.md edit.</pre>
+      </div>
+    </div>
+
+    <!-- SUITE CONTROLS -->
+    <div id="panel-suite" class="adm-panel">
+      <div style="max-width:520px;">
+        <div style="background:#fff; border:1px solid var(--line); border-radius:10px; padding:18px; margin-bottom:14px;">
+          <h4 style="margin:0 0 8px; color:var(--navy);">Broadcast Refresh</h4>
+          <p style="font-size:12px; color:var(--slate); margin:0 0 10px;">Tells every open tab across all 5 tools to show a "please refresh" banner.</p>
+          <button class="export-btn" id="suiteBroadcastBtn" onclick="triggerBroadcastNow()">Notify Everyone to Refresh</button>
+          <span id="suiteBroadcastStatus" style="font-size:11.5px; color:var(--slate); margin-left:8px;"></span>
+        </div>
+        <div style="background:#fff; border:1px solid var(--line); border-radius:10px; padding:18px;">
+          <h4 style="margin:0 0 8px; color:var(--navy);">CCE PMI Table</h4>
+          <p style="font-size:12px; color:var(--slate); margin:0 0 10px;">The shared PMI rate table used by the CCE calculator's auto-calc. Edited from inside CCE itself, not duplicated here.</p>
+          <a class="export-btn export-btn-outline" style="text-decoration:none; display:inline-block;" href="../cce_calculator/">Open CCE Calculator →</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EDIT USER MODAL -->
+  <div id="editUserModalOverlay" class="adm-modal-overlay">
+    <div class="adm-modal">
+      <h3 style="margin-top:0; color:var(--navy);">Edit User</h3>
+      <div class="adm-field"><label>Name</label><input type="text" id="editUserName"></div>
+      <div class="adm-field"><label>Email</label><input type="email" id="editUserEmail"></div>
+      <div class="adm-field"><label>Phone</label><input type="text" id="editUserPhone"></div>
+      <div class="adm-field">
+        <label>Status</label>
+        <select id="editUserStatus">
+          <option value="pending">pending</option>
+          <option value="approved">approved</option>
+          <option value="disabled">disabled</option>
+        </select>
+      </div>
+      <div id="editUserError" class="adm-error"></div>
+      <div style="margin-top:14px; display:flex; gap:8px; justify-content:flex-end;">
+        <button class="export-btn export-btn-outline" onclick="closeEditUserModal()">Cancel</button>
+        <button class="export-btn" onclick="submitEditUser()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESET PASSWORD MODAL -->
+  <div id="resetPasswordModalOverlay" class="adm-modal-overlay">
+    <div class="adm-modal" style="max-width:400px;">
+      <h3 style="margin-top:0; color:var(--navy);">Reset Password</h3>
+      <p style="font-size:12px; color:var(--slate);">Sets a new password directly — no current password required. Tell the user their new password out of band.</p>
+      <div class="adm-field"><label>New Password <span style="font-weight:400; color:var(--slate);">(min 8 characters)</span></label><input type="text" id="resetPasswordValue"></div>
+      <div id="resetPasswordError" class="adm-error"></div>
+      <div id="resetPasswordSuccess" class="adm-success"></div>
+      <div style="margin-top:14px; display:flex; gap:8px; justify-content:flex-end;">
+        <button class="export-btn export-btn-outline" onclick="closeResetPasswordModal()">Cancel</button>
+        <button class="export-btn" onclick="submitResetPassword()">Set New Password</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DELETE CONFIRM MODAL -->
+  <div id="deleteUserModalOverlay" class="adm-modal-overlay">
+    <div class="adm-modal" style="max-width:400px;">
+      <h3 style="margin-top:0; color:var(--bad);">Delete Account</h3>
+      <p style="font-size:12.5px; color:var(--slate); line-height:1.5;">This permanently deletes <b id="deleteUserName"></b>'s account. This cannot be undone.</p>
+      <div class="adm-field"><label>Type DELETE to confirm</label><input type="text" id="deleteUserConfirmText"></div>
+      <div id="deleteUserError" class="adm-error"></div>
+      <div style="margin-top:14px; display:flex; gap:8px; justify-content:flex-end;">
+        <button class="export-btn export-btn-outline" onclick="closeDeleteUserModal()">Cancel</button>
+        <button class="export-btn export-btn-danger" onclick="submitDeleteUser()">Delete Permanently</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PERMISSIONS MODAL (superAdmin only) -->
+  <div id="permissionsModalOverlay" class="adm-modal-overlay">
+    <div class="adm-modal" style="max-width:420px;">
+      <h3 style="margin-top:0; color:var(--navy);">Permissions — <span id="permissionsUserName"></span></h3>
+      <div id="permissionsChecklist"></div>
+      <div id="permissionsError" class="adm-error"></div>
+      <div style="margin-top:14px; display:flex; gap:8px; justify-content:flex-end;">
+        <button class="export-btn export-btn-outline" onclick="closePermissionsModal()">Cancel</button>
+        <button class="export-btn" onclick="submitPermissions()">Save Permissions</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===========================================================================
+// ADMIN_API — mirrors HUB_API/GT_API/PAG_API. Same API_BASE_URL, same
+// localStorage token key ('cce_session_token') so a login started anywhere
+// else in the suite carries over automatically.
+// ===========================================================================
+const ADMIN_API = (function(){
+  const core = createFmApiCore();
+  return Object.assign({}, core, {
+    listAccounts: async function(){
+      const data = await core.call('listAccounts', {});
+      return data.accounts;
+    },
+    setAccountStatus: async function(accountId, status){
+      const data = await core.call('setAccountStatus', { accountId: accountId, status: status });
+      return data.status;
+    },
+    updateAccountProfileAdmin: async function(payload){
+      const data = await core.call('updateAccountProfileAdmin', payload);
+      return data.account;
+    },
+    adminResetPassword: async function(accountId, newPassword){
+      const data = await core.call('adminResetPassword', { accountId: accountId, newPassword: newPassword });
+      return data.changed;
+    },
+    deleteAccount: async function(accountId){
+      const data = await core.call('deleteAccount', { accountId: accountId, confirm: true });
+      return data.deleted;
+    },
+    updateAccountPermissions: async function(accountId, permissions){
+      const data = await core.call('updateAccountPermissions', { accountId: accountId, permissions: permissions });
+      return data.permissions;
+    },
+    listAppRequests: async function(){
+      const data = await core.call('listAppRequests', {});
+      return data.requests;
+    },
+    deleteAppRequest: async function(requestId){
+      const data = await core.call('deleteAppRequest', { requestId: requestId });
+      return data.deleted;
+    },
+    updateAppRequestStatus: async function(requestId, status){
+      const data = await core.call('updateAppRequestStatus', { requestId: requestId, status: status });
+      return data.status;
+    },
+    emailAppRequestJson: async function(requestId){
+      const data = await core.call('emailAppRequestJson', { requestId: requestId });
+      return data.sent;
+    },
+    sendAppRequestToClaude: async function(requestId){
+      const data = await core.call('sendAppRequestToClaude', { requestId: requestId });
+      return data.reply;
+    },
+    getMyturnSnapshot: async function(){
+      return core.call('getMyturnSnapshot', {});
+    },
+    getAdminSummary: async function(){
+      return core.call('getAdminSummary', {});
+    },
+    triggerBroadcast: async function(){
+      const data = await core.call('triggerBroadcast', {});
+      return data.broadcastAt;
+    },
+  });
+})();
+
+const APP_REQUEST_CLAUDE_ENABLED = false; // same flag/reasoning as the old hub panel
+
+function escapeHtml_(str){
+  const div = document.createElement('div');
+  div.textContent = str == null ? '' : String(str);
+  return div.innerHTML;
+}
+function dateOnlyAdm_(value){
+  if (!value) return '';
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? String(value) : d.toISOString().slice(0,10);
+}
+
+// ===========================================================================
+// SESSION — no guest mode: this whole tool is admin-only. Authorization is
+// checked by calling getAdminSummary (any single admin permission passes)
+// and treating a thrown "admin-only" error as "not authorized," same
+// organic-failure pattern GT/Social already use for their own allowlists.
+// ===========================================================================
+let currentAccount = null;
+
+async function initSession(){
+  if (!ADMIN_API.isLoggedIn()){
+    showLoginGate('form');
+    return;
+  }
+  showLoginGate('checking');
+  try {
+    currentAccount = await ADMIN_API.whoAmI();
+    hideLoginGate();
+    await checkAdminAuthorization();
+  } catch (err) {
+    ADMIN_API.logout();
+    showLoginGate('form');
+  }
+}
+async function checkAdminAuthorization(){
+  try {
+    await ADMIN_API.getAdminSummary();
+    document.getElementById('admNotAuthorized').style.display = 'none';
+    document.getElementById('admMain').style.display = 'flex';
+    const note = document.getElementById('accountNote');
+    if (note) note.innerHTML = 'Logged in as ' + escapeHtml_(currentAccount.Name) + ' <a href="#" onclick="logoutAccount(); return false;">Logout</a>';
+    loadDashboard();
+  } catch (err) {
+    document.getElementById('admMain').style.display = 'none';
+    document.getElementById('admNotAuthorized').style.display = 'block';
+  }
+}
+function showLoginGate(mode){
+  document.getElementById('loginGateOverlay').style.display = 'flex';
+  const checking = mode === 'checking';
+  document.getElementById('loginGateForm').style.display = checking ? 'none' : 'block';
+  document.getElementById('loginGateChecking').style.display = checking ? 'block' : 'none';
+}
+function hideLoginGate(){ document.getElementById('loginGateOverlay').style.display = 'none'; }
+function logoutAccount(){ ADMIN_API.logout(); currentAccount = null; location.reload(); }
+async function attemptLogin(){
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  errEl.textContent = '';
+  if (!email || !password){ errEl.textContent = 'Enter your email and password.'; return; }
+  try {
+    currentAccount = await ADMIN_API.login(email, password);
+    document.getElementById('loginPassword').value = '';
+    hideLoginGate();
+    await checkAdminAuthorization();
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+}
+
+// ===========================================================================
+// TABS
+// ===========================================================================
+function switchAdmTab(tab){
+  document.querySelectorAll('.adm-tab').forEach(function(el){ el.classList.toggle('active', el.dataset.tab === tab); });
+  document.querySelectorAll('.adm-panel').forEach(function(el){ el.classList.toggle('active', el.id === 'panel-' + tab); });
+  if (tab === 'users' && !usersCache.length) loadUsers();
+  if (tab === 'requests' && !adminRequestsCache.length) openAdminPanel();
+  if (tab === 'myturn') loadMyturnSnapshot();
+}
+
+// ===========================================================================
+// DASHBOARD
+// ===========================================================================
+async function loadDashboard(){
+  const errEl = document.getElementById('dashboardError');
+  errEl.textContent = '';
+  try {
+    const summary = await ADMIN_API.getAdminSummary();
+    document.getElementById('statTotalUsers').textContent = summary.totalUsers;
+    document.getElementById('statPending').textContent = summary.pendingApprovals;
+    document.getElementById('statOpenRequests').textContent = summary.openAppRequests;
+    document.getElementById('statMyturnSync').textContent = summary.myturnSyncedAt ? dateOnlyAdm_(summary.myturnSyncedAt) : 'never';
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+}
+async function exportDashboardImage(format){
+  const node = document.getElementById('dashboardNode');
+  const canvas = await html2canvas(node, { scale: 4, backgroundColor: format === 'jpeg' ? '#ffffff' : null });
+  const mime = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+  const dataUrl = canvas.toDataURL(mime, 0.92);
+  const a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = 'admin-dashboard-' + new Date().toISOString().slice(0,10) + '.' + (format === 'jpeg' ? 'jpg' : 'png');
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+// ===========================================================================
+// GENERIC TABLE EXPORT HELPERS — shared by Users and App Requests tabs.
+// PDF: manual jsPDF table draw. Word: docxCell/docxPara/xmlEsc directly
+// per-cell (docxTable itself is hardcoded to exactly 2 columns, so it can't
+// be reused for a variable-column table). Excel: colLetter/cellXml/sheetXml
+// (already generic). CSV: no existing helper anywhere in the suite — new
+// local toCsv_. JSON: the same Blob+temp-<a> pattern used elsewhere already.
+// ===========================================================================
+function downloadBlob_(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function toCsv_(headers, rows){
+  function esc(v){
+    const s = v == null ? '' : String(v);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+  }
+  const lines = [headers.map(esc).join(',')];
+  rows.forEach(function(row){ lines.push(row.map(esc).join(',')); });
+  return lines.join('\r\n');
+}
+function exportTablePdf_(title, headers, rows, filenamePrefix){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'letter', orientation: headers.length > 6 ? 'landscape' : 'portrait' });
+  const navy = [27,42,74];
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const marginX = 36;
+  let y = 40;
+  doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(navy[0],navy[1],navy[2]);
+  doc.text(title, marginX, y);
+  y += 20;
+  const usableWidth = pageWidth - marginX*2;
+  const colWidth = usableWidth / headers.length;
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(255,255,255);
+  doc.setFillColor(navy[0],navy[1],navy[2]);
+  doc.rect(marginX, y-10, usableWidth, 16, 'F');
+  headers.forEach(function(h,i){ doc.text(String(h), marginX + i*colWidth + 3, y); });
+  y += 14;
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(30,30,30);
+  rows.forEach(function(row){
+    if (y > 760){ doc.addPage(); y = 40; }
+    row.forEach(function(cell,i){
+      const text = doc.splitTextToSize(String(cell == null ? '' : cell), colWidth - 6);
+      doc.text(text, marginX + i*colWidth + 3, y);
+    });
+    y += 14;
+  });
+  downloadBlob_(doc.output('blob'), filenamePrefix + '.pdf');
+}
+async function exportTableDocx_(title, headers, rows, filenamePrefix){
+  const colWidth = Math.floor(9000 / headers.length);
+  let body = docxPara(title, { bold:true, size:16, spaceAfter:200 });
+  let trs = '<w:tr>' + headers.map(function(h){ return docxCell(String(h), { bold:true, width: colWidth }); }).join('') + '</w:tr>';
+  rows.forEach(function(row){
+    trs += '<w:tr>' + row.map(function(cell){ return docxCell(cell == null ? '' : String(cell), { width: colWidth }); }).join('') + '</w:tr>';
+  });
+  const gridCols = headers.map(function(){ return '<w:gridCol w:w="' + colWidth + '"/>'; }).join('');
+  const table = '<w:tbl><w:tblPr><w:tblW w:w="9000" w:type="dxa"/><w:tblBorders>' +
+    '<w:top w:val="single" w:sz="4" w:color="D9DCE3"/><w:bottom w:val="single" w:sz="4" w:color="D9DCE3"/>' +
+    '<w:left w:val="single" w:sz="4" w:color="D9DCE3"/><w:right w:val="single" w:sz="4" w:color="D9DCE3"/>' +
+    '<w:insideH w:val="single" w:sz="4" w:color="D9DCE3"/><w:insideV w:val="single" w:sz="4" w:color="D9DCE3"/></w:tblBorders></w:tblPr>' +
+    '<w:tblGrid>' + gridCols + '</w:tblGrid>' + trs + '</w:tbl>';
+  body += table;
+  const documentXml = docxDocumentXml(body, 720);
+  const zip = new JSZip();
+  zip.file('[Content_Types].xml', DOCX_CONTENT_TYPES_XML);
+  zip.file('_rels/.rels', DOCX_RELS_XML);
+  zip.file('word/document.xml', documentXml);
+  const blob = await zip.generateAsync({ type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+  downloadBlob_(blob, filenamePrefix + '.docx');
+}
+async function exportTableXlsx_(title, headers, rows, filenamePrefix){
+  const cells = {};
+  function setCell(addr, opts){ cells[addr] = Object.assign({ s:0 }, opts); }
+  setCell('A1', { t:'inlineStr', v: title, s:1 });
+  const headerRow = 3;
+  headers.forEach(function(h, i){ setCell(colLetter(1+i) + headerRow, { t:'inlineStr', v: String(h), s:1 }); });
+  rows.forEach(function(row, ri){
+    row.forEach(function(cell, ci){
+      const addr = colLetter(1+ci) + (headerRow + 1 + ri);
+      if (cell == null || cell === '') return;
+      if (typeof cell === 'number') setCell(addr, { t:'n', v: cell });
+      else setCell(addr, { t:'inlineStr', v: String(cell) });
+    });
+  });
+
+  const stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+    '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>' +
+    '<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>' +
+    '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>' +
+    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+    '<cellXfs count="2">' +
+      '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+      '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +
+    '</cellXfs>' +
+    '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
+    '<dxfs count="0"/>' +
+    '</styleSheet>';
+  const workbookXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+    '<sheets><sheet name="' + xmlEsc(title.slice(0,30)) + '" sheetId="1" r:id="rId1"/></sheets>' +
+    '<calcPr calcId="0" fullCalcOnLoad="1"/>' +
+    '</workbook>';
+  const workbookRelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
+    '</Relationships>';
+  const contentTypesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+    '<Default Extension="xml" ContentType="application/xml"/>' +
+    '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+    '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
+    '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+    '</Types>';
+  const rootRelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' +
+    '</Relationships>';
+
+  const zip = new JSZip();
+  zip.file('[Content_Types].xml', contentTypesXml);
+  zip.file('_rels/.rels', rootRelsXml);
+  zip.file('xl/workbook.xml', workbookXml);
+  zip.file('xl/_rels/workbook.xml.rels', workbookRelsXml);
+  zip.file('xl/styles.xml', stylesXml);
+  zip.file('xl/worksheets/sheet1.xml', sheetXml(cells));
+  const blob = await zip.generateAsync({ type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  downloadBlob_(blob, filenamePrefix + '.xlsx');
+}
+function exportTableGeneric_(format, title, headers, rows, filenamePrefix, jsonRows){
+  if (format === 'csv'){ downloadBlob_(new Blob([toCsv_(headers, rows)], { type:'text/csv' }), filenamePrefix + '.csv'); return; }
+  if (format === 'json'){ downloadBlob_(new Blob([JSON.stringify(jsonRows || rows, null, 2)], { type:'application/json' }), filenamePrefix + '.json'); return; }
+  if (format === 'pdf'){ exportTablePdf_(title, headers, rows, filenamePrefix); return; }
+  if (format === 'docx'){ exportTableDocx_(title, headers, rows, filenamePrefix); return; }
+  if (format === 'xlsx'){ exportTableXlsx_(title, headers, rows, filenamePrefix); return; }
+}
+
+// ===========================================================================
+// USERS
+// ===========================================================================
+let usersCache = [];
+const PERMISSION_LABELS = {
+  superAdmin: 'Super Admin',
+  manageUsers: 'Manage Users',
+  manageAppRequests: 'Manage App Requests',
+  manageMyturn: 'Manage MYTURN',
+  accessGt: 'Access Greatness Tracker',
+  accessSocial: 'Access Social Media Tool',
+  manageCcePmiTable: 'Manage CCE PMI Table',
+  triggerBroadcast: 'Trigger Broadcast',
+};
+const PERMISSION_KEYS_CLIENT = Object.keys(PERMISSION_LABELS);
+
+function isSuperAdmin_(){ return !!(currentAccount && currentAccount.permissions && currentAccount.permissions.indexOf('superAdmin') !== -1); }
+
+async function loadUsers(){
+  const errEl = document.getElementById('usersError');
+  errEl.textContent = '';
+  document.getElementById('usersTableBody').innerHTML = '<tr><td colspan="9" style="color:var(--slate);">Loading…</td></tr>';
+  try {
+    usersCache = await ADMIN_API.listAccounts();
+    renderUsersTable();
+  } catch (err) {
+    document.getElementById('usersTableBody').innerHTML = '';
+    errEl.textContent = err.message;
+  }
+}
+function accountPermList_(a){
+  return String(a.Permissions || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+}
+function renderUsersTable(){
+  const body = document.getElementById('usersTableBody');
+  if (!usersCache.length){ body.innerHTML = '<tr><td colspan="9" style="color:var(--slate);">No accounts yet.</td></tr>'; return; }
+  body.innerHTML = usersCache.map(function(a, i){
+    const perms = accountPermList_(a);
+    const permsHtml = perms.length ? perms.map(function(p){ return '<span class="adm-perm-pill">' + escapeHtml_(PERMISSION_LABELS[p] || p) + '</span>'; }).join('') : '<span style="color:var(--slate); font-size:11px;">none</span>';
+    const statusOptions = ['pending','approved','disabled'].map(function(s){ return '<option value="'+s+'"'+(a.Status===s?' selected':'')+'>'+s+'</option>'; }).join('');
+    return '<tr>' +
+      '<td>' + escapeHtml_(a.Name) + '</td>' +
+      '<td>' + escapeHtml_(a.Email) + '</td>' +
+      '<td>' + escapeHtml_(a.Phone || '') + '</td>' +
+      '<td><select onchange="quickSetStatus(' + i + ', this.value)" style="font-size:11px; padding:3px;">' + statusOptions + '</select></td>' +
+      '<td>' + permsHtml + '</td>' +
+      '<td>' + escapeHtml_(dateOnlyAdm_(a.CreatedAt)) + '</td>' +
+      '<td>' + escapeHtml_(dateOnlyAdm_(a.ApprovedAt)) + '</td>' +
+      '<td>' + escapeHtml_(dateOnlyAdm_(a.LastLoginAt)) + '</td>' +
+      '<td><div class="adm-row-actions">' +
+        '<button class="export-btn export-btn-outline" onclick="openEditUserModal(' + i + ')">Edit</button>' +
+        '<button class="export-btn export-btn-outline" onclick="openResetPasswordModal(' + i + ')">Reset PW</button>' +
+        (isSuperAdmin_() ? '<button class="export-btn export-btn-outline" onclick="openPermissionsModal(' + i + ')">Permissions</button>' : '') +
+        '<button class="export-btn export-btn-danger" onclick="openDeleteUserModal(' + i + ')">Delete</button>' +
+      '</div></td>' +
+    '</tr>';
+  }).join('');
+}
+async function quickSetStatus(i, status){
+  const a = usersCache[i];
+  const errEl = document.getElementById('usersError');
+  errEl.textContent = '';
+  try {
+    await ADMIN_API.setAccountStatus(a.AccountID, status);
+    a.Status = status;
+  } catch (err) {
+    errEl.textContent = err.message;
+    renderUsersTable();
+  }
+}
+
+let editUserIndex = null;
+function openEditUserModal(i){
+  editUserIndex = i;
+  const a = usersCache[i];
+  document.getElementById('editUserName').value = a.Name || '';
+  document.getElementById('editUserEmail').value = a.Email || '';
+  document.getElementById('editUserPhone').value = a.Phone || '';
+  document.getElementById('editUserStatus').value = a.Status || 'pending';
+  document.getElementById('editUserError').textContent = '';
+  document.getElementById('editUserModalOverlay').classList.add('open');
+}
+function closeEditUserModal(){ document.getElementById('editUserModalOverlay').classList.remove('open'); }
+async function submitEditUser(){
+  const a = usersCache[editUserIndex];
+  const errEl = document.getElementById('editUserError');
+  errEl.textContent = '';
+  const name = document.getElementById('editUserName').value.trim();
+  const email = document.getElementById('editUserEmail').value.trim();
+  const phone = document.getElementById('editUserPhone').value.trim();
+  const status = document.getElementById('editUserStatus').value;
+  try {
+    await ADMIN_API.updateAccountProfileAdmin({ accountId: a.AccountID, name: name, email: email, phone: phone });
+    if (status !== a.Status) await ADMIN_API.setAccountStatus(a.AccountID, status);
+    closeEditUserModal();
+    loadUsers();
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+}
+
+let resetPasswordIndex = null;
+function openResetPasswordModal(i){
+  resetPasswordIndex = i;
+  document.getElementById('resetPasswordValue').value = '';
+  document.getElementById('resetPasswordError').textContent = '';
+  document.getElementById('resetPasswordSuccess').textContent = '';
+  document.getElementById('resetPasswordModalOverlay').classList.add('open');
+}
+function closeResetPasswordModal(){ document.getElementById('resetPasswordModalOverlay').classList.remove('open'); }
+async function submitResetPassword(){
+  const a = usersCache[resetPasswordIndex];
+  const errEl = document.getElementById('resetPasswordError');
+  const okEl = document.getElementById('resetPasswordSuccess');
+  errEl.textContent = ''; okEl.textContent = '';
+  const newPassword = document.getElementById('resetPasswordValue').value;
+  if (newPassword.length < 8){ errEl.textContent = 'Must be at least 8 characters.'; return; }
+  try {
+    await ADMIN_API.adminResetPassword(a.AccountID, newPassword);
+    okEl.textContent = 'Password updated for ' + a.Name + '.';
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+}
+
+let deleteUserIndex = null;
+function openDeleteUserModal(i){
+  deleteUserIndex = i;
+  document.getElementById('deleteUserName').textContent = usersCache[i].Name;
+  document.getElementById('deleteUserConfirmText').value = '';
+  document.getElementById('deleteUserError').textContent = '';
+  document.getElementById('deleteUserModalOverlay').classList.add('open');
+}
+function closeDeleteUserModal(){ document.getElementById('deleteUserModalOverlay').classList.remove('open'); }
+async function submitDeleteUser(){
+  const a = usersCache[deleteUserIndex];
+  const errEl = document.getElementById('deleteUserError');
+  errEl.textContent = '';
+  if (document.getElementById('deleteUserConfirmText').value.trim() !== 'DELETE'){ errEl.textContent = 'Type DELETE exactly to confirm.'; return; }
+  try {
+    await ADMIN_API.deleteAccount(a.AccountID);
+    closeDeleteUserModal();
+    loadUsers();
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+}
+
+let permissionsIndex = null;
+function openPermissionsModal(i){
+  permissionsIndex = i;
+  const a = usersCache[i];
+  const current = accountPermList_(a);
+  document.getElementById('permissionsUserName').textContent = a.Name;
+  document.getElementById('permissionsChecklist').innerHTML = PERMISSION_KEYS_CLIENT.map(function(key){
+    return '<div class="adm-perm-check-row"><label for="perm_'+key+'">' + escapeHtml_(PERMISSION_LABELS[key]) + '</label>' +
+      '<input type="checkbox" id="perm_' + key + '" value="' + key + '"' + (current.indexOf(key) !== -1 ? ' checked' : '') + '></div>';
+  }).join('');
+  document.getElementById('permissionsError').textContent = '';
+  document.getElementById('permissionsModalOverlay').classList.add('open');
+}
+function closePermissionsModal(){ document.getElementById('permissionsModalOverlay').classList.remove('open'); }
+async function submitPermissions(){
+  const a = usersCache[permissionsIndex];
+  const errEl = document.getElementById('permissionsError');
+  errEl.textContent = '';
+  const selected = PERMISSION_KEYS_CLIENT.filter(function(key){ return document.getElementById('perm_' + key).checked; });
+  try {
+    await ADMIN_API.updateAccountPermissions(a.AccountID, selected);
+    closePermissionsModal();
+    loadUsers();
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+}
+
+function usersExportRows_(){
+  return usersCache.map(function(a){
+    return [a.Name, a.Email, a.Phone || '', a.Status, accountPermList_(a).join('; '), dateOnlyAdm_(a.CreatedAt), dateOnlyAdm_(a.ApprovedAt), dateOnlyAdm_(a.LastLoginAt)];
+  });
+}
+function exportUsersAs(format){
+  const headers = ['Name','Email','Phone','Status','Permissions','Created','Approved','Last Login'];
+  exportTableGeneric_(format, 'Users', headers, usersExportRows_(), 'admin-users-' + new Date().toISOString().slice(0,10), usersCache);
+}
+
+// ===========================================================================
+// APP REQUESTS — ported from the hub's former admin modal, same backend
+// actions, same behavior, just re-homed here per the consolidation goal.
+// ===========================================================================
+let adminRequestsCache = [];
+
+async function openAdminPanel(){
+  document.getElementById('adminRequestsError').textContent = '';
+  document.getElementById('adminRequestsEmpty').style.display = 'none';
+  document.getElementById('adminRequestsList').innerHTML = '<div style="font-size:12.5px; color:var(--slate); padding:20px 0;">Loading…</div>';
+  try {
+    const requests = await ADMIN_API.listAppRequests();
+    renderAdminRequests(requests);
+  } catch (err) {
+    document.getElementById('adminRequestsList').innerHTML = '';
+    document.getElementById('adminRequestsError').textContent = err.message;
+  }
+}
+function renderAdminRequests(requests){
+  adminRequestsCache = requests;
+  const listEl = document.getElementById('adminRequestsList');
+  if (!requests.length) {
+    listEl.innerHTML = '';
+    document.getElementById('adminRequestsEmpty').style.display = 'block';
+    return;
+  }
+  document.getElementById('adminRequestsEmpty').style.display = 'none';
+  listEl.innerHTML = requests.map((r, i) => {
+    const status = r.Status || 'New';
+    return '<div class="hub-request-row">' +
+      '<h4>' + escapeHtml_(r.AppName) + '</h4>' +
+      '<div class="hub-request-meta">' + escapeHtml_(r.SubmitterName) + ' (' + escapeHtml_(r.SubmitterEmail) + ') &middot; ' + escapeHtml_(dateOnlyAdm_(r.CreatedAt)) + '</div>' +
+      '<div style="font-size:12.5px;">' + escapeHtml_(r.Purpose) + '</div>' +
+      '<div class="hub-request-status-row">' +
+        '<span class="hub-status-badge" data-status="' + status + '">' + escapeHtml_(status) + '</span>' +
+        '<button class="hub-btn hub-btn-status' + (status === 'Approved' ? ' active' : '') + '" onclick="setRequestStatus(' + i + ', \'Approved\')">Approved</button>' +
+        '<button class="hub-btn hub-btn-status' + (status === 'Denied' ? ' active' : '') + '" onclick="setRequestStatus(' + i + ', \'Denied\')">Denied</button>' +
+        '<button class="hub-btn hub-btn-status' + (status === 'Done' ? ' active' : '') + '" onclick="setRequestStatus(' + i + ', \'Done\')">Done</button>' +
+      '</div>' +
+      '<div class="hub-request-actions">' +
+        '<button class="hub-btn hub-btn-primary" onclick="downloadRequestJson(' + i + ')">Download JSON</button>' +
+        '<button class="hub-btn hub-btn-secondary" onclick="copyRequestPrompt(' + i + ')">Copy Prompt</button>' +
+        '<button class="hub-btn hub-btn-secondary" onclick="emailRequestJson(' + i + ')">Email Myself JSON</button>' +
+        (APP_REQUEST_CLAUDE_ENABLED ? '<button class="hub-btn hub-btn-secondary" onclick="sendRequestToClaude(' + i + ')">Send Directly to Claude</button>' : '') +
+        '<button class="hub-btn hub-btn-secondary" style="color:var(--bad);" onclick="deleteAdminRequest(' + i + ')">Delete</button>' +
+      '</div>' +
+      '<div id="hubRequestStatus' + i + '" class="adm-success" style="display:none;"></div>' +
+      '<div id="hubClaudeReply' + i + '" style="display:none; margin-top:10px; background:var(--slate-light); border-radius:6px; padding:10px; font-size:12px; white-space:pre-wrap;"></div>' +
+    '</div>';
+  }).join('');
+}
+async function copyRequestPrompt(i){
+  const r = adminRequestsCache[i];
+  try { await navigator.clipboard.writeText(r.PromptText || ''); }
+  catch (err) { alert('Could not copy automatically — select and copy manually:\n\n' + (r.PromptText || '')); }
+}
+function downloadRequestJson(i){
+  const r = adminRequestsCache[i];
+  downloadBlob_(new Blob([JSON.stringify(r, null, 2)], { type: 'application/json' }), 'app-request-' + (r.AppName || 'request').replace(/[^a-z0-9]+/gi, '-').toLowerCase() + '.json');
+}
+async function emailRequestJson(i){
+  const r = adminRequestsCache[i];
+  const statusEl = document.getElementById('hubRequestStatus' + i);
+  statusEl.style.display = 'block'; statusEl.style.color = 'var(--good)'; statusEl.textContent = 'Sending…';
+  try { await ADMIN_API.emailAppRequestJson(r.RequestID); statusEl.textContent = 'Sent to your inbox.'; }
+  catch (err) { statusEl.style.color = 'var(--bad)'; statusEl.textContent = err.message; }
+}
+async function sendRequestToClaude(i){
+  const r = adminRequestsCache[i];
+  const replyEl = document.getElementById('hubClaudeReply' + i);
+  replyEl.style.display = 'block'; replyEl.textContent = 'Asking Claude…';
+  try { replyEl.textContent = await ADMIN_API.sendAppRequestToClaude(r.RequestID); }
+  catch (err) { replyEl.textContent = err.message; }
+}
+async function setRequestStatus(i, status){
+  const r = adminRequestsCache[i];
+  const statusEl = document.getElementById('hubRequestStatus' + i);
+  statusEl.style.display = 'block'; statusEl.style.color = 'var(--good)'; statusEl.textContent = 'Updating…';
+  try { await ADMIN_API.updateAppRequestStatus(r.RequestID, status); r.Status = status; renderAdminRequests(adminRequestsCache); }
+  catch (err) { statusEl.style.color = 'var(--bad)'; statusEl.textContent = err.message; }
+}
+async function deleteAdminRequest(i){
+  const r = adminRequestsCache[i];
+  if (!confirm('Delete the request for "' + r.AppName + '"? This cannot be undone.')) return;
+  try { await ADMIN_API.deleteAppRequest(r.RequestID); openAdminPanel(); }
+  catch (err) { document.getElementById('adminRequestsError').textContent = err.message; }
+}
+function requestsExportRows_(){
+  return adminRequestsCache.map(function(r){
+    return [r.AppName, r.SubmitterName, r.SubmitterEmail, r.Purpose, r.Status || 'New', dateOnlyAdm_(r.CreatedAt)];
+  });
+}
+function exportRequestsAs(format){
+  const headers = ['App Name','Submitter','Email','Purpose','Status','Created'];
+  exportTableGeneric_(format, 'App Requests', headers, requestsExportRows_(), 'admin-app-requests-' + new Date().toISOString().slice(0,10), adminRequestsCache);
+}
+
+// ===========================================================================
+// MYTURN LIVE VIEW — read-only render of whatever a session last synced via
+// syncMyturnSnapshot (see MYTURN.md's own standing rule). Light sectioning
+// via a client-side split on "## " headers, no markdown renderer.
+// ===========================================================================
+async function loadMyturnSnapshot(){
+  const errEl = document.getElementById('myturnError');
+  errEl.textContent = '';
+  try {
+    const data = await ADMIN_API.getMyturnSnapshot();
+    const label = document.getElementById('myturnSyncedAtLabel');
+    if (!data.content){
+      label.textContent = 'Never synced.';
+      document.getElementById('myturnContent').textContent = 'Nothing synced yet — a Claude Code session needs to call syncMyturnSnapshot after its next MYTURN.md edit.';
+      document.getElementById('myturnNav').innerHTML = '';
+      return;
+    }
+    label.textContent = 'Last synced: ' + new Date(data.syncedAt).toLocaleString();
+    document.getElementById('myturnContent').textContent = data.content;
+    renderMyturnNav_(data.content);
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+}
+function renderMyturnNav_(content){
+  const nav = document.getElementById('myturnNav');
+  const lines = content.split('\n');
+  const headings = [];
+  lines.forEach(function(line, idx){
+    const m = line.match(/^(#{1,4})\s+(.*)/);
+    if (m && m[1].length >= 2) headings.push({ text: m[2], lineIndex: idx });
+  });
+  if (!headings.length){ nav.innerHTML = '<div style="padding:8px 10px; color:var(--slate);">No sections found.</div>'; return; }
+  nav.innerHTML = headings.map(function(h, i){
+    return '<a href="#" onclick="scrollMyturnTo(' + i + '); return false;">' + escapeHtml_(h.text) + '</a>';
+  }).join('');
+  window._myturnHeadings = headings;
+  window._myturnLines = lines;
+}
+function scrollMyturnTo(i){
+  const h = window._myturnHeadings[i];
+  if (!h) return;
+  const pre = document.getElementById('myturnContent');
+  const charOffset = window._myturnLines.slice(0, h.lineIndex).join('\n').length;
+  const ratio = charOffset / pre.textContent.length;
+  pre.scrollTop = ratio * pre.scrollHeight;
+}
+
+// ===========================================================================
+// SUITE CONTROLS
+// ===========================================================================
+async function triggerBroadcastNow(){
+  const statusEl = document.getElementById('suiteBroadcastStatus');
+  statusEl.textContent = 'Sending...';
+  try {
+    await ADMIN_API.triggerBroadcast();
+    statusEl.textContent = 'Sent — open tabs will see it within a couple minutes.';
+  } catch (err) {
+    statusEl.textContent = 'Failed: ' + err.message;
+  }
+}
+
+// ===========================================================================
+window.addEventListener('DOMContentLoaded', function(){
+  initSession();
+  initFmBroadcastPoll(ADMIN_API);
+});
+</script>

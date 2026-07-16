@@ -55,6 +55,8 @@
     font-size:11px;
     cursor:pointer;
     font-family:inherit;
+    text-decoration:none;
+    display:inline-block;
   }
   .hub-admin-btn:hover{ background:rgba(255,255,255,0.22); }
   .header img{
@@ -166,20 +168,6 @@
   .hub-btn-secondary{ background:var(--slate-light); color:var(--navy); }
   .hub-error{ color:#B3261E; font-size:12px; margin-top:10px; min-height:14px; }
   .hub-success{ color:var(--good); font-size:12px; margin-top:10px; }
-  .hub-request-row{ border:1px solid var(--line); border-radius:8px; padding:14px 16px; margin-bottom:12px; }
-  .hub-request-row h4{ margin:0 0 4px 0; color:var(--navy); font-size:14px; }
-  .hub-request-meta{ font-size:11px; color:var(--slate); margin-bottom:8px; }
-  .hub-request-actions{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
-  .hub-request-status-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:8px 0; }
-  .hub-status-badge{
-    font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px;
-    padding:3px 8px; border-radius:10px; background:var(--slate-light); color:var(--slate);
-  }
-  .hub-status-badge[data-status="Approved"]{ background:rgba(47,107,79,0.14); color:var(--good); }
-  .hub-status-badge[data-status="Denied"]{ background:rgba(179,38,30,0.12); color:#B3261E; }
-  .hub-status-badge[data-status="Done"]{ background:rgba(27,42,74,0.14); color:var(--navy); }
-  .hub-btn-status{ background:#fff; border:1px solid var(--line); color:var(--slate); padding:5px 10px; font-size:11.5px; }
-  .hub-btn-status.active{ background:var(--navy); color:#fff; border-color:var(--navy); }
 </style>
 </head>
 <body>
@@ -309,19 +297,6 @@
     </div>
   </div>
 
-  <!-- ADMIN: APP REQUESTS PANEL -->
-  <div id="adminAppRequestsModalOverlay" class="hub-modal-overlay">
-    <div class="hub-modal" style="max-width:640px;">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <h3>App Requests</h3>
-        <button class="hub-btn hub-btn-secondary" onclick="closeAdminPanel()">&times; Close</button>
-      </div>
-      <div id="adminRequestsError" class="hub-error"></div>
-      <div id="adminRequestsEmpty" style="display:none; font-size:12.5px; color:var(--slate); padding:20px 0;">No requests submitted yet.</div>
-      <div id="adminRequestsList"></div>
-    </div>
-  </div>
-
   <div class="wrap">
     <div class="projects">
       <h2>Projects</h2>
@@ -350,6 +325,12 @@
         <span class="card-arrow">Open tool →</span>
       </a>
 
+      <a class="card" href="admin/">
+        <div class="card-title">Admin App</div>
+        <p class="card-desc">One place for admin tasks — manage users and permissions, review App Requests, and check the live MYTURN.md coordination log.</p>
+        <span class="card-arrow">Open tool →</span>
+      </a>
+
       <a class="card card-request" href="#" onclick="openAppWizard(); return false;">
         <div class="card-title">Request an App</div>
         <p class="card-desc">Have an idea for a new internal tool? Answer a few questions and we'll turn it into a build-ready spec.</p>
@@ -372,41 +353,16 @@
 const HUB_API = (function(){
   const core = createFmApiCore();
   return Object.assign({}, core, {
+    // App Requests admin actions (listAppRequests/deleteAppRequest/
+    // updateAppRequestStatus/emailAppRequestJson/sendAppRequestToClaude)
+    // moved to the Admin App (admin/index.html) — the hub only ever needs
+    // submitAppRequest for its own "Request an App" wizard now.
     submitAppRequest: async function(payload){
       const data = await core.call('submitAppRequest', payload);
       return data.request;
     },
-    listAppRequests: async function(){
-      const data = await core.call('listAppRequests', {});
-      return data.requests;
-    },
-    deleteAppRequest: async function(requestId){
-      const data = await core.call('deleteAppRequest', { requestId: requestId });
-      return data.deleted;
-    },
-    updateAppRequestStatus: async function(requestId, status){
-      const data = await core.call('updateAppRequestStatus', { requestId: requestId, status: status });
-      return data.status;
-    },
-    emailAppRequestJson: async function(requestId){
-      const data = await core.call('emailAppRequestJson', { requestId: requestId });
-      return data.sent;
-    },
-    // PREP FOR LATER — see APP_REQUEST_CLAUDE_ENABLED below. The backend
-    // action this calls is fully wired; only the button that calls it is
-    // gated off until Ann has Anthropic API billing set up.
-    sendAppRequestToClaude: async function(requestId){
-      const data = await core.call('sendAppRequestToClaude', { requestId: requestId });
-      return data.reply;
-    },
   });
 })();
-
-// Flip to true once Ann sets ANTHROPIC_API_KEY (Script Properties) and
-// redeploys backend/Code.gs — no other code changes needed. Until then the
-// "Send Directly to Claude" button in the admin panel stays hidden and the
-// primary options are Download JSON / Copy Prompt / Email Myself JSON.
-const APP_REQUEST_CLAUDE_ENABLED = false;
 
 // ===========================================================================
 // SESSION — unlike CCE/PAG, the hub stays fully browsable while logged out;
@@ -434,26 +390,9 @@ function renderHubAccountArea(){
   }
   let html = 'Hi, ' + escapeHtml_(hubAccount.Name) + ' &middot; <a href="#" onclick="hubLogout(); return false;">Logout</a>';
   if (hubAccount.isAdmin) {
-    html += ' <button class="hub-admin-btn" onclick="openAdminPanel()">App Requests</button>';
-    html += ' <button class="hub-admin-btn" onclick="triggerBroadcastNow()">Notify Everyone to Refresh</button>';
-    html += ' <span id="hubBroadcastStatus" style="font-size:11px; color:var(--slate); margin-left:6px;"></span>';
+    html += ' <a class="hub-admin-btn" href="admin/">Admin App →</a>';
   }
   area.innerHTML = html;
-}
-
-// Fires the second, independent "please refresh" mechanism (not tied to a
-// specific code version, unlike CCE's own version-check banner) — every
-// tool's open tabs will pick this up within a couple minutes via their own
-// poller (assets/broadcast.js).
-async function triggerBroadcastNow(){
-  const statusEl = document.getElementById('hubBroadcastStatus');
-  statusEl.textContent = 'Sending...';
-  try {
-    await HUB_API.triggerBroadcast();
-    statusEl.textContent = 'Sent — open tabs will see it within a couple minutes.';
-  } catch (err) {
-    statusEl.textContent = 'Failed: ' + err.message;
-  }
 }
 
 function hubLogout(){
@@ -615,141 +554,6 @@ async function wizSubmit(){
     document.getElementById('wizSubmitBtn').style.display = 'none';
   } catch (err) {
     errEl.textContent = err.message;
-  }
-}
-
-// ===========================================================================
-// ADMIN — APP REQUESTS PANEL
-// ===========================================================================
-let adminRequestsCache = [];
-
-async function openAdminPanel(){
-  document.getElementById('adminAppRequestsModalOverlay').classList.add('open');
-  document.getElementById('adminRequestsError').textContent = '';
-  document.getElementById('adminRequestsEmpty').style.display = 'none';
-  document.getElementById('adminRequestsList').innerHTML = '<div style="font-size:12.5px; color:var(--slate); padding:20px 0;">Loading…</div>';
-  try {
-    const requests = await HUB_API.listAppRequests();
-    renderAdminRequests(requests);
-  } catch (err) {
-    document.getElementById('adminRequestsList').innerHTML = '';
-    document.getElementById('adminRequestsError').textContent = err.message;
-  }
-}
-function closeAdminPanel(){ document.getElementById('adminAppRequestsModalOverlay').classList.remove('open'); }
-
-function renderAdminRequests(requests){
-  adminRequestsCache = requests;
-  const listEl = document.getElementById('adminRequestsList');
-  if (!requests.length) {
-    listEl.innerHTML = '';
-    document.getElementById('adminRequestsEmpty').style.display = 'block';
-    return;
-  }
-  document.getElementById('adminRequestsEmpty').style.display = 'none';
-  listEl.innerHTML = requests.map((r, i) => {
-    const status = r.Status || 'New';
-    return '<div class="hub-request-row">' +
-      '<h4>' + escapeHtml_(r.AppName) + '</h4>' +
-      '<div class="hub-request-meta">' + escapeHtml_(r.SubmitterName) + ' (' + escapeHtml_(r.SubmitterEmail) + ') &middot; ' + escapeHtml_(dateOnlyHub_(r.CreatedAt)) + '</div>' +
-      '<div style="font-size:12.5px;">' + escapeHtml_(r.Purpose) + '</div>' +
-      '<div class="hub-request-status-row">' +
-        '<span class="hub-status-badge" data-status="' + status + '">' + escapeHtml_(status) + '</span>' +
-        '<button class="hub-btn hub-btn-status' + (status === 'Approved' ? ' active' : '') + '" onclick="setRequestStatus(' + i + ', \'Approved\')">Approved</button>' +
-        '<button class="hub-btn hub-btn-status' + (status === 'Denied' ? ' active' : '') + '" onclick="setRequestStatus(' + i + ', \'Denied\')">Denied</button>' +
-        '<button class="hub-btn hub-btn-status' + (status === 'Done' ? ' active' : '') + '" onclick="setRequestStatus(' + i + ', \'Done\')">Done</button>' +
-      '</div>' +
-      '<div class="hub-request-actions">' +
-        '<button class="hub-btn hub-btn-primary" onclick="downloadRequestJson(' + i + ')">Download JSON</button>' +
-        '<button class="hub-btn hub-btn-secondary" onclick="copyRequestPrompt(' + i + ')">Copy Prompt</button>' +
-        '<button class="hub-btn hub-btn-secondary" onclick="emailRequestJson(' + i + ')">Email Myself JSON</button>' +
-        (APP_REQUEST_CLAUDE_ENABLED ? '<button class="hub-btn hub-btn-secondary" onclick="sendRequestToClaude(' + i + ')">Send Directly to Claude</button>' : '') +
-        '<button class="hub-btn hub-btn-secondary" style="color:#B3261E;" onclick="deleteAdminRequest(' + i + ')">Delete</button>' +
-      '</div>' +
-      '<div id="hubRequestStatus' + i + '" class="hub-success" style="display:none;"></div>' +
-      '<div id="hubClaudeReply' + i + '" style="display:none; margin-top:10px; background:var(--slate-light); border-radius:6px; padding:10px; font-size:12px; white-space:pre-wrap;"></div>' +
-    '</div>';
-  }).join('');
-}
-function dateOnlyHub_(value){
-  if (!value) return '';
-  const d = new Date(value);
-  return isNaN(d.getTime()) ? String(value) : d.toISOString().slice(0,10);
-}
-async function copyRequestPrompt(i){
-  const r = adminRequestsCache[i];
-  try {
-    await navigator.clipboard.writeText(r.PromptText || '');
-  } catch (err) {
-    alert('Could not copy automatically — select and copy manually:\n\n' + (r.PromptText || ''));
-  }
-}
-function downloadRequestJson(i){
-  const r = adminRequestsCache[i];
-  const blob = new Blob([JSON.stringify(r, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'app-request-' + (r.AppName || 'request').replace(/[^a-z0-9]+/gi, '-').toLowerCase() + '.json';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-async function emailRequestJson(i){
-  const r = adminRequestsCache[i];
-  const statusEl = document.getElementById('hubRequestStatus' + i);
-  statusEl.style.display = 'block';
-  statusEl.style.color = 'var(--good)';
-  statusEl.textContent = 'Sending…';
-  try {
-    await HUB_API.emailAppRequestJson(r.RequestID);
-    statusEl.textContent = 'Sent to your inbox.';
-  } catch (err) {
-    statusEl.style.color = '#B3261E';
-    statusEl.textContent = err.message;
-  }
-}
-
-// PREP FOR LATER — only reachable when APP_REQUEST_CLAUDE_ENABLED is true
-// (the button that calls this isn't rendered otherwise).
-async function sendRequestToClaude(i){
-  const r = adminRequestsCache[i];
-  const replyEl = document.getElementById('hubClaudeReply' + i);
-  replyEl.style.display = 'block';
-  replyEl.textContent = 'Asking Claude…';
-  try {
-    const reply = await HUB_API.sendAppRequestToClaude(r.RequestID);
-    replyEl.textContent = reply;
-  } catch (err) {
-    replyEl.textContent = err.message;
-  }
-}
-
-async function setRequestStatus(i, status){
-  const r = adminRequestsCache[i];
-  const statusEl = document.getElementById('hubRequestStatus' + i);
-  statusEl.style.display = 'block';
-  statusEl.style.color = 'var(--good)';
-  statusEl.textContent = 'Updating…';
-  try {
-    await HUB_API.updateAppRequestStatus(r.RequestID, status);
-    r.Status = status;
-    renderAdminRequests(adminRequestsCache);
-  } catch (err) {
-    statusEl.style.color = '#B3261E';
-    statusEl.textContent = err.message;
-  }
-}
-
-async function deleteAdminRequest(i){
-  const r = adminRequestsCache[i];
-  if (!confirm('Delete the request for "' + r.AppName + '"? This cannot be undone.')) return;
-  try {
-    await HUB_API.deleteAppRequest(r.RequestID);
-    openAdminPanel();
-  } catch (err) {
-    document.getElementById('adminRequestsError').textContent = err.message;
   }
 }
 
