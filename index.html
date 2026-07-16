@@ -170,6 +170,16 @@
   .hub-request-row h4{ margin:0 0 4px 0; color:var(--navy); font-size:14px; }
   .hub-request-meta{ font-size:11px; color:var(--slate); margin-bottom:8px; }
   .hub-request-actions{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .hub-request-status-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:8px 0; }
+  .hub-status-badge{
+    font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px;
+    padding:3px 8px; border-radius:10px; background:var(--slate-light); color:var(--slate);
+  }
+  .hub-status-badge[data-status="Approved"]{ background:rgba(47,107,79,0.14); color:var(--good); }
+  .hub-status-badge[data-status="Denied"]{ background:rgba(179,38,30,0.12); color:#B3261E; }
+  .hub-status-badge[data-status="Done"]{ background:rgba(27,42,74,0.14); color:var(--navy); }
+  .hub-btn-status{ background:#fff; border:1px solid var(--line); color:var(--slate); padding:5px 10px; font-size:11.5px; }
+  .hub-btn-status.active{ background:var(--navy); color:#fff; border-color:var(--navy); }
 </style>
 </head>
 <body>
@@ -373,6 +383,10 @@ const HUB_API = (function(){
     deleteAppRequest: async function(requestId){
       const data = await core.call('deleteAppRequest', { requestId: requestId });
       return data.deleted;
+    },
+    updateAppRequestStatus: async function(requestId, status){
+      const data = await core.call('updateAppRequestStatus', { requestId: requestId, status: status });
+      return data.status;
     },
     emailAppRequestJson: async function(requestId){
       const data = await core.call('emailAppRequestJson', { requestId: requestId });
@@ -633,11 +647,18 @@ function renderAdminRequests(requests){
     return;
   }
   document.getElementById('adminRequestsEmpty').style.display = 'none';
-  listEl.innerHTML = requests.map((r, i) =>
-    '<div class="hub-request-row">' +
+  listEl.innerHTML = requests.map((r, i) => {
+    const status = r.Status || 'New';
+    return '<div class="hub-request-row">' +
       '<h4>' + escapeHtml_(r.AppName) + '</h4>' +
       '<div class="hub-request-meta">' + escapeHtml_(r.SubmitterName) + ' (' + escapeHtml_(r.SubmitterEmail) + ') &middot; ' + escapeHtml_(dateOnlyHub_(r.CreatedAt)) + '</div>' +
       '<div style="font-size:12.5px;">' + escapeHtml_(r.Purpose) + '</div>' +
+      '<div class="hub-request-status-row">' +
+        '<span class="hub-status-badge" data-status="' + status + '">' + escapeHtml_(status) + '</span>' +
+        '<button class="hub-btn hub-btn-status' + (status === 'Approved' ? ' active' : '') + '" onclick="setRequestStatus(' + i + ', \'Approved\')">Approved</button>' +
+        '<button class="hub-btn hub-btn-status' + (status === 'Denied' ? ' active' : '') + '" onclick="setRequestStatus(' + i + ', \'Denied\')">Denied</button>' +
+        '<button class="hub-btn hub-btn-status' + (status === 'Done' ? ' active' : '') + '" onclick="setRequestStatus(' + i + ', \'Done\')">Done</button>' +
+      '</div>' +
       '<div class="hub-request-actions">' +
         '<button class="hub-btn hub-btn-primary" onclick="downloadRequestJson(' + i + ')">Download JSON</button>' +
         '<button class="hub-btn hub-btn-secondary" onclick="copyRequestPrompt(' + i + ')">Copy Prompt</button>' +
@@ -647,8 +668,8 @@ function renderAdminRequests(requests){
       '</div>' +
       '<div id="hubRequestStatus' + i + '" class="hub-success" style="display:none;"></div>' +
       '<div id="hubClaudeReply' + i + '" style="display:none; margin-top:10px; background:var(--slate-light); border-radius:6px; padding:10px; font-size:12px; white-space:pre-wrap;"></div>' +
-    '</div>'
-  ).join('');
+    '</div>';
+  }).join('');
 }
 function dateOnlyHub_(value){
   if (!value) return '';
@@ -702,6 +723,22 @@ async function sendRequestToClaude(i){
     replyEl.textContent = reply;
   } catch (err) {
     replyEl.textContent = err.message;
+  }
+}
+
+async function setRequestStatus(i, status){
+  const r = adminRequestsCache[i];
+  const statusEl = document.getElementById('hubRequestStatus' + i);
+  statusEl.style.display = 'block';
+  statusEl.style.color = 'var(--good)';
+  statusEl.textContent = 'Updating…';
+  try {
+    await HUB_API.updateAppRequestStatus(r.RequestID, status);
+    r.Status = status;
+    renderAdminRequests(adminRequestsCache);
+  } catch (err) {
+    statusEl.style.color = '#B3261E';
+    statusEl.textContent = err.message;
   }
 }
 
