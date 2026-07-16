@@ -1396,8 +1396,8 @@
           </div>
           <div class="field-row"><label>Total Loan Amount <span class="calc-badge">Auto</span></label><span class="summary-value" data-fld="out_totalLoan"></span></div>
           <div class="field-row">
-            <label>Discount Points <span class="manual-badge">Manual</span> <span class="hint">+/- number of points. 1 point = 1% of Base Loan Amount, added to Cash to Close. Negative = lender credit, deducts from Cash to Close. <span data-fld="pointsHint"></span></span></label>
-            <input type="number" step="0.01" data-fld="ratePoints" value="0" oninput="calc(this.closest('.loan-block'))">
+            <label>Discount Points <span class="manual-badge">Manual</span> <span class="hint">+/- number of points (decimals OK). 1 point = 1% of Base Loan Amount, added to Cash to Close. Negative = lender credit, deducts from Cash to Close. Editing this or Points ($) in Lender Fees updates the other. <span data-fld="pointsHint"></span></span></label>
+            <input type="number" step="0.01" data-fld="ratePoints" value="0" oninput="onPointsEdit(this, 'pct')">
           </div>
         </div>
       </div>
@@ -1452,7 +1452,7 @@
           <div class="field-row"><label>Processing</label><input type="text" inputmode="decimal" data-fld="f_processing" value="0" oninput="calc(this.closest('.loan-block'))"></div>
           <div class="field-row"><label>Underwriting</label><input type="text" inputmode="decimal" data-fld="f_underwriting" value="0" oninput="calc(this.closest('.loan-block'))"></div>
           <div class="field-row"><label>Commitment</label><input type="text" inputmode="decimal" data-fld="f_commitment" value="995" oninput="calc(this.closest('.loan-block'))"></div>
-          <div class="field-row"><label>Points ($) <span class="calc-badge">Auto</span></label><input type="text" inputmode="decimal" data-fld="f_points" value="0" disabled></div>
+          <div class="field-row"><label>Points ($) <span class="manual-badge">Manual</span> <span class="hint">Editing this updates Discount Points above (decimals OK)</span></label><input type="text" inputmode="decimal" data-fld="f_points" value="0" oninput="onPointsEdit(this, 'dollar')"></div>
           <div data-fld="customFieldsList_g2"></div>
         </div>
       </div>
@@ -1473,6 +1473,14 @@
       <div class="panel" data-nav="titleGovFees">
         <div class="panel-head"><span>Title &amp; Government Fees</span><span style="display:flex; align-items:center; gap:6px;"><span class="tag" data-fld="g3total"></span><button type="button" class="export-btn" style="padding:2px 8px; font-size:10px;" onclick="openAddCustomFieldModal(this.closest('.loan-block'), 'g3')">+ Field</button></span></div>
         <div class="panel-body">
+          <div class="field-row">
+            <label>Discount Points <span class="hint">Synced with Loan Basics (decimals OK)</span></label>
+            <input type="number" step="0.01" data-fld="ratePoints_title" value="0" oninput="onPointsEdit(this, 'pct')">
+          </div>
+          <div class="field-row">
+            <label>Point Fee ($) <span class="hint">Synced with Points ($) in Lender Fees</span></label>
+            <input type="text" inputmode="decimal" data-fld="f_points_title" value="0" oninput="onPointsEdit(this, 'dollar')">
+          </div>
           <div class="dev-banner-inline">Please check Title &amp; Government Fees, as this is in early development.</div>
           <div class="field-row" style="justify-content:flex-start; gap:10px; flex-wrap:wrap;">
             <label class="radio-opt" style="font-size:12px; font-weight:700; color:var(--navy);"><input type="checkbox" data-fld="chk_govauto" checked onchange="onGovAutoChange(this.closest('.loan-block'))"> Auto-calculate government fees &amp; title insurance</label>
@@ -3529,6 +3537,20 @@ function onProgramChange(container){
   calc(container);
 }
 
+// Discount Points (%, in Loan Basics + mirrored in Title & Gov Fees) and
+// Points ($, in Lender Fees + mirrored in Title & Gov Fees) are two views of
+// the same value — editing either recomputes the other. `kind` says which
+// side was just typed into ('pct' or 'dollar'); container.dataset.pointsMode
+// records that so calc() knows which field is the source of truth this pass,
+// and dataset.pointsActiveFld is the exact input so calc() doesn't overwrite
+// it mid-keystroke (same "don't fight active typing" pattern as down payment).
+function onPointsEdit(el, kind){
+  const container = el.closest('.loan-block');
+  container.dataset.pointsMode = kind;
+  container.dataset.pointsActiveFld = el.dataset.fld;
+  calc(container);
+}
+
 // Format: "Loan Estimate - {Loan Type}", plus down payment % for Conventional
 // only. Called from calc() so it always reflects the current state, and
 // updates both the top and bottom ribbons for this block.
@@ -3724,7 +3746,6 @@ function calc(container){
   const term = parseFloat(E(container,'term').value) || 30;
   const rate = (parseFloat(E(container,'rate').value) || 0) / 100;
   const program = E(container,'loanProgram').value;
-  const pointsPct = parseFloat(E(container,'ratePoints').value) || 0;
 
   // Upfront MIP (FHA/USDA/VA financed fee) and MI (their monthly equivalent)
   // apply to these three programs only; Conventional uses PMI instead
@@ -3763,12 +3784,33 @@ function calc(container){
   // Discount Points: a dollar cost/credit toward Cash to Close, NOT a deduction
   // from the loan amount. 1 point = 1% of the Base Loan Amount. Positive points
   // cost the borrower (added to Cash to Close via Lender Fees below); negative
-  // points are a lender credit (reduces Cash to Close).
-  const pointsCost = loanAmt * (pointsPct/100);
-  E(container,'f_points').value = pointsCost.toFixed(2);
+  // points are a lender credit (reduces Cash to Close). Editable from either
+  // side (Discount Points % or Points $), each mirrored in Title & Gov Fees —
+  // whichever was just typed into (dataset.pointsMode/pointsActiveFld, set by
+  // onPointsEdit) is the source of truth this pass; the other three fields
+  // recompute from it. Points can be fractional either way (e.g. 1.375 pt or
+  // a $ amount that doesn't land on a round point count).
+  const pointsMode = container.dataset.pointsMode || 'pct';
+  const activeFld = container.dataset.pointsActiveFld || 'ratePoints';
+  let pointsPct, pointsCost;
+  if (pointsMode === 'dollar'){
+    const dollarSrc = (activeFld === 'f_points_title') ? 'f_points_title' : 'f_points';
+    pointsCost = numVal(container, dollarSrc);
+    pointsPct = loanAmt ? (pointsCost / loanAmt) * 100 : 0;
+  } else {
+    const pctSrc = (activeFld === 'ratePoints_title') ? 'ratePoints_title' : 'ratePoints';
+    pointsPct = parseFloat(E(container, pctSrc).value) || 0;
+    pointsCost = loanAmt * (pointsPct / 100);
+  }
+  const pointsPctRounded = Math.round(pointsPct * 10000) / 10000;
+  const pointsCostFixed = pointsCost.toFixed(2);
+  if (activeFld !== 'ratePoints') E(container,'ratePoints').value = pointsPctRounded;
+  if (activeFld !== 'ratePoints_title') E(container,'ratePoints_title').value = pointsPctRounded;
+  if (activeFld !== 'f_points') E(container,'f_points').value = pointsCostFixed;
+  if (activeFld !== 'f_points_title') E(container,'f_points_title').value = pointsCostFixed;
   const pointsCostFmt = pointsCost >= 0 ? ('+' + fmt(pointsCost)) : ('-' + fmt(Math.abs(pointsCost)));
-  E(container,'pointsHint').textContent = pointsPct
-    ? ('(' + pointsPct + ' pt = ' + pointsCostFmt + (pointsCost >= 0 ? ' to' : ' credit to') + ' Cash to Close)')
+  E(container,'pointsHint').textContent = pointsPctRounded
+    ? ('(' + pointsPctRounded + ' pt = ' + pointsCostFmt + (pointsCost >= 0 ? ' to' : ' credit to') + ' Cash to Close)')
     : '';
 
   const sellerConcession = numVal(container,'sellerConcession');
@@ -5101,7 +5143,7 @@ const LAST_UPDATED = 'July 8, 2026'; // bump this whenever rate tables/defaults 
 // (and cce_version.json alongside this file on GitHub Pages) whenever a
 // deploy is ready for users to be notified about; skip the bump for
 // quiet/WIP pushes you don't want to nag anyone with.
-const CCE_VERSION = '0.23.0';
+const CCE_VERSION = '0.24.0';
 const CCE_VERSION_CHECK_URL = 'cce_version.json';
 const CCE_VERSION_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
