@@ -851,6 +851,30 @@
     margin-top:-4px;
     font-style:italic;
   }
+
+  /* MODAL POP ANIMATION — shared across every FM Home Loans tool (CCE, PAG,
+     Social, GT, hub), same values everywhere by design. Pure CSS: relies on
+     @starting-style + transition-behavior:allow-discrete so display:none can
+     itself be animated (no JS timing hacks needed). Degrades silently to the
+     old instant show/hide on any browser that doesn't support those two
+     features — nothing breaks, it just won't animate. */
+  .cce-modal-overlay{
+    display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55);
+    z-index:1000; align-items:center; justify-content:center; padding:20px;
+    opacity:0;
+    transition:opacity .22s cubic-bezier(.16,1,.3,1), display .22s allow-discrete;
+  }
+  .cce-modal-overlay.open{ display:flex; opacity:1; }
+  @starting-style{ .cce-modal-overlay.open{ opacity:0; } }
+  .cce-modal-overlay > div{
+    opacity:1; transform:scale(1) translateY(0);
+    transition:opacity .24s cubic-bezier(.16,1,.3,1), transform .24s cubic-bezier(.16,1,.3,1);
+  }
+  .cce-modal-overlay:not(.open) > div{ opacity:0; transform:scale(.94) translateY(10px); }
+  @starting-style{ .cce-modal-overlay.open > div{ opacity:0; transform:scale(.94) translateY(10px); } }
+  @media (prefers-reduced-motion:reduce){
+    .cce-modal-overlay, .cce-modal-overlay > div{ transition:none !important; }
+  }
 </style>
 
 <div id="ccUpdateBanner">
@@ -981,7 +1005,7 @@
   <!-- DELETE SAVED CLIENT MODAL (from the preview — the record is already
        saved, so this is a plain permanent-delete confirmation, no draft
        escape hatch needed the way the toolbar's Delete This Client has). -->
-  <div id="deleteSavedClientModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:1500; align-items:center; justify-content:center; padding:20px;">
+  <div id="deleteSavedClientModalOverlay" class="cce-modal-overlay" style="z-index:1500;">
     <div style="background:#fff; border-radius:10px; max-width:400px; width:100%; padding:24px; font-family:Calibri, Arial, sans-serif;">
       <h3 style="margin-top:0; color:var(--navy);">Delete Saved Client</h3>
       <p style="font-size:13px; color:var(--slate); line-height:1.5;">This permanently removes this client from everyone's saved clients — this can't be undone.</p>
@@ -1098,7 +1122,7 @@
 
 
       <!-- UPDATE INFORMATION MODAL -->
-      <div id="updateModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+      <div id="updateModalOverlay" class="cce-modal-overlay">
         <div style="background:#fff; border-radius:10px; max-width:640px; width:100%; max-height:88vh; overflow-y:auto; padding:24px; font-family:Calibri, Arial, sans-serif;">
 
           <div id="update_step_password">
@@ -1186,7 +1210,7 @@
            browser. Any-number-of-rows, chooseable axes (LTV band / Credit
            Score band / Loan Type), plus a Talk-and-Fill-style Use-Claude
            prompt/paste bridge for filling it in from a real rate sheet. -->
-      <div id="pmiTableModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+      <div id="pmiTableModalOverlay" class="cce-modal-overlay">
         <div style="background:#fff; border-radius:10px; max-width:720px; width:100%; max-height:88vh; overflow-y:auto; padding:24px; font-family:Calibri, Arial, sans-serif;">
 
           <div id="pmi_step_password">
@@ -1259,7 +1283,7 @@
       </div>
 
       <!-- XLSX DOWN-PAYMENT-MODE MODAL -->
-      <div id="xlsxModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+      <div id="xlsxModalOverlay" class="cce-modal-overlay">
         <div style="background:#fff; border-radius:10px; max-width:480px; width:100%; padding:24px; font-family:Calibri, Arial, sans-serif;">
           <h3 style="margin-top:0; color:var(--navy);">One quick thing before exporting</h3>
           <p id="xlsxModalWhichEstimate" style="font-size:12px; color:#8A6A1F; font-weight:700; display:none;"></p>
@@ -1281,7 +1305,7 @@
            direction, which Total it should hit, then Save Permanently
            (included when the client is saved) or Add Temporarily (this
            page/session only, not persisted on Save). -->
-      <div id="cfModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:1050; align-items:center; justify-content:center; padding:20px;">
+      <div id="cfModalOverlay" class="cce-modal-overlay" style="z-index:1050;">
         <div style="background:#fff; border-radius:10px; max-width:440px; width:100%; padding:24px; font-family:Calibri, Arial, sans-serif; max-height:88vh; overflow-y:auto;">
           <h3 id="cfModalTitle" style="margin-top:0; color:var(--navy);">Add Field</h3>
 
@@ -1322,7 +1346,7 @@
       </div>
 
       <!-- LOAN TYPE MODAL (replaces native prompt() for Add Loan Estimate) -->
-      <div id="loanTypeModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+      <div id="loanTypeModalOverlay" class="cce-modal-overlay">
         <div style="background:#fff; border-radius:10px; max-width:440px; width:100%; padding:24px; font-family:Calibri, Arial, sans-serif;">
           <h3 style="margin-top:0; color:var(--navy);">Add Loan Estimate</h3>
           <p style="font-size:13px; color:var(--slate); line-height:1.5;">What type of loan is this?</p>
@@ -1345,7 +1369,7 @@
       <!-- TALK AND FILL MODAL (Update 4.0) — one overlay, three steps shown/
            hidden via tafShowStep(): pick a target, capture voice/text, then
            review the extracted fields before anything is actually applied. -->
-      <div id="tafModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:1100; align-items:center; justify-content:center; padding:20px;">
+      <div id="tafModalOverlay" class="cce-modal-overlay" style="z-index:1100;">
         <div style="background:#fff; border-radius:10px; max-width:520px; width:100%; padding:24px; font-family:Calibri, Arial, sans-serif; max-height:88vh; overflow-y:auto;">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <h3 style="margin:0; color:var(--navy);">Talk and Fill</h3>
@@ -1416,7 +1440,7 @@
       </div>
 
       <!-- REMOVE LOAN BLOCK MODAL (replaces native confirm()) -->
-      <div id="removeBlockModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+      <div id="removeBlockModalOverlay" class="cce-modal-overlay">
         <div style="background:#fff; border-radius:10px; max-width:400px; width:100%; padding:24px; font-family:Calibri, Arial, sans-serif;">
           <h3 style="margin-top:0; color:var(--navy);">Remove Loan Estimate</h3>
           <p style="font-size:13px; color:var(--slate); line-height:1.5;">This will permanently remove this loan estimate from the page. This can't be undone.</p>
@@ -1428,7 +1452,7 @@
       </div>
 
       <!-- EXPORT-NO-DATA MODAL (replaces native alert()) -->
-      <div id="exportNoDataModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+      <div id="exportNoDataModalOverlay" class="cce-modal-overlay">
         <div style="background:#fff; border-radius:10px; max-width:380px; width:100%; padding:24px; font-family:Calibri, Arial, sans-serif;">
           <h3 style="margin-top:0; color:var(--navy);">Nothing to Export</h3>
           <p id="exportNoDataMessage" style="font-size:13px; color:var(--slate); line-height:1.5;"></p>
@@ -1439,7 +1463,7 @@
       </div>
 
       <!-- DELETE THIS CLIENT MODAL -->
-      <div id="deleteClientModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+      <div id="deleteClientModalOverlay" class="cce-modal-overlay">
         <div style="background:#fff; border-radius:10px; max-width:420px; width:100%; padding:24px; font-family:Calibri, Arial, sans-serif;">
           <h3 style="margin-top:0; color:var(--navy);">Delete This Client</h3>
           <p style="font-size:13px; color:var(--slate); line-height:1.5;">Permanently deleting removes this client from everyone's saved clients — this can't be undone. If you're not done yet, save it and start a new client instead so it's not lost.</p>
@@ -1455,7 +1479,7 @@
       </div>
 
       <!-- LOAD INTO CALCULATOR CONFIRM MODAL -->
-      <div id="loadConfirmModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+      <div id="loadConfirmModalOverlay" class="cce-modal-overlay">
         <div style="background:#fff; border-radius:10px; max-width:420px; width:100%; padding:24px; font-family:Calibri, Arial, sans-serif;">
           <h3 style="margin-top:0; color:var(--navy);">Replace Current Page</h3>
           <p style="font-size:13px; color:var(--slate); line-height:1.5;">Loading this client will replace everything currently on this page — this can't be undone. If you're not done with what's here, save it first so it's not lost.</p>
@@ -1471,7 +1495,7 @@
       </div>
 
       <!-- EXPORT: SELECT WHICH LOANS MODAL -->
-      <div id="exportSelectModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+      <div id="exportSelectModalOverlay" class="cce-modal-overlay">
         <div style="background:#fff; border-radius:10px; max-width:440px; width:100%; padding:24px; font-family:Calibri, Arial, sans-serif;">
           <h3 style="margin-top:0; color:var(--navy);" id="exportSelectTitle">Select Loan Estimates to Export</h3>
           <p style="font-size:12px; color:var(--slate);" id="exportSelectHint">Choose which loan estimates to include, then pick a format.</p>
@@ -1484,7 +1508,7 @@
       </div>
 
       <!-- EXPORT: PICK FORMAT MODAL (2nd step, after loans are selected) -->
-      <div id="exportFormatModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+      <div id="exportFormatModalOverlay" class="cce-modal-overlay">
         <div style="background:#fff; border-radius:10px; max-width:400px; width:100%; padding:24px; font-family:Calibri, Arial, sans-serif;">
           <h3 style="margin-top:0; color:var(--navy);">Choose a Format</h3>
           <p style="font-size:12px; color:var(--slate);" id="exportFormatHint"></p>
@@ -1500,7 +1524,7 @@
       </div>
 
       <!-- EXPORT: PREVIEW MODAL -->
-      <div id="exportPreviewModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.65); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+      <div id="exportPreviewModalOverlay" class="cce-modal-overlay" style="background:rgba(16,27,51,0.65);">
         <div style="background:#fff; border-radius:10px; max-width:900px; width:100%; max-height:92vh; display:flex; flex-direction:column; font-family:Calibri, Arial, sans-serif; overflow:hidden;">
           <div style="padding:16px 20px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center;">
             <h3 style="margin:0; color:var(--navy);" id="exportPreviewTitle">Preview</h3>
@@ -1518,7 +1542,7 @@
       </div>
 
       <!-- EXPORT DISCREPANCIES MODAL -->
-      <div id="discrepancyModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+      <div id="discrepancyModalOverlay" class="cce-modal-overlay">
         <div style="background:#fff; border-radius:10px; max-width:560px; width:100%; max-height:90vh; overflow-y:auto; padding:24px; font-family:Calibri, Arial, sans-serif;">
           <h3 style="margin-top:0; color:var(--navy);">Export Discrepancies</h3>
           <p style="font-size:12px; color:var(--slate); line-height:1.5;">Compares the auto-calculated numbers (from right before you turned Auto-Calculate off) against whatever you've entered manually — for the developer to investigate.</p>
@@ -1607,7 +1631,7 @@
 </script>
 
 <!-- REQUEST LOGIN MODAL -->
-<div id="requestLoginModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:2001; align-items:center; justify-content:center; padding:20px;">
+<div id="requestLoginModalOverlay" class="cce-modal-overlay" style="z-index:2001;">
   <div style="background:#fff; border-radius:10px; max-width:420px; width:100%; padding:24px; font-family:Calibri, Arial, sans-serif;">
     <h3 style="margin-top:0; color:var(--navy);">Request Login</h3>
     <p style="font-size:12.5px; color:var(--slate); line-height:1.5;">Choose your name, email, and a password. This sends a request for approval — you won't be able to log in until it's approved.</p>
@@ -2069,10 +2093,10 @@ function openRequestLoginModal(){
   ['reqLoginName','reqLoginEmail','reqLoginPassword','reqLoginPasswordConfirm'].forEach(id => { document.getElementById(id).value = ''; });
   document.getElementById('reqLoginError').textContent = '';
   document.getElementById('reqLoginSuccess').style.display = 'none';
-  document.getElementById('requestLoginModalOverlay').style.display = 'flex';
+  document.getElementById('requestLoginModalOverlay').classList.add('open');
 }
 function closeRequestLoginModal(){
-  document.getElementById('requestLoginModalOverlay').style.display = 'none';
+  document.getElementById('requestLoginModalOverlay').classList.remove('open');
 }
 async function attemptRequestLogin(){
   const name = document.getElementById('reqLoginName').value.trim();
@@ -2343,16 +2367,16 @@ async function exportSavedClient(kind){
     _xlsxChosenPairs = [];
     _xlsxPendingTempContainer = tempContainer;
     document.getElementById('xlsxModalWhichEstimate').style.display = 'none';
-    document.getElementById('xlsxModalOverlay').style.display = 'flex';
+    document.getElementById('xlsxModalOverlay').classList.add('open');
   }
 }
 
 function openDeleteSavedClientModal(){
   document.getElementById('deleteSavedClientError').textContent = '';
-  document.getElementById('deleteSavedClientModalOverlay').style.display = 'flex';
+  document.getElementById('deleteSavedClientModalOverlay').classList.add('open');
 }
 function closeDeleteSavedClientModal(){
-  document.getElementById('deleteSavedClientModalOverlay').style.display = 'none';
+  document.getElementById('deleteSavedClientModalOverlay').classList.remove('open');
 }
 async function confirmDeleteSavedClient(){
   if (!selectedClient) return;
@@ -2378,7 +2402,7 @@ function loadSelectedIntoCalculator(){
   if (getAllLoanBlocks().length){
     _pendingLoadRecord = selectedClient;
     document.getElementById('loadConfirmError').textContent = '';
-    document.getElementById('loadConfirmModalOverlay').style.display = 'flex';
+    document.getElementById('loadConfirmModalOverlay').classList.add('open');
   } else {
     applyLoadRecord(selectedClient);
   }
@@ -2391,7 +2415,7 @@ function applyLoadRecord(record){
 }
 
 function closeLoadConfirmModal(){
-  document.getElementById('loadConfirmModalOverlay').style.display = 'none';
+  document.getElementById('loadConfirmModalOverlay').classList.remove('open');
   _pendingLoadRecord = null;
 }
 
@@ -2400,7 +2424,7 @@ function closeLoadConfirmModal(){
 // without saving) and loads the new one.
 function discardAndLoad(){
   const record = _pendingLoadRecord;
-  document.getElementById('loadConfirmModalOverlay').style.display = 'none';
+  document.getElementById('loadConfirmModalOverlay').classList.remove('open');
   _pendingLoadRecord = null;
   if (record) applyLoadRecord(record);
 }
@@ -2417,7 +2441,7 @@ async function saveAndLoad(){
     return;
   }
   const record = _pendingLoadRecord;
-  document.getElementById('loadConfirmModalOverlay').style.display = 'none';
+  document.getElementById('loadConfirmModalOverlay').classList.remove('open');
   _pendingLoadRecord = null;
   if (record) applyLoadRecord(record);
 }
@@ -3579,7 +3603,7 @@ let _updateConfirmedThisSession = false;
 let _pendingRateUpdate = null;
 
 function openUpdateModal(){
-  document.getElementById('updateModalOverlay').style.display = 'flex';
+  document.getElementById('updateModalOverlay').classList.add('open');
   ['update_step_password','update_step_choice','update_step_needPrompt','update_step_havePrompt','update_step_diff','update_step_done']
     .forEach(id => document.getElementById(id).style.display = 'none');
   document.getElementById('updateAdminPassword').value = '';
@@ -3591,7 +3615,7 @@ function openUpdateModal(){
   }
 }
 function closeUpdateModal(){
-  document.getElementById('updateModalOverlay').style.display = 'none';
+  document.getElementById('updateModalOverlay').classList.remove('open');
 }
 async function verifyUpdatePassword(){
   const password = document.getElementById('updateAdminPassword').value;
@@ -3762,7 +3786,7 @@ let _pmiTable = { axes: [], rows: [] };
 let _pmiAdminPassword = null; // held in memory only (like _updateConfirmedThisSession, never persisted) so Save doesn't re-prompt
 
 function openPmiTableModal(){
-  document.getElementById('pmiTableModalOverlay').style.display = 'flex';
+  document.getElementById('pmiTableModalOverlay').classList.add('open');
   document.getElementById('pmiAdminPasswordInput').value = '';
   document.getElementById('pmiAdminPasswordError').textContent = '';
   if (_pmiAdminPassword){
@@ -3772,7 +3796,7 @@ function openPmiTableModal(){
   }
 }
 function closePmiTableModal(){
-  document.getElementById('pmiTableModalOverlay').style.display = 'none';
+  document.getElementById('pmiTableModalOverlay').classList.remove('open');
 }
 function showPmiStep(step){
   ['password','editor','claudePrompt','claudeReply'].forEach(s => {
@@ -4110,10 +4134,10 @@ function openAddCustomFieldModal(container, group){
   document.getElementById('cfTargetOwnOption').textContent = "This group's Total (" + groupLabel + ')';
   document.getElementById('cfTargetTotal').value = 'own';
   cfOnDirectionChange();
-  document.getElementById('cfModalOverlay').style.display = 'flex';
+  document.getElementById('cfModalOverlay').classList.add('open');
 }
 function closeAddCustomFieldModal(){
-  document.getElementById('cfModalOverlay').style.display = 'none';
+  document.getElementById('cfModalOverlay').classList.remove('open');
   cfModalTarget = null;
 }
 function cfOnDirectionChange(){
@@ -4790,7 +4814,7 @@ function openStewartRateCalculator(container){
 }
 
 function closeXlsxModal(){
-  document.getElementById('xlsxModalOverlay').style.display = 'none';
+  document.getElementById('xlsxModalOverlay').classList.remove('open');
   _xlsxPendingQueue = [];
   _xlsxChosenPairs = [];
   // Cancelling out of the down-payment-mode step while exporting a saved
@@ -5719,10 +5743,10 @@ function initLoanBlock(container){
 
 function openLoanTypeModal(){
   document.getElementById('customLoanTypeInput').value = '';
-  document.getElementById('loanTypeModalOverlay').style.display = 'flex';
+  document.getElementById('loanTypeModalOverlay').classList.add('open');
 }
 function closeLoanTypeModal(){
-  document.getElementById('loanTypeModalOverlay').style.display = 'none';
+  document.getElementById('loanTypeModalOverlay').classList.remove('open');
 }
 function selectLoanType(type){
   closeLoanTypeModal();
@@ -5911,12 +5935,12 @@ function tafOpen(){
   document.getElementById('tafTextInput').value = '';
   document.getElementById('tafCaptureStatus').textContent = '';
   tafRenderTargetList();
-  document.getElementById('tafModalOverlay').style.display = 'flex';
+  document.getElementById('tafModalOverlay').classList.add('open');
   tafShowStep('target');
 }
 function tafClose(){
   if (tafListening && tafRecognition) tafRecognition.stop();
-  document.getElementById('tafModalOverlay').style.display = 'none';
+  document.getElementById('tafModalOverlay').classList.remove('open');
 }
 function tafShowStep(step){
   document.getElementById('tafStepTarget').style.display = step === 'target' ? '' : 'none';
@@ -6369,10 +6393,10 @@ async function newClient(){
 
 function openDeleteClientModal(){
   document.getElementById('deleteClientError').textContent = '';
-  document.getElementById('deleteClientModalOverlay').style.display = 'flex';
+  document.getElementById('deleteClientModalOverlay').classList.add('open');
 }
 function closeDeleteClientModal(){
-  document.getElementById('deleteClientModalOverlay').style.display = 'none';
+  document.getElementById('deleteClientModalOverlay').classList.remove('open');
 }
 
 async function saveAndStartNewFromDeleteModal(){
@@ -6403,10 +6427,10 @@ async function confirmPermanentDelete(){
 let _pendingRemoveBlock = null;
 function removeLoanBlock(btn){
   _pendingRemoveBlock = btn.closest('.loan-block');
-  document.getElementById('removeBlockModalOverlay').style.display = 'flex';
+  document.getElementById('removeBlockModalOverlay').classList.add('open');
 }
 function closeRemoveBlockModal(){
-  document.getElementById('removeBlockModalOverlay').style.display = 'none';
+  document.getElementById('removeBlockModalOverlay').classList.remove('open');
   _pendingRemoveBlock = null;
 }
 function confirmRemoveBlock(){
@@ -6416,10 +6440,10 @@ function confirmRemoveBlock(){
 
 function openExportNoDataModal(message){
   document.getElementById('exportNoDataMessage').textContent = message;
-  document.getElementById('exportNoDataModalOverlay').style.display = 'flex';
+  document.getElementById('exportNoDataModalOverlay').classList.add('open');
 }
 function closeExportNoDataModal(){
-  document.getElementById('exportNoDataModalOverlay').style.display = 'none';
+  document.getElementById('exportNoDataModalOverlay').classList.remove('open');
 }
 
 // ===========================================================================
@@ -6457,10 +6481,10 @@ function openExportPickModal(){
       '<input type="checkbox" name="exportSelectChoice" value="'+i+'"'+(i===0?' checked':'')+'> ' + xmlEsc(label) + '</label>';
   }).join('');
 
-  document.getElementById('exportSelectModalOverlay').style.display = 'flex';
+  document.getElementById('exportSelectModalOverlay').classList.add('open');
 }
 function closeExportPickModal(){
-  document.getElementById('exportSelectModalOverlay').style.display = 'none';
+  document.getElementById('exportSelectModalOverlay').classList.remove('open');
 }
 
 function proceedFromExportPick(){
@@ -6477,10 +6501,10 @@ function proceedFromExportPick(){
     ? 'XLSX supports up to 2 loan estimates side by side \u2014 go back and select 1 or 2.'
     : (_exportPickedBlocks.length === 2 ? 'XLSX will place both selected estimates side by side in one file.' : '');
 
-  document.getElementById('exportFormatModalOverlay').style.display = 'flex';
+  document.getElementById('exportFormatModalOverlay').classList.add('open');
 }
 function closeExportFormatModal(){
-  document.getElementById('exportFormatModalOverlay').style.display = 'none';
+  document.getElementById('exportFormatModalOverlay').classList.remove('open');
 }
 
 async function chooseExportFormat(kind){
@@ -6520,7 +6544,7 @@ function xlsxAdvanceQueue_(){
   } else {
     whichEl.style.display = 'none';
   }
-  document.getElementById('xlsxModalOverlay').style.display = 'flex';
+  document.getElementById('xlsxModalOverlay').classList.add('open');
 }
 
 // Called by the XLSX modal's three Down-Payment-mode buttons.
@@ -6534,7 +6558,7 @@ async function onXlsxDpModeChosen(dpMode){
     return;
   }
 
-  document.getElementById('xlsxModalOverlay').style.display = 'none';
+  document.getElementById('xlsxModalOverlay').classList.remove('open');
   const { blob, estimates } = await buildXlsxExport(_xlsxChosenPairs);
   showExportPreview('xlsx', blob, _xlsxChosenPairs.map(p => p.container), estimates);
   if (_xlsxPendingTempContainer){
@@ -6708,11 +6732,11 @@ function showExportPreview(kind, blob, blocks, xlsxEstimates){
     whatsappBtn.style.display = 'none';
     noteEl.textContent = 'This shows the data that will be in the ' + kind.toUpperCase() + ' file \u2014 the actual file will have full ' + (kind === 'xlsx' ? 'spreadsheet formulas and formatting.' : 'Word document formatting.');
   }
-  document.getElementById('exportPreviewModalOverlay').style.display = 'flex';
+  document.getElementById('exportPreviewModalOverlay').classList.add('open');
 }
 
 function closeExportPreviewModal(){
-  document.getElementById('exportPreviewModalOverlay').style.display = 'none';
+  document.getElementById('exportPreviewModalOverlay').classList.remove('open');
 }
 
 const EXPORT_FILE_TYPE_INFO = {
@@ -6831,10 +6855,10 @@ function openDiscrepancyModal(container){
     }).join('') + '</table>';
 
   document.getElementById('discrepancyNotes').value = '';
-  document.getElementById('discrepancyModalOverlay').style.display = 'flex';
+  document.getElementById('discrepancyModalOverlay').classList.add('open');
 }
 function closeDiscrepancyModal(){
-  document.getElementById('discrepancyModalOverlay').style.display = 'none';
+  document.getElementById('discrepancyModalOverlay').classList.remove('open');
 }
 
 function buildDiscrepancyData(){
@@ -7453,7 +7477,7 @@ function altViewExport(){
   if (xlsxBtn) xlsxBtn.disabled = false;
   const hintEl = document.getElementById('exportFormatHint');
   if (hintEl) hintEl.textContent = '';
-  document.getElementById('exportFormatModalOverlay').style.display = 'flex';
+  document.getElementById('exportFormatModalOverlay').classList.add('open');
 }
 
 // Routes the shared nav-bar Export button to the right flow depending on
