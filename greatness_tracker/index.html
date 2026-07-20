@@ -583,8 +583,13 @@ function sectionTotal(sectionDef){
   const rows = gridState.sections[sectionDef.id];
   let total = 0;
   rows.forEach(row => row.forEach(cell => {
-    if (sectionDef.mode === 'counta'){ if (cell != null && cell !== '') total++; }
-    else { total += Number(cell) || 0; }
+    if (cell == null || cell === '') return;
+    if (sectionDef.mode === 'counta'){ total++; return; }
+    // 'sum' sections still add up a real number when one's entered, but a
+    // name/note in a box counts as 1 occurrence instead of silently adding
+    // 0 — typing "sent a card to the Millers" should still count as 1 card.
+    const num = Number(cell);
+    total += isNaN(num) ? 1 : num;
   }));
   return total;
 }
@@ -617,8 +622,9 @@ function renderGrid(){
         // No inputmode="numeric" here on purpose — even the "sum" sections
         // (Videos/Thank You Cards/Leads/Deals/Pre-Apps) sometimes need a
         // name or a short note instead of a bare number, so every cell gets
-        // a normal text keyboard on mobile, not a digits-only one.
-        html += '<td class="gt-cell"><input type="text" class="gt-cell-input" placeholder="'+(sectionDef.mode==='counta'?'name':'')+'" data-section="'+sectionDef.id+'" data-row="'+ri+'" data-day="'+di+'" value="'+(val==null?'':escapeHtml(String(val)))+'"></td>';
+        // a normal text keyboard on mobile, not a digits-only one. No
+        // placeholder text either — empty boxes stay blank, not "name" x N.
+        html += '<td class="gt-cell"><input type="text" class="gt-cell-input" data-section="'+sectionDef.id+'" data-row="'+ri+'" data-day="'+di+'" value="'+(val==null?'':escapeHtml(String(val)))+'"></td>';
       });
       if (ri === 0){
         const total = sectionTotal(sectionDef);
@@ -1200,7 +1206,12 @@ async function buildGtXlsxBlob(){
     const totalAddr = colLetter(2+DAYS.length) + startRow;
     const rangeStart = colLetter(2) + startRow;
     const rangeEnd = colLetter(1+DAYS.length) + endRow;
-    const formula = sectionDef.mode === 'counta' ? 'COUNTA('+rangeStart+':'+rangeEnd+')' : 'SUM('+rangeStart+':'+rangeEnd+')';
+    // 'sum' sections mirror sectionTotal(): real numbers add their value,
+    // but a name/note in a box still counts as 1 (COUNTA - COUNT = count of
+    // non-blank, non-numeric cells) instead of being silently ignored.
+    const formula = sectionDef.mode === 'counta'
+      ? 'COUNTA('+rangeStart+':'+rangeEnd+')'
+      : 'SUM('+rangeStart+':'+rangeEnd+')+COUNTA('+rangeStart+':'+rangeEnd+')-COUNT('+rangeStart+':'+rangeEnd+')';
     setCell(totalAddr, { t:'n', f: formula, v:0, s:1 });
     if (sectionDef.target){
       setCell(colLetter(3+DAYS.length)+startRow, { t:'inlineStr', v: String(sectionDef.target) });
