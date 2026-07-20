@@ -67,8 +67,13 @@
   .gt-label{ background:var(--slate-light); min-width:200px; }
   .gt-label-main{ font-weight:700; color:var(--navy); font-size:12px; }
   .gt-label-sub{ font-size:10px; color:var(--slate); margin-top:2px; }
-  .gt-cell{ text-align:center; width:62px; }
-  .gt-cell-input{ width:100%; border:none; text-align:center; font-size:12px; background:transparent; padding:3px 0; }
+  .gt-day-col{ width:62px; }
+  .gt-cell{ text-align:center; }
+  .gt-cell-input{
+    display:block; width:100%; border:none; text-align:center; font-size:12px; background:transparent;
+    padding:3px 2px; resize:none; overflow:hidden; white-space:pre-wrap; word-break:break-word;
+    font-family:inherit; line-height:1.3;
+  }
   .gt-cell-input:focus{ outline:1px solid var(--gold); background:#fff; }
   .gt-total{ background:rgba(201,162,75,0.14); text-align:center; min-width:92px; }
   .gt-total-value{ font-weight:700; font-size:15px; color:var(--navy); }
@@ -245,6 +250,12 @@
         <div class="gt-card gt-calendar-card">
           <div style="overflow:auto;">
             <table class="gt-grid-table">
+              <colgroup>
+                <col>
+                <col class="gt-day-col"><col class="gt-day-col"><col class="gt-day-col">
+                <col class="gt-day-col"><col class="gt-day-col"><col class="gt-day-col">
+                <col>
+              </colgroup>
               <thead>
                 <tr>
                   <th></th>
@@ -643,12 +654,13 @@ function renderGrid(){
       }
       DAYS.forEach((day, di) => {
         const val = row[di];
-        // No inputmode="numeric" here on purpose — even the "sum" sections
-        // (Videos/Thank You Cards/Leads/Deals/Pre-Apps) sometimes need a
-        // name or a short note instead of a bare number, so every cell gets
-        // a normal text keyboard on mobile, not a digits-only one. No
-        // placeholder text either — empty boxes stay blank, not "name" x N.
-        html += '<td class="gt-cell"><input type="text" class="gt-cell-input" data-section="'+sectionDef.id+'" data-row="'+ri+'" data-day="'+di+'" value="'+(val==null?'':escapeHtml(String(val)))+'"></td>';
+        // A <textarea> (not <input>) on purpose — a long name needs to wrap
+        // onto a second line once the day columns hit their max width,
+        // rather than getting cut off. No inputmode="numeric" restriction
+        // either — even the "sum" sections (Videos/Thank You Cards/Leads/
+        // Deals/Pre-Apps) sometimes need a name or note, not a bare number.
+        // No placeholder text — empty boxes stay blank, not "name" x N.
+        html += '<td class="gt-cell"><textarea rows="1" class="gt-cell-input" data-section="'+sectionDef.id+'" data-row="'+ri+'" data-day="'+di+'">'+(val==null?'':escapeHtml(String(val)))+'</textarea></td>';
       });
       if (ri === 0){
         const total = sectionTotal(sectionDef);
@@ -662,6 +674,37 @@ function renderGrid(){
     });
   });
   container.innerHTML = html;
+  recalcDayColumnWidth();
+  document.querySelectorAll('.gt-cell-input').forEach(autoSizeTextareaEl_);
+}
+// All 6 day columns share ONE width — computed from the single longest entry
+// anywhere in the table, capped at GT_DAY_COL_MAX so a very long name wraps
+// onto a 2nd line (via the textarea's normal soft-wrap) instead of the
+// column growing without bound. Widening one box widens every day column
+// together, since they're all driven off the same <col> width.
+const GT_DAY_COL_MIN = 62, GT_DAY_COL_MAX = 140;
+function gtMeasureTextWidth_(text, font){
+  if (!gtMeasureTextWidth_._ctx) gtMeasureTextWidth_._ctx = document.createElement('canvas').getContext('2d');
+  gtMeasureTextWidth_._ctx.font = font;
+  return gtMeasureTextWidth_._ctx.measureText(text).width;
+}
+function recalcDayColumnWidth(){
+  const cells = document.querySelectorAll('.gt-cell-input');
+  const cols = document.querySelectorAll('.gt-day-col');
+  if (!cells.length || !cols.length) return;
+  const font = getComputedStyle(cells[0]).font;
+  let widest = GT_DAY_COL_MIN;
+  cells.forEach(el => {
+    if (!el.value) return;
+    const w = gtMeasureTextWidth_(el.value, font) + 14; // cell padding allowance
+    if (w > widest) widest = w;
+  });
+  const width = Math.min(GT_DAY_COL_MAX, Math.max(GT_DAY_COL_MIN, Math.ceil(widest)));
+  cols.forEach(col => { col.style.width = width + 'px'; });
+}
+function autoSizeTextareaEl_(el){
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
 }
 function onCellChange(e){
   const t = e.target;
@@ -1444,7 +1487,22 @@ function runImportJson(){
 
 // ===========================================================================
 window.addEventListener('DOMContentLoaded', function(){
-  document.getElementById('gtGridBody').addEventListener('change', onCellChange);
+  const gridBody = document.getElementById('gtGridBody');
+  gridBody.addEventListener('change', onCellChange);
+  // Live auto-grow while typing (wraps + grows taller as needed) — the
+  // day-column width itself only recalculates on commit (see onCellChange),
+  // so columns don't jump around mid-keystroke.
+  gridBody.addEventListener('input', function(e){
+    if (e.target.classList && e.target.classList.contains('gt-cell-input')) autoSizeTextareaEl_(e.target);
+  });
+  // Enter commits the box (same as tabbing away) instead of inserting a
+  // literal newline — wrapping still happens automatically via width.
+  gridBody.addEventListener('keydown', function(e){
+    if (e.key === 'Enter' && e.target.classList && e.target.classList.contains('gt-cell-input')){
+      e.preventDefault();
+      e.target.blur();
+    }
+  });
   initSession();
   initFmBroadcastPoll(GT_API);
 });
