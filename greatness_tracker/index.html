@@ -212,6 +212,8 @@
       <button class="export-btn" onclick="saveWeek()">Save</button>
       <button class="export-btn" onclick="exportPdf()">Export PDF</button>
       <button class="export-btn" onclick="exportXlsx()">Export Excel</button>
+      <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="exportJson()">Export JSON</button>
+      <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="openImportJsonModal()">Import JSON</button>
     </div>
   </div>
   <div id="gtSaveStatus" class="save-status"></div>
@@ -323,6 +325,28 @@
         <button class="export-btn" style="padding:4px 8px; font-size:11px; background:var(--slate-light); color:var(--navy);" onclick="closeSavedModal()">&times; Close</button>
       </div>
       <div id="savedListBody" style="margin-top:12px;"></div>
+    </div>
+  </div>
+
+  <!-- IMPORT JSON MODAL -->
+  <div id="importJsonModalOverlay" class="gt-modal-overlay">
+    <div class="gt-modal" style="max-width:520px;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3 style="margin:0; color:var(--navy);">Import JSON</h3>
+        <button class="export-btn" style="padding:4px 8px; font-size:11px; background:var(--slate-light); color:var(--navy);" onclick="closeImportJsonModal()">&times; Close</button>
+      </div>
+      <p style="font-size:12px; color:var(--slate); line-height:1.5; margin:10px 0;">
+        Pick a <code>.json</code> file exported from here (or from Cowork), or paste JSON directly below.
+        Imported activity is <b>added</b> to this week's data — it won't overwrite or duplicate anything
+        already entered.
+      </p>
+      <input type="file" id="importJsonFile" accept="application/json,.json" onchange="handleImportJsonFile(event)" style="margin-bottom:10px; font-size:12px;">
+      <textarea id="importJsonText" placeholder="…or paste JSON here" style="width:100%; box-sizing:border-box; min-height:140px; padding:10px; border:1px solid var(--line); border-radius:6px; font-family:Consolas, Menlo, monospace; font-size:11.5px;"></textarea>
+      <div id="importJsonStatus" style="font-size:12px; margin-top:8px; min-height:16px;"></div>
+      <div style="margin-top:12px; display:flex; gap:8px; justify-content:flex-end;">
+        <button class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="closeImportJsonModal()">Cancel</button>
+        <button class="export-btn" onclick="runImportJson()">Import</button>
+      </div>
     </div>
   </div>
 
@@ -1278,7 +1302,8 @@ async function buildGtXlsxBlob(){
 
 const EXPORT_FILE_TYPE_INFO = {
   pdf: { mime:'application/pdf', ext:'pdf', desc:'PDF Document' },
-  xlsx: { mime:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', ext:'xlsx', desc:'Excel Workbook' }
+  xlsx: { mime:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', ext:'xlsx', desc:'Excel Workbook' },
+  json: { mime:'application/json', ext:'json', desc:'JSON Data' },
 };
 async function saveExportBlob(kind, blob){
   const filename = buildExportFilename(kind);
@@ -1307,6 +1332,114 @@ async function exportPdf(){
 async function exportXlsx(){
   const blob = await buildGtXlsxBlob();
   await saveExportBlob('xlsx', blob);
+}
+
+// ===========================================================================
+// IMPORT/EXPORT JSON — round-trips gridState so the same week's data can be
+// reconciled between this app and an external source (e.g. a Cowork check-in
+// session). Import is additive/merge-only: it never overwrites or removes
+// anything already entered here, only fills empty boxes and blank cells.
+// ===========================================================================
+function exportJson(){
+  const payload = {
+    weekOf: gridState.weekOf,
+    sections: gridState.sections,
+    themeDayCalls: gridState.themeDayCalls,
+    logHistory: gridState.logHistory || [],
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  saveExportBlob('json', blob);
+}
+function openImportJsonModal(){
+  document.getElementById('importJsonText').value = '';
+  document.getElementById('importJsonFile').value = '';
+  const statusEl = document.getElementById('importJsonStatus');
+  statusEl.textContent = '';
+  document.getElementById('importJsonModalOverlay').classList.add('open');
+}
+function closeImportJsonModal(){ document.getElementById('importJsonModalOverlay').classList.remove('open'); }
+function handleImportJsonFile(event){
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => { document.getElementById('importJsonText').value = String(reader.result || ''); };
+  reader.onerror = () => {
+    const statusEl = document.getElementById('importJsonStatus');
+    statusEl.style.color = '#B3261E';
+    statusEl.textContent = 'Could not read that file — try pasting the JSON instead.';
+  };
+  reader.readAsText(file);
+}
+// Adds every filled box from `imported` into the current week without
+// touching anything already here. Growable sections (counta, plus the two
+// growable sum sections) get new entries placed in the next empty box (or a
+// newly grown row) per day; the 3 fixed single-row sum sections
+// (leads_non_internet/deals/pre_apps) add numbers together when both sides
+// have a value, or concatenate as text when either side isn't a number.
+function mergeImportedGridData_(imported){
+  let added = 0;
+  const impSections = imported.sections || {};
+  SECTIONS.forEach(sectionDef => {
+    const impRows = impSections[sectionDef.id];
+    if (!Array.isArray(impRows)) return;
+    const localRows = gridState.sections[sectionDef.id];
+    DAYS.forEach((day, di) => {
+      const impValues = [];
+      impRows.forEach(r => { if (Array.isArray(r) && r[di] != null && r[di] !== '') impValues.push(r[di]); });
+      impValues.forEach(impVal => {
+        if (sectionDef.growable){
+          let row = localRows.find(r => r[di] == null);
+          if (!row){ row = DAYS.map(()=>null); localRows.push(row); }
+          row[di] = impVal;
+        } else {
+          const existing = localRows[0][di];
+          if (existing == null || existing === ''){
+            localRows[0][di] = impVal;
+          } else {
+            const numA = Number(existing), numB = Number(impVal);
+            localRows[0][di] = (!isNaN(numA) && !isNaN(numB)) ? (numA + numB) : (String(existing) + '; ' + String(impVal));
+          }
+        }
+        added++;
+      });
+    });
+  });
+  const impTdc = imported.themeDayCalls || imported.theme_day_calls || {};
+  Object.keys(impTdc).forEach(k => {
+    if (!(k in gridState.themeDayCalls)) return;
+    if (gridState.themeDayCalls[k] == null && impTdc[k] != null) gridState.themeDayCalls[k] = !!impTdc[k];
+  });
+  if (Array.isArray(imported.logHistory)){
+    if (!gridState.logHistory) gridState.logHistory = [];
+    const existingKeys = new Set(gridState.logHistory.map(e => (e.time||'')+'|'+(e.text||'')));
+    imported.logHistory.forEach(e => {
+      const key = (e.time||'')+'|'+(e.text||'');
+      if (!existingKeys.has(key)){ gridState.logHistory.push(e); existingKeys.add(key); }
+    });
+  }
+  return added;
+}
+function runImportJson(){
+  const statusEl = document.getElementById('importJsonStatus');
+  const raw = document.getElementById('importJsonText').value.trim();
+  if (!raw){ statusEl.style.color = '#B3261E'; statusEl.textContent = 'Pick a file or paste JSON first.'; return; }
+  let parsed;
+  try { parsed = JSON.parse(raw); }
+  catch (err) { statusEl.style.color = '#B3261E'; statusEl.textContent = "That doesn't look like valid JSON."; return; }
+  if (parsed.weekOf && parsed.weekOf !== gridState.weekOf){
+    const proceed = confirm('This JSON is from the week of ' + parsed.weekOf + ', but you\'re viewing the week of ' + gridState.weekOf + '. Import anyway, merged into the CURRENT week?');
+    if (!proceed){ statusEl.style.color = 'var(--slate)'; statusEl.textContent = 'Import canceled.'; return; }
+  }
+  const added = mergeImportedGridData_(parsed);
+  shrinkSections();
+  renderGrid();
+  renderThemeDayCalls();
+  renderLogHistory();
+  persistDraftLocal();
+  statusEl.style.color = 'var(--good)';
+  statusEl.textContent = added ? ('Imported ' + added + ' new entr' + (added === 1 ? 'y' : 'ies') + '.') : 'Nothing new to import — already up to date.';
+  document.getElementById('gtLogStatus').textContent = added ? ('Imported ' + added + ' entries from JSON.') : '';
+  if (added) setTimeout(closeImportJsonModal, 1200);
 }
 
 // ===========================================================================
