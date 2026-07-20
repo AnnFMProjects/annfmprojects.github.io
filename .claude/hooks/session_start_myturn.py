@@ -61,6 +61,25 @@ if os.path.isfile(path):
                         "so explicitly in your first reply to Ann rather than only mentioning it in a debrief."
                     )
                     context += "\n".join(lines)
+
+            checks_res = call_backend("listMyturnChecks", {}, token)
+            if checks_res.get("ok"):
+                pending_checks = [c for c in checks_res.get("checks", []) if c.get("Status") == "pending"]
+                if pending_checks:
+                    lines = [
+                        "",
+                        "---",
+                        "☑️ Ann checked off " + str(len(pending_checks)) + " item(s) in the Admin App's MYTURN Live View → Outstanding section, not yet applied to the real MYTURN.md:",
+                    ]
+                    for i, c in enumerate(pending_checks, 1):
+                        lines.append(str(i) + ". [CheckID " + str(c.get("CheckID", "")) + "] " + str(c.get("ItemText", "")))
+                    lines.append(
+                        "For each: find the matching \"- [ ] <text>\" line in MYTURN.md's Outstanding section (match "
+                        "by text, it may have drifted slightly) and change it to \"- [x] <text>\", then call the "
+                        "applyMyturnCheck backend action with that CheckID to mark it applied. Mention this in your "
+                        "first reply to Ann, not just an end-of-turn debrief."
+                    )
+                    context += "\n".join(lines)
     except Exception:
         pass
 

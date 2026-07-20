@@ -112,9 +112,14 @@
   .adm-mtv-hr{ border:none; border-top:1px solid var(--line); margin:20px 0; }
   .adm-mtv-list{ margin:0 0 12px; padding-left:22px; }
   .adm-mtv-list li{ margin-bottom:5px; }
-  .adm-mtv-check{ list-style:none; margin-left:-22px; display:flex; gap:7px; align-items:flex-start; }
+  .adm-mtv-check{ list-style:none; margin-left:-22px; display:flex; gap:7px; align-items:flex-start; flex-wrap:wrap; }
   .adm-mtv-check input{ margin-top:3px; flex:0 0 auto; }
-  .adm-mtv-check.is-done span{ color:var(--slate); text-decoration:line-through; }
+  .adm-mtv-check input[onclick]{ cursor:pointer; }
+  .adm-mtv-check.is-done .adm-mtv-check-label{ color:var(--slate); text-decoration:line-through; }
+  .adm-mtv-check-status{ font-size:10.5px; font-style:italic; flex-basis:100%; padding-left:29px; }
+  .adm-mtv-check-status.is-pending{ color:var(--slate); }
+  .adm-mtv-check-status.is-queued{ color:var(--good); }
+  .adm-mtv-check-status.is-error{ color:var(--bad); font-style:normal; font-weight:600; }
   .adm-mtv-empty-msg{ color:var(--slate); font-style:italic; }
   .adm-mtv-table-wrap{ overflow-x:auto; margin:0 0 16px; }
   .adm-mtv-table{ border-collapse:collapse; width:100%; font-size:11.5px; }
@@ -471,6 +476,10 @@ const ADMIN_API = (function(){
     triggerBroadcast: async function(){
       const data = await core.call('triggerBroadcast', {});
       return data.broadcastAt;
+    },
+    submitMyturnCheck: async function(itemText, sourceSection){
+      const data = await core.call('submitMyturnCheck', { itemText: itemText, sourceSection: sourceSection || '' });
+      return data.checkId;
     },
   });
 })();
@@ -1107,6 +1116,11 @@ function renderMyturnMarkdown_(content){
   let html = '';
   let listBuf = null;
   let i = 0;
+  // Checkboxes only become clickable inside the "Outstanding" section (see
+  // mtvCheckboxClick_) — tracked by heading level so it turns off again at
+  // the next heading of equal-or-shallower depth, same nesting rule as any
+  // markdown section.
+  let interactiveLevel = null;
 
   function flushList(){
     if (!listBuf) return;
@@ -1129,6 +1143,8 @@ function renderMyturnMarkdown_(content){
       const text = hm[2].trim();
       const id = mtvSlug_(text, used);
       headings.push({ id: id, text: text, level: level });
+      if (interactiveLevel !== null && level <= interactiveLevel) interactiveLevel = null;
+      if (text.toLowerCase() === 'outstanding') interactiveLevel = level;
       html += '<h' + level + ' id="' + id + '" class="adm-mtv-h">' + mtvInline_(text) + '</h' + level + '>';
       i++; continue;
     }
@@ -1156,7 +1172,11 @@ function renderMyturnMarkdown_(content){
     if (cm){
       if (!listBuf || listBuf.type !== 'checklist') { flushList(); listBuf = { type: 'checklist', items: [] }; }
       const checked = cm[1].toLowerCase() === 'x';
-      listBuf.items.push('<li class="adm-mtv-check' + (checked ? ' is-done' : '') + '"><input type="checkbox" disabled' + (checked ? ' checked' : '') + '><span>' + mtvInline_(cm[2]) + '</span></li>');
+      const rawText = cm[2].trim();
+      const interactive = interactiveLevel !== null && !checked;
+      const inputAttrs = 'type="checkbox"' + (checked ? ' checked' : '') + (interactive ? ' onclick="mtvCheckboxClick_(this)"' : ' disabled');
+      const dataAttr = interactive ? ' data-raw="' + escapeHtml_(rawText) + '"' : '';
+      listBuf.items.push('<li class="adm-mtv-check' + (checked ? ' is-done' : '') + '"' + dataAttr + '><input ' + inputAttrs + '><span class="adm-mtv-check-label">' + mtvInline_(rawText) + '</span>' + (interactive ? '<span class="adm-mtv-check-status"></span>' : '') + '</li>');
       i++; continue;
     }
 
@@ -1215,6 +1235,28 @@ function mtvFilterNav_(q){
   document.querySelectorAll('.adm-mtv-nav a').forEach(function(a){
     a.style.display = (!query || a.textContent.toLowerCase().indexOf(query) !== -1) ? '' : 'none';
   });
+}
+
+// Checking an Outstanding-section box doesn't edit Ann's local MYTURN.md
+// directly (this backend has no access to her disk) — it queues via
+// submitMyturnCheck, same async pattern as the Messages tab, and the next
+// Claude Code session opened in the project applies the real edit.
+async function mtvCheckboxClick_(inputEl){
+  const li = inputEl.closest('.adm-mtv-check');
+  const rawText = li.getAttribute('data-raw');
+  const statusEl = li.querySelector('.adm-mtv-check-status');
+  inputEl.disabled = true;
+  li.classList.add('is-done');
+  if (statusEl){ statusEl.textContent = ' Queuing…'; statusEl.className = 'adm-mtv-check-status is-pending'; }
+  try {
+    await ADMIN_API.submitMyturnCheck(rawText, 'outstanding');
+    if (statusEl){ statusEl.textContent = ' Queued — will be checked off in MYTURN.md next time a Claude Code session runs.'; statusEl.className = 'adm-mtv-check-status is-queued'; }
+  } catch (err) {
+    inputEl.disabled = false;
+    inputEl.checked = false;
+    li.classList.remove('is-done');
+    if (statusEl){ statusEl.textContent = ' Failed to queue: ' + err.message; statusEl.className = 'adm-mtv-check-status is-error'; }
+  }
 }
 
 // ===========================================================================
