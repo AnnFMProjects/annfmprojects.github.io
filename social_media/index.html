@@ -774,15 +774,29 @@ function renderMarketDesigns(){
 function fitSquareToContent_(inner, size){
   if (!inner) return;
   inner.style.transform = 'none';
-  inner.style.transformOrigin = 'top left';
+  inner.style.transformOrigin = 'top center'; // shrinks evenly from the center so any leftover gap splits left/right instead of piling up on one side
   inner.style.width = size + 'px';
   const h0 = inner.scrollHeight;
-  if (h0 <= size) return; // fits already, no scaling needed
-  const s0 = size / h0;
-  inner.style.width = (size / s0) + 'px';
-  const h1 = inner.scrollHeight;
-  const s1 = size / h1;
-  inner.style.transform = 'scale(' + s1 + ')';
+  if (h0 > size) {
+    // Scale the whole natural-width block down by one uniform factor so its
+    // height becomes exactly `size` — width shrinks by the same factor too
+    // (never grows), so it can only ever leave a gap on the right, never
+    // overflow/clip. (A prior version tried to pre-widen the block first so
+    // scaling would land back at exactly `size` wide too, but the math for
+    // that mixed up width and height and pushed content past the right edge
+    // — this simpler version trades a possible right-side gap for a hard
+    // guarantee of never clipping.)
+    const s = size / h0;
+    inner.style.transform = 'scale(' + s + ')';
+  }
+  // Real verification, not just trusting the math: after layout, check the
+  // actual rendered box (post-transform) doesn't exceed the square. Logs
+  // loudly if it ever does, so a regression here is never silent again.
+  const box = inner.getBoundingClientRect();
+  const EPS = 0.5;
+  if (box.width > size + EPS || box.height > size + EPS) {
+    console.error('[Market Update square-fit check FAILED] inner content is', box.width.toFixed(1) + 'x' + box.height.toFixed(1), 'but the square is', size + 'x' + size + ' — content will be clipped.');
+  }
 }
 function toggleMuDesign(id, checked){
   muSelectedDesigns[id] = checked;
