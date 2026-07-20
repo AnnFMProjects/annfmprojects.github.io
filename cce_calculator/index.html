@@ -731,6 +731,12 @@
   <button onclick="location.reload()">Refresh Now</button>
 </div>
 <div id="cceNavBar">
+  <div class="cce-client-stepper" id="cceClientStepper">
+    <button class="cce-stepper-btn cce-stepper-minus" onclick="openDeleteClientModal()" title="Delete this client" aria-label="Delete this client">&minus;</button>
+    <button class="cce-stepper-label" onclick="toggleSidePanel('left')" title="View saved clients">Client</button>
+    <button class="cce-stepper-btn" onclick="newClient()" title="Save this client and start a new one" aria-label="Save this client and start a new one">&plus;</button>
+  </div>
+  <div class="cce-nav-divider"></div>
   <div class="cce-nav-group">
     <div>
       <span class="cce-nav-group-caption">Page</span>
@@ -880,11 +886,6 @@
     <button id="savedClientsToggleBtn" class="export-btn" onclick="toggleSidePanel('left')">&#9776; Saved Clients</button>
     <button id="addLoanEstimateBtn" class="export-btn" onclick="openLoanTypeModal()">+ Add Loan Estimate</button>
     <button id="talkAndFillBtn" class="export-btn" onclick="tafOpen()">&#127908; Talk and Fill</button>
-    <div class="cce-client-stepper" id="cceClientStepper">
-      <button class="cce-stepper-btn cce-stepper-minus" onclick="openDeleteClientModal()" title="Delete this client" aria-label="Delete this client">&minus;</button>
-      <button class="cce-stepper-label" onclick="toggleSidePanel('left')" title="View saved clients">Client</button>
-      <button class="cce-stepper-btn" onclick="newClient()" title="Save this client and start a new one" aria-label="Save this client and start a new one">&plus;</button>
-    </div>
     <button id="accountToggleBtn" class="export-btn" style="margin-left:auto;" onclick="toggleSidePanel('right')">&#128100; Account</button>
   </div>
   <div id="saveClientStatus" style="display:none; padding:8px 28px; font-size:12px;"></div>
