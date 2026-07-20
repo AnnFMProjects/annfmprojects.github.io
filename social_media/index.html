@@ -1049,13 +1049,19 @@ async function exportSelectedDesigns(kind, format){
     const node = document.getElementById('node_' + d.id);
     const canvas = await html2canvas(node, { scale: 4, backgroundColor: format === 'jpeg' ? '#ffffff' : null });
     const mime = format === 'jpeg' ? 'image/jpeg' : 'image/png';
-    const dataUrl = canvas.toDataURL(mime, 0.92);
+    // Blob URL + download attribute, not a raw data: URI — some browsers
+    // (Safari especially) just navigate to/open a data: URI instead of
+    // honoring `download`, which is why exports were opening in a new tab
+    // instead of prompting to save.
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, mime, 0.92));
+    const blobUrl = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = dataUrl;
+    a.href = blobUrl;
     a.download = 'fm-' + kind + '-' + dateIso + '-' + d.id + '.' + (format === 'jpeg' ? 'jpg' : 'png');
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+    URL.revokeObjectURL(blobUrl);
   }
 }
 
