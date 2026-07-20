@@ -547,6 +547,9 @@
     gap:10px;
     max-width:calc(100vw - 20px);
   }
+  /* Hidden state — everything collapses away except the toggle button
+     itself, which flips its own label between Hide/Show. */
+  #cceFloatingBarWrap.cce-nav-collapsed > *:not(#cceNavCollapseWrap){ display:none !important; }
   #cceNavBar, .cce-float-pill{
     display:none;
     flex-shrink:0;
@@ -888,6 +891,9 @@
     </button>
     <input type="text" id="cceSearchInput" placeholder="Search fields, panels, buttons&hellip;" oninput="cceSearchInput_()" onkeydown="cceSearchKeydown_(event)">
   </div>
+</div>
+<div id="cceNavCollapseWrap" class="cce-float-pill">
+  <button id="cceNavCollapseBtn" onclick="cceNavToggleCollapse_()" title="Hide nav" data-tip="Hide nav">Hide</button>
 </div>
 </div>
 <div class="cce-wrap">
@@ -7154,12 +7160,26 @@ function updateCceNavBar_(){
   document.getElementById('cceNavBar').style.display = 'flex';
   document.getElementById('cceSearchBar').style.display = 'block';
   document.getElementById('cceNavTalkFillBar').style.display = 'flex';
+  document.getElementById('cceNavCollapseWrap').style.display = 'flex';
   document.getElementById('cceNavAddLoanBtn').style.display = blocks.length ? 'none' : '';
   document.getElementById('cceNavFullGroup').style.display = blocks.length ? 'flex' : 'none';
   if (!blocks.length) return;
   if (altViewActive) altViewApplyCurrent_(blocks);
   updateCceNavEstimateGroup_(blocks);
   updateCceNavSectionGroup_(blocks);
+}
+
+// Hides everything in the floating bar system except the toggle button
+// itself — useful on narrow screens where the vertically-stacked nav can
+// take up a lot of the viewport. Visible (not collapsed) by default on
+// every fresh page load; not persisted across reloads on purpose.
+function cceNavToggleCollapse_(){
+  const wrap = document.getElementById('cceFloatingBarWrap');
+  const collapsed = wrap.classList.toggle('cce-nav-collapsed');
+  const btn = document.getElementById('cceNavCollapseBtn');
+  btn.textContent = collapsed ? 'Show' : 'Hide';
+  btn.title = collapsed ? 'Show nav' : 'Hide nav';
+  btn.setAttribute('data-tip', collapsed ? 'Show nav' : 'Hide nav');
 }
 
 let cceNavScrollTicking = false;
