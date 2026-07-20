@@ -856,6 +856,8 @@
         </div>
         <div class="field-row">
           <label>Name of Borrower / Client <span class="hint">Person receiving this estimate</span></label>
+          <input type="text" id="borrowerFirstName" placeholder="First" oninput="syncBorrowerNameFromParts()">
+          <input type="text" id="borrowerLastName" placeholder="Last" oninput="syncBorrowerNameFromParts()">
           <input type="text" id="borrowerName" placeholder="e.g. John & Jane Smith">
         </div>
       </div>
@@ -2357,6 +2359,18 @@ function E(container, id){
 // every export (PDF/DOCX/XLSX) too, so a future phone/NMLS change is a
 // one-line edit instead of three.
 const ANN_CONTACT_LINE = 'Ann Zeilingold | NMLS# 41850 | P: 845-354-9700 | C: 914-260-9000';
+
+// One-way sync: typing in First/Last always rebuilds the Full Name field as
+// "Last, First" — typing in Full Name directly does NOT write back into
+// First/Last (kept deliberately decoupled, since Full Name also needs to
+// support multi-borrower text like "John & Jane Smith" that First/Last
+// can't represent).
+function syncBorrowerNameFromParts(){
+  const first = document.getElementById('borrowerFirstName').value.trim();
+  const last = document.getElementById('borrowerLastName').value.trim();
+  const full = (last && first) ? (last + ', ' + first) : (last || first);
+  document.getElementById('borrowerName').value = full;
+}
 
 // ===========================================================================
 // EXPORT NAMING — filename is just the client's name (sanitized), and
@@ -5943,6 +5957,8 @@ function serializeCurrentPage(){
     dealSetup: {
       processorName: document.getElementById('processorName').value,
       borrowerName: document.getElementById('borrowerName').value,
+      borrowerFirstName: document.getElementById('borrowerFirstName').value,
+      borrowerLastName: document.getElementById('borrowerLastName').value,
     },
     loanBlocks: getAllLoanBlocks().map(b => ({
       loanType: b.dataset.loanType || 'Loan',
@@ -5961,6 +5977,8 @@ function serializeCurrentPage(){
 function loadPageFromData(data){
   document.getElementById('processorName').value = (data.dealSetup && data.dealSetup.processorName) || '';
   document.getElementById('borrowerName').value = (data.dealSetup && data.dealSetup.borrowerName) || '';
+  document.getElementById('borrowerFirstName').value = (data.dealSetup && data.dealSetup.borrowerFirstName) || '';
+  document.getElementById('borrowerLastName').value = (data.dealSetup && data.dealSetup.borrowerLastName) || '';
 
   document.getElementById('loanBlocksContainer').innerHTML = '';
   (data.loanBlocks || []).forEach(b => {
@@ -6026,6 +6044,8 @@ function showSaveClientStatus(message, isError){
 function clearCurrentPage(){
   document.getElementById('processorName').value = '';
   document.getElementById('borrowerName').value = '';
+  document.getElementById('borrowerFirstName').value = '';
+  document.getElementById('borrowerLastName').value = '';
   document.getElementById('loanBlocksContainer').innerHTML = '';
   document.getElementById('sharedPropertyAddress').value = '';
   document.getElementById('sharedAddressDetectNote').textContent = '';
@@ -6100,6 +6120,8 @@ async function cceNavSaveBtnClick(){
 // "New Client" click would just mean retyping it constantly.
 function clearForNewClient(){
   document.getElementById('borrowerName').value = '';
+  document.getElementById('borrowerFirstName').value = '';
+  document.getElementById('borrowerLastName').value = '';
   document.getElementById('loanBlocksContainer').innerHTML = '';
   currentRecordId = null;
 }
