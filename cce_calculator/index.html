@@ -543,14 +543,11 @@
     left:50%;
     transform:translateX(-50%);
     z-index:1500;
-    background:rgba(27,42,74,0.72);
-    -webkit-backdrop-filter:blur(20px) saturate(180%);
-    backdrop-filter:blur(20px) saturate(180%);
+    background:var(--navy);
     color:#fff;
     font-family:Calibri, Arial, sans-serif;
     border-radius:18px;
-    border:1px solid rgba(255,255,255,0.16);
-    box-shadow:0 10px 34px rgba(16,27,51,0.38);
+    box-shadow:0 8px 26px rgba(16,27,51,0.4);
     align-items:center;
     gap:4px;
     padding:7px;
@@ -635,6 +632,76 @@
     padding:8px 14px !important;
   }
   #cceNavExportBtn:hover{ background:#D9B76A !important; }
+  #cceNavSaveBtn{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    min-width:58px;
+    background:var(--good);
+    color:#fff;
+    font-weight:600;
+    padding:8px 14px !important;
+  }
+  #cceNavSaveBtn:hover{ background:#3A8362 !important; }
+  #cceNavSaveBtn:disabled{ opacity:1 !important; cursor:default; }
+  /* Kinetic "Saving…" animation while a save is in flight — orbiting dot +
+     each letter individually squash-stretched on a staggered delay. */
+  .cce-kinetic{ position:relative; display:inline-flex; padding:0 6px; }
+  .cce-kinetic-dot{
+    position:absolute;
+    top:-8px;
+    left:50%;
+    width:4px;
+    height:4px;
+    margin-left:-2px;
+    background:#fff;
+    border-radius:50%;
+    animation:cceKineticDot 900ms cubic-bezier(.25,.25,.75,.75) infinite;
+  }
+  @keyframes cceKineticDot{
+    0%, 100%{ transform:translateX(-15px); }
+    50%{ transform:translateX(15px); }
+  }
+  .cce-kinetic-letter{
+    display:inline-block;
+    animation:cceKineticStretch 900ms ease-in-out infinite;
+  }
+  @keyframes cceKineticStretch{
+    0%, 100%{ transform:scale(1,0.6); }
+    50%{ transform:scale(1,1.18); }
+  }
+  .cce-save-done{
+    display:inline-flex;
+    align-items:center;
+    gap:4px;
+    animation:cceSaveDonePop 300ms ease-out;
+  }
+  @keyframes cceSaveDonePop{
+    0%{ transform:scale(0.7); opacity:0; }
+    60%{ transform:scale(1.15); opacity:1; }
+    100%{ transform:scale(1); }
+  }
+  .cce-client-stepper{
+    display:flex;
+    align-items:center;
+    background:var(--slate-light);
+    border-radius:7px;
+    overflow:hidden;
+  }
+  .cce-client-stepper button{
+    font-family:Calibri, Arial, sans-serif;
+    font-size:12px;
+    border:none;
+    background:transparent;
+    color:var(--navy);
+    cursor:pointer;
+    padding:8px 10px;
+    transition:background .12s ease;
+  }
+  .cce-client-stepper button:hover{ background:rgba(27,42,74,0.1); }
+  .cce-stepper-btn{ font-weight:700; font-size:15px !important; padding:8px 12px !important; line-height:1; }
+  .cce-stepper-btn.cce-stepper-minus{ color:#B3261E; }
+  .cce-stepper-label{ font-weight:600; border-left:1px solid var(--line); border-right:1px solid var(--line); }
   @media (max-width: 880px){
     #cceNavBar{ left:auto; right:10px; transform:none; bottom:10px; }
     .cce-nav-label{ display:none; }
@@ -698,6 +765,8 @@
   <!-- ALT VIEW button temporarily hidden per Ann's request (2026-07-20) — pending nav redesign.
        toggleAltView()/enterAltView()/exitAltView() left fully intact; re-add this button (and its divider) to bring it back. -->
   <button id="cceNavAltViewBtn" onclick="toggleAltView()" title="Switch to a PAG-style left/center/right editor layout for the current estimate" style="display:none;">ALT VIEW</button>
+  <div class="cce-nav-divider"></div>
+  <button id="cceNavSaveBtn" onclick="cceNavSaveBtnClick()" title="Save" data-tip="Save this client"><span class="cce-save-label">Save</span></button>
   <div class="cce-nav-divider"></div>
   <button id="cceNavExportBtn" onclick="cceNavExportBtnClick()" title="Export"><svg class="dl-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v11m0 0l-4.5-4.5M12 14l4.5-4.5M5 19h14" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg> Export</button>
 </div>
@@ -811,10 +880,11 @@
     <button id="savedClientsToggleBtn" class="export-btn" onclick="toggleSidePanel('left')">&#9776; Saved Clients</button>
     <button id="addLoanEstimateBtn" class="export-btn" onclick="openLoanTypeModal()">+ Add Loan Estimate</button>
     <button id="talkAndFillBtn" class="export-btn" onclick="tafOpen()">&#127908; Talk and Fill</button>
-    <button id="saveThisClientBtn" class="export-btn" style="background:var(--navy); color:#fff;" onclick="saveThisClient()">Save This Client</button>
-    <button id="saveAsDraftBtn" class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="saveThisClientAsDraftButton()">Save As Draft</button>
-    <button id="newClientBtn" class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="newClient()">New Client</button>
-    <button id="deleteThisClientBtn" class="export-btn" style="background:var(--slate-light); color:var(--navy);" onclick="openDeleteClientModal()">Delete This Client</button>
+    <div class="cce-client-stepper" id="cceClientStepper">
+      <button class="cce-stepper-btn cce-stepper-minus" onclick="openDeleteClientModal()" title="Delete this client" aria-label="Delete this client">&minus;</button>
+      <button class="cce-stepper-label" onclick="toggleSidePanel('left')" title="View saved clients">Client</button>
+      <button class="cce-stepper-btn" onclick="newClient()" title="Save this client and start a new one" aria-label="Save this client and start a new one">&plus;</button>
+    </div>
     <button id="accountToggleBtn" class="export-btn" style="margin-left:auto;" onclick="toggleSidePanel('right')">&#128100; Account</button>
   </div>
   <div id="saveClientStatus" style="display:none; padding:8px 28px; font-size:12px;"></div>
@@ -1220,10 +1290,10 @@
       <div id="deleteClientModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
         <div style="background:#fff; border-radius:10px; max-width:420px; width:100%; padding:24px; font-family:Calibri, Arial, sans-serif;">
           <h3 style="margin-top:0; color:var(--navy);">Delete This Client</h3>
-          <p style="font-size:13px; color:var(--slate); line-height:1.5;">Permanently deleting removes this client from everyone's saved clients — this can't be undone. If you're not done yet, save it as a draft instead so it's not lost.</p>
+          <p style="font-size:13px; color:var(--slate); line-height:1.5;">Permanently deleting removes this client from everyone's saved clients — this can't be undone. If you're not done yet, save it and start a new client instead so it's not lost.</p>
           <div id="deleteClientError" style="color:#B3261E; font-size:12px; margin-top:6px; min-height:14px;"></div>
           <div style="margin-top:14px; display:flex; flex-direction:column; gap:8px;">
-            <button class="export-btn" style="padding:12px; background:var(--navy); color:#fff;" onclick="saveThisClientAsDraft()">Save as Draft</button>
+            <button class="export-btn" style="padding:12px; background:var(--navy); color:#fff;" onclick="saveAndStartNewFromDeleteModal()">Save &amp; New</button>
             <button class="export-btn" style="padding:12px; background:#B3261E; color:#fff;" onclick="confirmPermanentDelete()">Permanently Delete</button>
           </div>
           <div style="margin-top:14px; text-align:right;">
@@ -1236,10 +1306,10 @@
       <div id="loadConfirmModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
         <div style="background:#fff; border-radius:10px; max-width:420px; width:100%; padding:24px; font-family:Calibri, Arial, sans-serif;">
           <h3 style="margin-top:0; color:var(--navy);">Replace Current Page</h3>
-          <p style="font-size:13px; color:var(--slate); line-height:1.5;">Loading this client will replace everything currently on this page — this can't be undone. If you're not done with what's here, save it as a draft first so it's not lost.</p>
+          <p style="font-size:13px; color:var(--slate); line-height:1.5;">Loading this client will replace everything currently on this page — this can't be undone. If you're not done with what's here, save it first so it's not lost.</p>
           <div id="loadConfirmError" style="color:#B3261E; font-size:12px; margin-top:6px; min-height:14px;"></div>
           <div style="margin-top:14px; display:flex; flex-direction:column; gap:8px;">
-            <button class="export-btn" style="padding:12px; background:var(--navy); color:#fff;" onclick="saveDraftThenLoad()">Save as Draft, Then Load</button>
+            <button class="export-btn" style="padding:12px; background:var(--navy); color:#fff;" onclick="saveAndLoad()">Save and Load</button>
             <button class="export-btn" style="padding:12px; background:#B3261E; color:#fff;" onclick="discardAndLoad()">Discard and Load</button>
           </div>
           <div style="margin-top:14px; text-align:right;">
@@ -1807,7 +1877,7 @@ function continueAsGuest(){
 }
 
 function applyGuestModeUI(){
-  ['savedClientsToggleBtn', 'accountToggleBtn', 'saveThisClientBtn', 'saveAsDraftBtn', 'newClientBtn', 'deleteThisClientBtn'].forEach(id => {
+  ['savedClientsToggleBtn', 'accountToggleBtn', 'cceClientStepper', 'cceNavSaveBtn'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = guestMode ? 'none' : '';
   });
@@ -1964,10 +2034,9 @@ function renderFilteredClientList(){
     return;
   }
   bodyEl.innerHTML = records.map(r => {
-    const draftBadge = r.Status === 'draft' ? '<span style="color:#B3261E; font-weight:700; font-size:10.5px; margin-left:6px;">DRAFT</span>' : '';
     const dateLabel = r.CreatedAt ? new Date(r.CreatedAt).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }) : '';
     return '<div onclick="selectClient(\''+r.RecordID+'\')" style="cursor:pointer; padding:8px 6px; border-bottom:1px solid var(--line);">'
-      + '<div style="font-weight:700; color:var(--navy);">'+xmlEsc(r.ClientName)+draftBadge+'</div>'
+      + '<div style="font-weight:700; color:var(--navy);">'+xmlEsc(r.ClientName)+'</div>'
       + '<div style="color:var(--slate); font-size:11px;">'+xmlEsc(r.ProcessorNameSnapshot||'')+' &middot; '+dateLabel+'</div>'
       + '</div>';
   }).join('');
@@ -2006,9 +2075,6 @@ function renderClientPreview(){
   if (!selectedClient) return;
   const r = selectedClient.record;
 
-  const draftBanner = r.Status === 'draft'
-    ? '<div style="background:#FBE9E7; border:1px solid #F0C4BE; color:#B3261E; font-weight:700; font-size:11px; padding:5px 8px; border-radius:5px; margin-bottom:10px;">DRAFT — not yet finalized</div>'
-    : '';
   const dateLabel = r.CreatedAt ? new Date(r.CreatedAt).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }) : '';
   const blocksHtml = (selectedClient.loanBlocks||[]).map(b => {
     const price = (b.fields && b.fields.price) ? fmt(parseFloat(String(b.fields.price).replace(/[^0-9.\-]/g,''))||0) : '';
@@ -2025,8 +2091,7 @@ function renderClientPreview(){
     pdfHtml = '<div style="color:var(--slate); margin-top:10px;">No PDF saved for this record.</div>';
   }
 
-  el.innerHTML = draftBanner
-    + '<div style="font-weight:700; color:var(--navy); font-size:14px;">'+xmlEsc(r.ClientName)+'</div>'
+  el.innerHTML = '<div style="font-weight:700; color:var(--navy); font-size:14px;">'+xmlEsc(r.ClientName)+'</div>'
     + '<div style="color:var(--slate); font-size:11px; margin-bottom:10px;">Processor: '+xmlEsc(r.ProcessorNameSnapshot||'')+' &middot; Saved '+dateLabel+'</div>'
     + blocksHtml
     + pdfHtml
@@ -2146,15 +2211,15 @@ function discardAndLoad(){
   if (record) applyLoadRecord(record);
 }
 
-async function saveDraftThenLoad(){
+async function saveAndLoad(){
   const errEl = document.getElementById('loadConfirmError');
   if (!document.getElementById('borrowerName').value.trim()){
-    errEl.textContent = 'Enter a Name of Borrower / Client before saving as a draft.';
+    errEl.textContent = 'Enter a Name of Borrower / Client before saving.';
     return;
   }
-  const savedRecordId = await saveThisClient('draft');
+  const savedRecordId = await saveThisClient();
   if (!savedRecordId){
-    errEl.textContent = 'Could not save as draft — see the message behind this dialog.';
+    errEl.textContent = 'Could not save — see the message behind this dialog.';
     return;
   }
   const record = _pendingLoadRecord;
@@ -5966,8 +6031,14 @@ function clearCurrentPage(){
   currentRecordId = null;
 }
 
-async function saveThisClient(status){
-  status = status || 'final';
+// No more draft/final distinction (removed 2026-07-20, per Ann's request) —
+// every save is just a save. NOTE: if two records are ever saved under the
+// same Client Name, they currently save as two independent records with no
+// relationship between them (see CCE_API.saveClient / handleSaveClient_ in
+// the backend — identity is by RecordID only, never by name). Ann asked for
+// same-name saves to instead be tracked as versions ("version 1", "version
+// 2", ...) — not built yet, flagged as a follow-up in MYTURN.md.
+async function saveThisClient(){
   const blocks = getAllLoanBlocks();
   if (!blocks.length){ showSaveClientStatus('Add at least one loan estimate first.', true); return null; }
   const clientName = document.getElementById('borrowerName').value.trim();
@@ -5981,13 +6052,12 @@ async function saveThisClient(status){
     const { recordId } = await CCE_API.saveClient({
       recordId: currentRecordId,
       clientName: clientName,
-      status: status,
       dealSetup: pageData.dealSetup,
       loanBlocks: pageData.loanBlocks,
       pdfBase64: pdfBase64,
     });
     currentRecordId = recordId;
-    showSaveClientStatus(status === 'draft' ? 'Saved as draft.' : 'Client saved.', false);
+    showSaveClientStatus('Client saved.', false);
     return recordId;
   } catch (err) {
     showSaveClientStatus(err.message, true);
@@ -5995,11 +6065,30 @@ async function saveThisClient(status){
   }
 }
 
-// Thin wrapper so the standalone "Save As Draft" toolbar button reuses the
-// exact same validation/save path as everything else that saves a draft
-// (the Delete-modal escape hatch, the Load-into-calculator escape hatch).
-function saveThisClientAsDraftButton(){
-  return saveThisClient('draft');
+// Builds the little letters-stretch + orbiting-dot "Saving…" markup used by
+// the nav bar's Save button while a save is in flight.
+function cceKineticHtml_(word){
+  return '<span class="cce-kinetic"><span class="cce-kinetic-dot"></span>'
+    + word.split('').map((ch, i) => '<span class="cce-kinetic-letter" style="animation-delay:' + (i * 70) + 'ms">' + ch + '</span>').join('')
+    + '</span>';
+}
+
+// The nav bar's Save button (moved here from the toolbar 2026-07-20, per
+// Ann's request — no separate toolbar Save button anymore).
+async function cceNavSaveBtnClick(){
+  const btn = document.getElementById('cceNavSaveBtn');
+  if (btn.disabled) return;
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = cceKineticHtml_('Saving');
+  const recordId = await saveThisClient();
+  if (recordId){
+    btn.innerHTML = '<span class="cce-save-done">&#10003; Saved</span>';
+    setTimeout(() => { btn.innerHTML = original; btn.disabled = false; }, 1100);
+  } else {
+    btn.innerHTML = original;
+    btn.disabled = false;
+  }
 }
 
 // Clears only the client-identifying parts of the page (client name + loan
@@ -6012,23 +6101,30 @@ function clearForNewClient(){
   currentRecordId = null;
 }
 
-// One click, no confirmation modal — safe to be a single click specifically
-// BECAUSE it always autosaves first, so nothing is ever silently lost. If
-// there's nothing worth saving (no loan blocks, or no client name yet),
-// skips straight to starting fresh. If the autosave itself fails, stops
-// there and leaves the page untouched rather than discarding unsaved work.
-async function newClient(){
+// Shared by the toolbar's "+" (New) stepper button and the Delete modal's
+// "Save & New" escape hatch — always a real save now that drafts are gone.
+// Skips the save if there's nothing worth saving (no loan blocks, or no
+// client name yet). Returns false only if a save was attempted and failed
+// (error already shown by saveThisClient), so callers know not to proceed.
+async function saveThenClearForNewClient(){
   const hasContent = getAllLoanBlocks().length > 0;
   const hasName = document.getElementById('borrowerName').value.trim().length > 0;
 
   if (hasContent && hasName){
-    const recordId = await saveThisClient('draft');
-    if (!recordId) return; // save failed — error already shown, don't discard their work
-    showSaveClientStatus('Saved as draft. Started new client.', false);
+    const recordId = await saveThisClient();
+    if (!recordId) return false;
+    showSaveClientStatus('Saved. Started new client.', false);
   } else {
     showSaveClientStatus('Started new client.', false);
   }
   clearForNewClient();
+  return true;
+}
+
+// One click, no confirmation modal — safe to be a single click specifically
+// BECAUSE it always saves first, so nothing is ever silently lost.
+async function newClient(){
+  await saveThenClearForNewClient();
 }
 
 function openDeleteClientModal(){
@@ -6039,19 +6135,18 @@ function closeDeleteClientModal(){
   document.getElementById('deleteClientModalOverlay').style.display = 'none';
 }
 
-async function saveThisClientAsDraft(){
+async function saveAndStartNewFromDeleteModal(){
   const errEl = document.getElementById('deleteClientError');
-  if (!document.getElementById('borrowerName').value.trim()){
-    errEl.textContent = 'Enter a Name of Borrower / Client before saving as a draft.';
+  if (getAllLoanBlocks().length && !document.getElementById('borrowerName').value.trim()){
+    errEl.textContent = 'Enter a Name of Borrower / Client before saving.';
     return;
   }
-  const recordId = await saveThisClient('draft');
-  if (!recordId){
-    errEl.textContent = 'Could not save as draft — see the message behind this dialog.';
+  const ok = await saveThenClearForNewClient();
+  if (!ok){
+    errEl.textContent = 'Could not save — see the message behind this dialog.';
     return;
   }
   closeDeleteClientModal();
-  clearCurrentPage();
 }
 
 async function confirmPermanentDelete(){
