@@ -2,6 +2,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <script src="../assets/api.js"></script>
 <script src="../assets/broadcast.js"></script>
 <script src="../export/docx-helpers.js"></script>
@@ -36,36 +37,34 @@
     flex:1 1 auto;
     min-height:0;
   }
+  /* Saved Clients (left) / Account (right) — always a fixed-position overlay
+     drawer at every viewport width now (used to only overlay under 880px;
+     above that it was a plain flex sibling that just popped in/out with no
+     animation at all, display:none/block can't be transitioned). GSAP
+     (power4.inOut, matching the referenced nav component's easing) drives
+     the actual slide — see openSidePanel_/closeSidePanelEl_ below; these
+     rules only set the static geometry each panel animates from/to. */
   .cce-side-panel{
     display:none;
-    width:280px;
-    flex:0 0 280px;
+    position:fixed;
+    top:0; bottom:0;
+    width:320px;
+    max-width:88vw;
     background:#fff;
     overflow-y:auto;
     padding:16px;
+    box-sizing:border-box;
+    z-index:1500;
   }
-  .cce-side-panel.open{ display:block; }
-  .cce-side-panel.cce-side-left{ border-right:1px solid var(--line); }
-  .cce-side-panel.cce-side-right{ border-left:1px solid var(--line); }
+  .cce-side-panel.cce-side-left{ left:0; border-right:1px solid var(--line); box-shadow:10px 0 34px rgba(16,27,51,0.22); }
+  .cce-side-panel.cce-side-right{ right:0; border-left:1px solid var(--line); box-shadow:-10px 0 34px rgba(16,27,51,0.22); }
   .cce-side-panel h3{ margin:0; color:var(--navy); font-size:15px; }
   .cce-side-placeholder{ font-size:12.5px; color:var(--slate); line-height:1.6; margin-top:12px; }
-  .cce-side-backdrop{ display:none; }
-  @media (max-width: 880px){
-    .cce-side-panel.open{
-      position:fixed;
-      top:0; bottom:0;
-      width:86vw;
-      max-width:340px;
-      z-index:1500;
-    }
-    .cce-side-panel.cce-side-left.open{ left:0; right:auto; box-shadow:6px 0 24px rgba(16,27,51,0.18); }
-    .cce-side-panel.cce-side-right.open{ right:0; left:auto; box-shadow:-6px 0 24px rgba(16,27,51,0.18); }
-    .cce-side-backdrop.open{
-      display:block;
-      position:fixed; inset:0;
-      background:rgba(16,27,51,0.45);
-      z-index:1400;
-    }
+  .cce-side-backdrop{
+    display:none;
+    position:fixed; inset:0;
+    background:rgba(16,27,51,0.45);
+    z-index:1400;
   }
   .cce-header{
     background:linear-gradient(135deg,var(--navy) 0%, var(--navy-deep) 100%);
@@ -2063,37 +2062,75 @@ async function attemptRequestLogin(){
 
 // ===========================================================================
 // SIDE PANELS — left (Saved Clients) and right (Account) are independently
-// toggleable. Below the 880px breakpoint they switch from in-flow columns to
-// full-height overlays (see CSS) with a shared backdrop; closing the backdrop
-// closes both regardless of viewport, which is harmless on desktop since the
-// backdrop is invisible there.
+// toggleable, GSAP-animated slide-in overlays (concept ported from a
+// referenced React/GSAP nav component: same power4.inOut easing, adapted
+// from that component's bottom-panel takeover to a left/right edge slide
+// here, since that's the "typical" pattern for a drawer like this). Only
+// one is ever open at a time (opening one auto-closes the other) — a
+// shared backdrop dims the page and clicking it closes whichever is open,
+// reversing the same animation.
 // ===========================================================================
+const CCE_SIDE_PANEL_DURATION = 0.5;
+const CCE_SIDE_PANEL_EASE = 'power4.inOut';
+
+function openSidePanel_(which){
+  const panel = document.getElementById(which === 'left' ? 'leftPanel' : 'rightPanel');
+  const other = document.getElementById(which === 'left' ? 'rightPanel' : 'leftPanel');
+  if (other.dataset.open === 'true') closeSidePanelEl_(other);
+
+  const fromX = which === 'left' ? '-100%' : '100%';
+  gsap.killTweensOf(panel);
+  gsap.set(panel, { display:'block', x: fromX });
+  panel.dataset.open = 'true';
+  gsap.to(panel, { x: '0%', duration: CCE_SIDE_PANEL_DURATION, ease: CCE_SIDE_PANEL_EASE });
+
+  const backdrop = document.getElementById('sidePanelBackdrop');
+  gsap.killTweensOf(backdrop);
+  gsap.set(backdrop, { display:'block' });
+  gsap.fromTo(backdrop, { opacity:0 }, { opacity:1, duration: CCE_SIDE_PANEL_DURATION, ease: CCE_SIDE_PANEL_EASE });
+
+  // Always reopen fresh on the List tab — otherwise a previous session's
+  // Detailed/PDF view (with now-stale cached data) would still be showing.
+  if (which === 'left') loadClientList();
+  if (which === 'right') loadAccountPanel();
+}
+
+function closeSidePanelEl_(panel){
+  if (panel.dataset.open !== 'true') return;
+  const which = panel.id === 'leftPanel' ? 'left' : 'right';
+  const toX = which === 'left' ? '-100%' : '100%';
+  panel.dataset.open = 'false';
+  gsap.killTweensOf(panel);
+  gsap.to(panel, {
+    x: toX, duration: CCE_SIDE_PANEL_DURATION, ease: CCE_SIDE_PANEL_EASE,
+    onComplete: () => gsap.set(panel, { display:'none' }),
+  });
+}
+
 function toggleSidePanel(which){
   if (guestMode) return; // no toggle buttons in guest mode, but defend against any other caller
   const panel = document.getElementById(which === 'left' ? 'leftPanel' : 'rightPanel');
-  const other = document.getElementById(which === 'left' ? 'rightPanel' : 'leftPanel');
-  const opening = !panel.classList.contains('open');
-  // Below the overlay breakpoint, two full-height overlays stacked on top of
-  // each other is just broken — keep it to one at a time there. Side by side
-  // on desktop is fine, so this only applies under 880px.
-  if (opening && window.matchMedia('(max-width: 880px)').matches){
-    other.classList.remove('open');
+  if (panel.dataset.open === 'true'){
+    closeSidePanels();
+  } else {
+    openSidePanel_(which);
   }
-  panel.classList.toggle('open');
-  updateSidePanelBackdrop();
-  // Always reopen fresh on the List tab — otherwise a previous session's
-  // Detailed/PDF view (with now-stale cached data) would still be showing.
-  if (which === 'left' && panel.classList.contains('open')) loadClientList();
-  if (which === 'right' && panel.classList.contains('open')) loadAccountPanel();
 }
+
 function closeSidePanels(){
-  document.getElementById('leftPanel').classList.remove('open');
-  document.getElementById('rightPanel').classList.remove('open');
-  updateSidePanelBackdrop();
-}
-function updateSidePanelBackdrop(){
-  const anyOpen = document.getElementById('leftPanel').classList.contains('open') || document.getElementById('rightPanel').classList.contains('open');
-  document.getElementById('sidePanelBackdrop').classList.toggle('open', anyOpen);
+  const left = document.getElementById('leftPanel');
+  const right = document.getElementById('rightPanel');
+  const anyOpen = left.dataset.open === 'true' || right.dataset.open === 'true';
+  closeSidePanelEl_(left);
+  closeSidePanelEl_(right);
+  if (anyOpen){
+    const backdrop = document.getElementById('sidePanelBackdrop');
+    gsap.killTweensOf(backdrop);
+    gsap.to(backdrop, {
+      opacity:0, duration: CCE_SIDE_PANEL_DURATION, ease: CCE_SIDE_PANEL_EASE,
+      onComplete: () => gsap.set(backdrop, { display:'none' }),
+    });
+  }
 }
 
 // ===========================================================================
