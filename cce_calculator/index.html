@@ -688,31 +688,16 @@
     60%{ transform:scale(1.15); opacity:1; }
     100%{ transform:scale(1); }
   }
+  /* Seamless into the nav bar — no background of its own, buttons just
+     inherit the standard #cceNavBar button styling (white text, hover-lift,
+     tooltip pop) like every other button in the bar. */
   .cce-client-stepper{
     display:flex;
     align-items:center;
-    background:var(--slate-light);
-    border-radius:7px;
-    overflow:hidden;
   }
-  /* #cceNavBar-prefixed on purpose: #cceNavBar button{color:#fff; background:transparent}
-     is an ID selector, which otherwise beats these plain-class rules and left
-     the stepper's buttons rendering white-on-light-grey (illegible) once the
-     stepper moved inside the (dark) floating nav bar. */
-  #cceNavBar .cce-client-stepper button{
-    font-family:Calibri, Arial, sans-serif;
-    font-size:12px;
-    border:none;
-    background:transparent;
-    color:var(--navy);
-    cursor:pointer;
-    padding:8px 10px;
-    transition:background .12s ease;
-  }
-  #cceNavBar .cce-client-stepper button:hover{ background:rgba(27,42,74,0.1); transform:none; }
   .cce-stepper-btn{ font-weight:700; font-size:15px !important; padding:8px 12px !important; line-height:1; }
-  #cceNavBar .cce-stepper-btn.cce-stepper-minus{ color:#B3261E; }
-  .cce-stepper-label{ font-weight:600; border-left:1px solid var(--line); border-right:1px solid var(--line); }
+  .cce-stepper-btn.cce-stepper-minus{ color:#FF8A80; }
+  .cce-stepper-label{ font-weight:600; border-left:1px solid rgba(255,255,255,0.22); border-right:1px solid rgba(255,255,255,0.22); }
 
   /* Floating search — sits to the right of #cceNavBar, same wrap/visibility.
      A collapsed circular button morphs into a text pill on click (concept
@@ -802,6 +787,23 @@
     .cce-nav-group-caption{ display:none; }
     .cce-search-results{ width:260px; }
   }
+  /* Too thin for a horizontal row of 3 floating bars — stack them (and each
+     bar's own contents) into a vertical column instead of letting anything
+     overflow or squeeze unreadably. */
+  @media (max-width: 600px){
+    #cceFloatingBarWrap{
+      flex-direction:column;
+      align-items:stretch;
+      max-height:calc(100vh - 20px);
+      overflow-y:auto;
+    }
+    #cceNavBar, .cce-float-pill, #cceNavFullGroup{
+      flex-direction:column;
+      align-items:stretch;
+    }
+    .cce-nav-divider{ width:auto; height:1px; align-self:stretch; margin:3px 2px; }
+    .cce-client-stepper{ justify-content:center; }
+  }
   @keyframes cceNavHighlightFlash{
     0%{ box-shadow:0 0 0 3px rgba(201,162,75,0.95); }
     100%{ box-shadow:0 0 0 3px rgba(201,162,75,0); }
@@ -830,6 +832,8 @@
   <button id="cceNavTalkFillBtn" onclick="tafOpen()" title="Talk and Fill" data-tip="Talk and Fill">&#127908; Talk and Fill</button>
 </div>
 <div id="cceNavBar">
+  <button id="cceNavAddLoanBtn" onclick="openLoanTypeModal()" title="Add Loan Estimate" data-tip="Add Loan Estimate" style="display:none;">+ Add Loan Estimate</button>
+  <div id="cceNavFullGroup" style="display:none; align-items:center; gap:4px;">
   <div class="cce-client-stepper" id="cceClientStepper">
     <button class="cce-stepper-btn cce-stepper-minus" onclick="openDeleteClientModal()" title="Delete this client" aria-label="Delete this client">&minus;</button>
     <button class="cce-stepper-label" onclick="toggleSidePanel('left')" title="View saved clients">Client</button>
@@ -874,6 +878,7 @@
   <button id="cceNavSaveBtn" onclick="cceNavSaveBtnClick()" title="Save" data-tip="Save this client"><span class="cce-save-label">Save</span></button>
   <div class="cce-nav-divider"></div>
   <button id="cceNavExportBtn" onclick="cceNavExportBtnClick()" title="Export"><svg class="dl-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v11m0 0l-4.5-4.5M12 14l4.5-4.5M5 19h14" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg> Export</button>
+  </div>
 </div>
 <div id="cceSearchBar">
   <div class="cce-search-results" id="cceSearchResults"></div>
@@ -7141,10 +7146,16 @@ function updateCceNavSectionGroup_(blocks){
 
 function updateCceNavBar_(){
   const blocks = getAllLoanBlocks();
-  const bar = document.getElementById('cceNavBar');
-  bar.style.display = blocks.length ? 'flex' : 'none';
-  document.getElementById('cceSearchBar').style.display = blocks.length ? 'block' : 'none';
-  document.getElementById('cceNavTalkFillBar').style.display = blocks.length ? 'flex' : 'none';
+  // The floating bars are always up now — Talk and Fill / search / adding a
+  // loan estimate are all useful before any estimate exists. Only the
+  // middle bar's CONTENT switches: a lone "+ Add Loan Estimate" button
+  // until there's something to navigate, then the normal Client/Page/Loan
+  // Estimate/Section/Save/Export group.
+  document.getElementById('cceNavBar').style.display = 'flex';
+  document.getElementById('cceSearchBar').style.display = 'block';
+  document.getElementById('cceNavTalkFillBar').style.display = 'flex';
+  document.getElementById('cceNavAddLoanBtn').style.display = blocks.length ? 'none' : '';
+  document.getElementById('cceNavFullGroup').style.display = blocks.length ? 'flex' : 'none';
   if (!blocks.length) return;
   if (altViewActive) altViewApplyCurrent_(blocks);
   updateCceNavEstimateGroup_(blocks);
