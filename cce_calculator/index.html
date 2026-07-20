@@ -293,7 +293,7 @@
     flex-wrap:wrap;
   }
 
-  #loanBlocksContainer{ display:flex; flex-direction:column; gap:20px; margin:20px 0; }
+  #loanBlocksContainer{ display:flex; flex-direction:column; gap:20px; margin:20px 0; position:relative; }
   #loanBlocksContainer:empty{ margin:0; }
 
   .loan-block{
@@ -7393,9 +7393,52 @@ function altViewApplyCurrent_(blocks){
   if (!blocks.length) return;
   altViewBlockIndex = Math.max(0, Math.min(altViewBlockIndex, blocks.length - 1));
   if (altViewBlockIndex === altViewLastAppliedIndex && blocks[altViewBlockIndex].classList.contains('cce-alt-current')) return;
+  const prevBlock = blocks.find(b => b.classList.contains('cce-alt-current')) || null;
   altViewLastAppliedIndex = altViewBlockIndex;
+  const nextBlock = blocks[altViewBlockIndex];
   blocks.forEach((b, i) => b.classList.toggle('cce-alt-current', i === altViewBlockIndex));
-  calc(blocks[altViewBlockIndex]);
+  calc(nextBlock);
+  altViewAnimateSwap_(prevBlock, nextBlock);
+}
+
+// Center-display "middle section" pop when the current loan estimate swaps
+// (Prev/Next nav, or a loan estimate gets added/removed while its neighbor
+// becomes the new current one) — same blur+scale spring-pop family as the
+// nav bar's Hide/Show and the Saved Clients/Account side panels, ported
+// from a React/framer-motion reference component Ann shared (its per-item
+// results-list entrance: scale up from a soft blur with a springy bounce,
+// exit with a small downward-scale dip). Both blocks are plain vertical
+// siblings inside #loanBlocksContainer (each .loan-block owns its own
+// self-contained 3-column grid via its own nested .cce-body — nothing
+// shared across blocks), so the only reason this needs JS instead of a
+// pure CSS transition (like the modal pop-in/out elsewhere in this file)
+// is to keep the OUTGOING block from adding its full height to the flex
+// column while it fades out: it's pulled into position:absolute at its
+// own current on-screen spot for the duration of its exit only, then
+// fully cleared back to normal flow (display:none, per the existing
+// body.cce-alt-mode CSS rule) once gone.
+function altViewAnimateSwap_(prevBlock, nextBlock){
+  if (!nextBlock || typeof gsap === 'undefined') return;
+  if (prevBlock && prevBlock !== nextBlock){
+    const container = prevBlock.parentElement;
+    const rect = prevBlock.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    gsap.killTweensOf(prevBlock);
+    gsap.set(prevBlock, {
+      display:'block', position:'absolute',
+      top: rect.top - containerRect.top, left: rect.left - containerRect.left, width: rect.width
+    });
+    gsap.to(prevBlock, {
+      opacity:0, scale:0.96, y:-8, filter:'blur(6px)',
+      duration:0.28, ease:'power2.in',
+      onComplete(){ gsap.set(prevBlock, { clearProps:'display,position,top,left,width,opacity,scale,y,filter' }); }
+    });
+  }
+  gsap.killTweensOf(nextBlock);
+  gsap.fromTo(nextBlock,
+    { opacity:0, scale:0.94, y:10, filter:'blur(8px)' },
+    { opacity:1, scale:1, y:0, filter:'blur(0px)', duration:0.5, ease:'back.out(1.7)', clearProps:'opacity,scale,y,filter' }
+  );
 }
 
 // Scrolls to + flashes the editor field/panel a pencil icon points at.
