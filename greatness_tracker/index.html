@@ -75,9 +75,37 @@
   .gt-total-target{ font-size:9.5px; color:var(--slate); margin-top:2px; }
   .gt-add-row{ margin-top:4px; font-size:9px; padding:2px 6px; border:1px solid var(--line); background:#fff; border-radius:4px; cursor:pointer; color:var(--slate); }
 
-  .gt-theme-item{ display:flex; align-items:center; gap:16px; font-size:12px; padding:6px 0; border-bottom:1px solid var(--slate-light); }
+  .gt-layout{ display:grid; grid-template-columns:240px 1fr; gap:20px; align-items:start; padding:14px 24px 0; }
+  @media (max-width:820px){ .gt-layout{ grid-template-columns:1fr; } }
+
+  .gt-sidebar{ background:#fff; border:1px solid var(--line); border-radius:10px; padding:14px 16px; position:sticky; top:10px; }
+  .gt-card-title{ color:var(--navy); margin:0 0 8px; font-size:13px; }
+
+  .gt-content{ display:flex; flex-direction:column; gap:20px; min-width:0; }
+  .gt-card{ background:#fff; border:1px solid var(--line); border-radius:10px; padding:14px; }
+  .gt-calendar-card{ padding:10px; }
+
+  .gt-history-card{
+    background:var(--slate-light);
+    border:1px dashed var(--line);
+    border-radius:10px;
+    padding:14px 16px;
+    box-shadow:inset 0 1px 3px rgba(16,27,51,0.06);
+  }
+  .gt-history-header{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid var(--line); }
+  .gt-history-header span:first-child{ font-weight:700; font-size:12px; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; }
+  .gt-history-sub{ font-size:10px; color:var(--slate); }
+  .gt-history-list{ display:flex; flex-direction:column; gap:8px; max-height:340px; overflow-y:auto; }
+  .gt-history-entry{ background:#fff; border:1px solid var(--line); border-radius:6px; padding:8px 10px; font-size:11.5px; }
+  .gt-history-time{ font-size:9.5px; color:var(--slate); font-family:Consolas, Menlo, monospace; margin-bottom:2px; }
+  .gt-history-text{ color:var(--ink); font-style:italic; }
+  .gt-history-summary{ color:var(--good); font-size:10.5px; margin-top:3px; }
+  .gt-history-empty{ font-size:11.5px; color:var(--slate); font-style:italic; }
+
+  .gt-theme-item{ display:flex; flex-direction:column; gap:6px; font-size:12px; padding:8px 0; border-bottom:1px solid var(--slate-light); }
   .gt-theme-item label{ display:flex; align-items:center; gap:4px; cursor:pointer; }
-  .gt-theme-item span{ flex:1; }
+  .gt-theme-item > span{ font-weight:600; color:var(--ink); }
+  .gt-theme-options{ display:flex; gap:14px; }
 
   .gt-log-bar{ position:sticky; bottom:0; background:#fff; border-top:1px solid var(--line); padding:10px 24px; display:flex; gap:8px; z-index:10; }
   .gt-log-bar input{ flex:1; padding:9px 12px; font-size:13px; border:1px solid var(--line); border-radius:6px; }
@@ -194,22 +222,36 @@
   <div id="gtMain" style="display:none; flex:1; flex-direction:column;">
     <div style="padding:10px 24px 0; font-size:11px; color:var(--slate);">Week of <b id="gtWeekOfLabel"></b></div>
 
-    <div style="overflow:auto; padding:10px 24px 0;">
-      <table class="gt-grid-table">
-        <thead>
-          <tr>
-            <th></th>
-            <th>Mon</th><th>Tues</th><th>Wed</th><th>Thurs</th><th>Fri</th><th>Weekend</th>
-            <th>Total</th>
-          </tr>
-        </thead>
-        <tbody id="gtGridBody"></tbody>
-      </table>
-    </div>
+    <div class="gt-layout">
+      <div class="gt-sidebar">
+        <h4 class="gt-card-title">Theme Day Calls</h4>
+        <div id="gtThemeDayCalls"></div>
+      </div>
 
-    <div style="padding:16px 24px 4px;">
-      <h4 style="color:var(--navy); margin:0 0 6px;">Theme Day Calls</h4>
-      <div id="gtThemeDayCalls"></div>
+      <div class="gt-content">
+        <div class="gt-card gt-calendar-card">
+          <div style="overflow:auto;">
+            <table class="gt-grid-table">
+              <thead>
+                <tr>
+                  <th></th>
+                  <th>Mon</th><th>Tues</th><th>Wed</th><th>Thurs</th><th>Fri</th><th>Weekend</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody id="gtGridBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="gt-history-card">
+          <div class="gt-history-header">
+            <span>Logged Activity History</span>
+            <span class="gt-history-sub">This week's Talk-and-Fill submissions</span>
+          </div>
+          <div id="gtLogHistoryList" class="gt-history-list"></div>
+        </div>
+      </div>
     </div>
 
     <div style="padding:14px 24px 8px; font-size:10.5px; color:var(--slate); line-height:1.5;">
@@ -453,7 +495,7 @@ function blankGrid(weekOf){
   SECTIONS.forEach(s => { sections[s.id] = Array.from({length:s.startRows}, () => DAYS.map(()=>null)); });
   const themeDayCalls = {};
   THEME_DAY_ITEMS.forEach(t => themeDayCalls[t.id] = null);
-  return { weekOf: weekOf, sections: sections, themeDayCalls: themeDayCalls };
+  return { weekOf: weekOf, sections: sections, themeDayCalls: themeDayCalls, logHistory: [] };
 }
 function isGridEmpty(grid){
   return SECTIONS.every(s => (grid.sections[s.id]||[]).every(row => row.every(c => c == null)))
@@ -507,6 +549,7 @@ async function initWeek(){
   persistDraftLocal();
   renderGrid();
   renderThemeDayCalls();
+  renderLogHistory();
 }
 
 function openWeekRolloverPrompt(staleWeekOf){
@@ -599,14 +642,33 @@ function renderThemeDayCalls(){
     const val = gridState.themeDayCalls[item.id];
     return '<div class="gt-theme-item">'+
       '<span>'+escapeHtml(item.label)+'</span>'+
-      '<label><input type="radio" name="tdc_'+item.id+'" '+(val===true?'checked':'')+' onchange="setThemeDayCall(\''+item.id+'\', true)"> Yes</label>'+
-      '<label><input type="radio" name="tdc_'+item.id+'" '+(val===false?'checked':'')+' onchange="setThemeDayCall(\''+item.id+'\', false)"> No</label>'+
+      '<div class="gt-theme-options">'+
+        '<label><input type="radio" name="tdc_'+item.id+'" '+(val===true?'checked':'')+' onchange="setThemeDayCall(\''+item.id+'\', true)"> Yes</label>'+
+        '<label><input type="radio" name="tdc_'+item.id+'" '+(val===false?'checked':'')+' onchange="setThemeDayCall(\''+item.id+'\', false)"> No</label>'+
+      '</div>'+
     '</div>';
   }).join('');
 }
 function setThemeDayCall(id, val){
   gridState.themeDayCalls[id] = val;
   persistDraftLocal();
+}
+
+function renderLogHistory(){
+  const container = document.getElementById('gtLogHistoryList');
+  if (!container) return;
+  const entries = (gridState.logHistory || []).slice().reverse();
+  if (!entries.length){
+    container.innerHTML = '<div class="gt-history-empty">No activity logged yet this week — entries you submit below will show up here.</div>';
+    return;
+  }
+  container.innerHTML = entries.map(e =>
+    '<div class="gt-history-entry">'+
+      '<div class="gt-history-time">'+escapeHtml(e.time || '')+'</div>'+
+      '<div class="gt-history-text">&ldquo;'+escapeHtml(e.text || '')+'&rdquo;</div>'+
+      (e.summary ? '<div class="gt-history-summary">'+escapeHtml(e.summary)+'</div>' : '')+
+    '</div>'
+  ).join('');
 }
 
 // Applies a { updates:[{section,day,count,note?}], theme_day_calls?:{} } payload
@@ -903,6 +965,14 @@ function tafApplyConfirmed(){
     theme_day_calls[row.dataset.tafTdc] = row.querySelector('[data-taf-tdc-check]').checked;
   });
   const messages = applyPayload({ updates: updates, theme_day_calls: theme_day_calls });
+  if (!gridState.logHistory) gridState.logHistory = [];
+  gridState.logHistory.push({
+    time: new Date().toLocaleString([], { weekday:'short', hour:'2-digit', minute:'2-digit' }),
+    text: tafState.rawTranscript,
+    summary: messages.length ? messages.join(', ') : 'No changes recognized',
+  });
+  persistDraftLocal();
+  renderLogHistory();
   document.getElementById('gtLogStatus').textContent = messages.length ? ('Logged: ' + messages.join(', ')) : '';
   document.getElementById('gtLogInput').value = '';
   tafClose();
@@ -977,6 +1047,7 @@ async function loadSavedRecord(recordId){
     persistDraftLocal();
     renderGrid();
     renderThemeDayCalls();
+    renderLogHistory();
     closeSavedModal();
   } catch (err) {
     alert(err.message);
