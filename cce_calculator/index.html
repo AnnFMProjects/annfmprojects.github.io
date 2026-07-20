@@ -536,13 +536,19 @@
     font-family:Calibri, Arial, sans-serif;
   }
 
-  #cceNavBar{
-    display:none;
+  #cceFloatingBarWrap{
     position:fixed;
     bottom:18px;
     left:50%;
     transform:translateX(-50%);
     z-index:1500;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    max-width:calc(100vw - 20px);
+  }
+  #cceNavBar{
+    display:none;
     background:var(--navy);
     color:#fff;
     font-family:Calibri, Arial, sans-serif;
@@ -551,7 +557,6 @@
     align-items:center;
     gap:4px;
     padding:7px;
-    max-width:calc(100vw - 20px);
     transition:box-shadow .2s ease;
   }
   .cce-nav-group{
@@ -688,7 +693,11 @@
     border-radius:7px;
     overflow:hidden;
   }
-  .cce-client-stepper button{
+  /* #cceNavBar-prefixed on purpose: #cceNavBar button{color:#fff; background:transparent}
+     is an ID selector, which otherwise beats these plain-class rules and left
+     the stepper's buttons rendering white-on-light-grey (illegible) once the
+     stepper moved inside the (dark) floating nav bar. */
+  #cceNavBar .cce-client-stepper button{
     font-family:Calibri, Arial, sans-serif;
     font-size:12px;
     border:none;
@@ -698,14 +707,97 @@
     padding:8px 10px;
     transition:background .12s ease;
   }
-  .cce-client-stepper button:hover{ background:rgba(27,42,74,0.1); }
+  #cceNavBar .cce-client-stepper button:hover{ background:rgba(27,42,74,0.1); transform:none; }
   .cce-stepper-btn{ font-weight:700; font-size:15px !important; padding:8px 12px !important; line-height:1; }
-  .cce-stepper-btn.cce-stepper-minus{ color:#B3261E; }
+  #cceNavBar .cce-stepper-btn.cce-stepper-minus{ color:#B3261E; }
   .cce-stepper-label{ font-weight:600; border-left:1px solid var(--line); border-right:1px solid var(--line); }
+
+  /* Floating search — sits to the right of #cceNavBar, same wrap/visibility.
+     A collapsed circular button morphs into a text pill on click (concept
+     ported from a referenced "gooey search" component — no framer-motion/
+     SVG goo filter here, just a CSS width/border-radius transition plus a
+     staggered pop-in on each result, which reads the same at a glance). */
+  #cceSearchBar{
+    display:none;
+    position:relative;
+  }
+  .cce-search-pill{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    width:42px;
+    height:42px;
+    background:var(--navy);
+    border-radius:50%;
+    box-shadow:0 8px 26px rgba(16,27,51,0.4);
+    overflow:hidden;
+    padding:0 11px;
+    transition:width .32s cubic-bezier(.34,1.56,.64,1), border-radius .32s cubic-bezier(.34,1.56,.64,1);
+  }
+  #cceSearchBar.cce-search-open .cce-search-pill{ width:260px; border-radius:22px; }
+  .cce-search-icon-btn{
+    flex:0 0 auto;
+    width:20px;
+    height:20px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:#fff;
+    background:none;
+    border:none;
+    padding:0;
+    cursor:pointer;
+  }
+  #cceSearchInput{
+    flex:1;
+    min-width:0;
+    background:transparent;
+    border:none;
+    outline:none;
+    color:#fff;
+    font-size:13px;
+    font-family:Calibri, Arial, sans-serif;
+    opacity:0;
+    transition:opacity .18s ease .08s;
+  }
+  #cceSearchBar.cce-search-open #cceSearchInput{ opacity:1; }
+  #cceSearchInput::placeholder{ color:rgba(255,255,255,0.6); }
+  .cce-search-results{
+    display:none;
+    position:absolute;
+    bottom:calc(100% + 12px);
+    right:0;
+    width:320px;
+    max-height:360px;
+    overflow-y:auto;
+    background:#fff;
+    border-radius:12px;
+    box-shadow:0 14px 40px rgba(16,27,51,0.35);
+    padding:6px;
+  }
+  .cce-search-results.cce-search-has-results{ display:block; }
+  .cce-search-result{
+    display:flex;
+    align-items:flex-start;
+    gap:8px;
+    padding:9px 10px;
+    border-radius:8px;
+    cursor:pointer;
+    opacity:0;
+    transform:translateY(6px) scale(.96);
+    animation:cceSearchResultIn .3s cubic-bezier(.34,1.56,.64,1) forwards;
+  }
+  .cce-search-result:hover{ background:var(--slate-light); }
+  @keyframes cceSearchResultIn{ to{ opacity:1; transform:translateY(0) scale(1); } }
+  .cce-search-result-icon{ flex:0 0 auto; font-size:13px; line-height:1.4; color:var(--slate); }
+  .cce-search-result-text{ font-size:12.5px; color:var(--navy); font-weight:600; line-height:1.35; }
+  .cce-search-result-context{ font-size:10.5px; color:var(--slate); font-weight:400; margin-top:1px; }
+  .cce-search-empty{ padding:10px; font-size:12px; color:var(--slate); font-style:italic; }
   @media (max-width: 880px){
-    #cceNavBar{ left:auto; right:10px; transform:none; bottom:10px; }
+    #cceFloatingBarWrap{ left:auto; right:10px; transform:none; bottom:10px; }
     .cce-nav-label{ display:none; }
     .cce-nav-group-caption{ display:none; }
+    .cce-search-results{ width:260px; }
   }
   @keyframes cceNavHighlightFlash{
     0%{ box-shadow:0 0 0 3px rgba(201,162,75,0.95); }
@@ -730,6 +822,7 @@
   <span>A newer version of this tool is available.</span>
   <button onclick="location.reload()">Refresh Now</button>
 </div>
+<div id="cceFloatingBarWrap">
 <div id="cceNavBar">
   <button id="cceNavTalkFillBtn" onclick="tafOpen()" title="Talk and Fill" data-tip="Talk and Fill">&#127908; Talk and Fill</button>
   <div class="cce-nav-divider"></div>
@@ -777,6 +870,16 @@
   <button id="cceNavSaveBtn" onclick="cceNavSaveBtnClick()" title="Save" data-tip="Save this client"><span class="cce-save-label">Save</span></button>
   <div class="cce-nav-divider"></div>
   <button id="cceNavExportBtn" onclick="cceNavExportBtnClick()" title="Export"><svg class="dl-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v11m0 0l-4.5-4.5M12 14l4.5-4.5M5 19h14" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg> Export</button>
+</div>
+<div id="cceSearchBar">
+  <div class="cce-search-results" id="cceSearchResults"></div>
+  <div class="cce-search-pill">
+    <button class="cce-search-icon-btn" type="button" onclick="cceSearchOpen_()" title="Search" aria-label="Search everything on this page">
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 6.5C10 8.433 8.433 10 6.5 10C4.567 10 3 8.433 3 6.5C3 4.567 4.567 3 6.5 3C8.433 3 10 4.567 10 6.5ZM9.30884 10.0159C8.53901 10.6318 7.56251 11 6.5 11C4.01472 11 2 8.98528 2 6.5C2 4.01472 4.01472 2 6.5 2C8.98528 2 11 4.01472 11 6.5C11 7.56251 10.6318 8.53901 10.0159 9.30884L12.8536 12.1464C13.0488 12.3417 13.0488 12.6583 12.8536 12.8536C12.6583 13.0488 12.3417 13.0488 12.1464 12.8536L9.30884 10.0159Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"/></svg>
+    </button>
+    <input type="text" id="cceSearchInput" placeholder="Search fields, panels, buttons&hellip;" oninput="cceSearchInput_()" onkeydown="cceSearchKeydown_(event)">
+  </div>
+</div>
 </div>
 <div class="cce-wrap">
   <div class="cce-header">
@@ -1670,15 +1773,15 @@
               <span class="calc-badge" data-fld="badge_title">Auto</span>
               <span class="hint" data-fld="hint_title"></span>
             </label>
-            <input type="text" inputmode="decimal" data-fld="t_title" value="0" oninput="calc(this.closest('.loan-block'))">
+            <input type="text" inputmode="decimal" data-fld="t_title" value="0" oninput="onTitleFieldEdit(this)">
           </div>
           <div class="field-row" data-fld="row_titleOwner">
             <label>Owner's Policy Premium <span class="hint">Enter directly from title co. calculator if not auto-calculating</span></label>
-            <input type="text" inputmode="decimal" data-fld="t_titleOwner" value="0" oninput="calc(this.closest('.loan-block'))">
+            <input type="text" inputmode="decimal" data-fld="t_titleOwner" value="0" oninput="onTitleFieldEdit(this)">
           </div>
           <div class="field-row" data-fld="row_titleLoan">
             <label>Loan Policy Premium</label>
-            <input type="text" inputmode="decimal" data-fld="t_titleLoan" value="0" oninput="calc(this.closest('.loan-block'))">
+            <input type="text" inputmode="decimal" data-fld="t_titleLoan" value="0" oninput="onTitleFieldEdit(this)">
           </div>
 
           <div class="field-row"><label>Recording Fees</label><input type="text" inputmode="decimal" data-fld="t_recording" value="500" oninput="calc(this.closest('.loan-block'))"></div>
@@ -3263,6 +3366,20 @@ function onSharedCountyChange(){
   propagateDealInfoToBlocks();
 }
 
+// Title Insurance total (t_title) was always being overwritten by
+// owner+loan on every calc() pass, even when auto-calculate was off and the
+// badge said "Manual" — typing directly into it looked broken because it
+// snapped back to the owner+loan sum on the very next keystroke. Same
+// "don't fight active typing" pattern already used for Discount Points
+// (dataset.pointsMode/pointsActiveFld): whichever of the 3 title fields was
+// just typed into is recorded here so applyTitleInsurance() knows not to
+// recompute that one this pass.
+function onTitleFieldEdit(el){
+  const container = el.closest('.loan-block');
+  container.dataset.titleActiveFld = el.dataset.fld;
+  calc(container);
+}
+
 function applyTitleInsurance(container, price, loanAmt){
   const stateCode = E(container,'state').value;
   const countyName = E(container,'county').value;
@@ -3294,7 +3411,11 @@ function applyTitleInsurance(container, price, loanAmt){
     loanInput.disabled = false;
     const owner = numVal(container,'t_titleOwner');
     const loan = numVal(container,'t_titleLoan');
-    totalInput.value = (owner + loan).toFixed(2);
+    // Only resync Total from Owner+Loan when one of THOSE was just edited —
+    // if the user is typing directly into Total itself, leave it alone.
+    if (container.dataset.titleActiveFld !== 't_title'){
+      totalInput.value = (owner + loan).toFixed(2);
+    }
     badge.textContent = 'Manual';
     badge.className = 'manual-badge';
     hint.textContent = '';
@@ -6760,6 +6881,113 @@ function cceNavFlashHighlight_(el){
   el.addEventListener('animationend', () => el.classList.remove('cce-nav-highlight'), { once:true });
 }
 
+// ===========================================================================
+// FLOATING SEARCH — jump to any field/panel/button by text. Rebuilds its
+// index fresh on every search rather than caching, since loan blocks are
+// cloned per estimate (duplicate labels/data-nav across blocks) and fields
+// can be hidden/shown by Auto-calculate toggles — a stale cache would drift.
+// ===========================================================================
+function cceSearchOpen_(){
+  document.getElementById('cceSearchBar').classList.add('cce-search-open');
+  const input = document.getElementById('cceSearchInput');
+  setTimeout(() => input.focus(), 60); // let the width transition start before focusing
+}
+function cceSearchClose_(){
+  document.getElementById('cceSearchBar').classList.remove('cce-search-open');
+  document.getElementById('cceSearchInput').value = '';
+  cceSearchRenderResults_([]);
+}
+function cceSearchKeydown_(evt){
+  if (evt.key === 'Escape') cceSearchClose_();
+}
+document.addEventListener('click', function(evt){
+  const bar = document.getElementById('cceSearchBar');
+  if (bar && bar.classList.contains('cce-search-open') && !bar.contains(evt.target)) cceSearchClose_();
+});
+
+function cceBuildSearchIndex_(){
+  const items = [];
+
+  document.querySelectorAll('.field-row').forEach(row => {
+    if (row.offsetParent === null) return; // skip hidden rows (e.g. Auto-calculated fields toggled off)
+    const label = row.querySelector('label');
+    if (!label) return;
+    const clone = label.cloneNode(true);
+    clone.querySelectorAll('input,select,textarea,.hint').forEach(n => n.remove()); // .hint can hold a long dynamic sentence — keep it out of the search label
+    const text = clone.textContent.replace(/\s+/g, ' ').trim();
+    if (!text) return;
+    const block = row.closest('.loan-block');
+    const context = block ? (block.querySelector('.loan-block-title')||{}).textContent||'' : '';
+    items.push({ type:'field', icon:'&#9998;', text: text, context: context.trim(), el: row, key: (text+' '+context).toLowerCase() });
+  });
+
+  document.querySelectorAll('.panel[data-nav]').forEach(panel => {
+    if (panel.offsetParent === null) return;
+    const key = panel.getAttribute('data-nav');
+    const label = CCE_NAV_LABELS[key] || key;
+    const block = panel.closest('.loan-block');
+    const context = block ? (block.querySelector('.loan-block-title')||{}).textContent||'' : '';
+    items.push({ type:'panel', icon:'&#9635;', text: label, context: context.trim(), el: panel, key: (label+' '+context).toLowerCase() });
+  });
+
+  document.querySelectorAll('#cceNavBar button, .cce-toolbar button').forEach(btn => {
+    if (btn.closest('#cceSearchBar')) return;
+    const titleLabel = (btn.title || btn.dataset.tip || '').trim();
+    const textLabel = btn.textContent.replace(/\s+/g, ' ').trim();
+    const label = (titleLabel && titleLabel.toLowerCase() === textLabel.toLowerCase()) ? textLabel : (titleLabel + ' ' + textLabel).trim();
+    if (!label) return;
+    items.push({ type:'button', icon:'&#9656;', text: label, context: '', el: btn, key: label.toLowerCase() });
+  });
+
+  return items;
+}
+
+let cceSearchDebounceTimer_ = null;
+function cceSearchInput_(){
+  clearTimeout(cceSearchDebounceTimer_);
+  const val = document.getElementById('cceSearchInput').value;
+  cceSearchDebounceTimer_ = setTimeout(() => cceSearchRun_(val), 180);
+}
+
+let _cceSearchResults = [];
+function cceSearchRun_(query){
+  const q = query.trim().toLowerCase();
+  if (!q){ cceSearchRenderResults_([]); return; }
+  const index = cceBuildSearchIndex_();
+  cceSearchRenderResults_(index.filter(it => it.key.indexOf(q) !== -1).slice(0, 8));
+}
+
+function cceSearchRenderResults_(results){
+  _cceSearchResults = results;
+  const wrap = document.getElementById('cceSearchResults');
+  const hasQuery = document.getElementById('cceSearchInput').value.trim().length > 0;
+  if (!hasQuery){ wrap.innerHTML = ''; wrap.classList.remove('cce-search-has-results'); return; }
+  wrap.classList.add('cce-search-has-results');
+  if (!results.length){
+    wrap.innerHTML = '<div class="cce-search-empty">No matches.</div>';
+    return;
+  }
+  wrap.innerHTML = results.map((r, i) =>
+    '<div class="cce-search-result" style="animation-delay:'+(i*40)+'ms" onclick="cceSearchSelectByIndex_('+i+')">'
+    + '<span class="cce-search-result-icon">'+r.icon+'</span>'
+    + '<span><span class="cce-search-result-text">'+xmlEsc(r.text)+'</span>'
+    + (r.context ? '<div class="cce-search-result-context">'+xmlEsc(r.context)+'</div>' : '')
+    + '</span></div>'
+  ).join('');
+}
+
+function cceSearchSelectByIndex_(i){
+  const item = _cceSearchResults[i];
+  if (!item) return;
+  item.el.scrollIntoView({ behavior:'smooth', block:'center' });
+  cceNavFlashHighlight_(item.el);
+  if (item.type === 'field'){
+    const input = item.el.querySelector('input,select,textarea');
+    if (input) setTimeout(() => input.focus(), 400);
+  }
+  cceSearchClose_();
+}
+
 function cceNearestIndexByTop_(elements){
   // Alt View shows exactly one block at a time (the rest are display:none,
   // so their bounding rects are meaningless) — every nav function that asks
@@ -6911,6 +7139,7 @@ function updateCceNavBar_(){
   const blocks = getAllLoanBlocks();
   const bar = document.getElementById('cceNavBar');
   bar.style.display = blocks.length ? 'flex' : 'none';
+  document.getElementById('cceSearchBar').style.display = blocks.length ? 'block' : 'none';
   if (!blocks.length) return;
   if (altViewActive) altViewApplyCurrent_(blocks);
   updateCceNavEstimateGroup_(blocks);
