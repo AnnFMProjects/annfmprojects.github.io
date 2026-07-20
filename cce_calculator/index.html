@@ -549,6 +549,7 @@
   }
   #cceNavBar, .cce-float-pill{
     display:none;
+    flex-shrink:0;
     background:var(--navy);
     color:#fff;
     font-family:Calibri, Arial, sans-serif;
@@ -583,6 +584,7 @@
     font-size:13px;
     cursor:pointer;
     font-family:Calibri, Arial, sans-serif;
+    white-space:nowrap;
     transition:transform .18s cubic-bezier(.34,1.56,.64,1), background .15s ease;
   }
   #cceNavBar button:hover, .cce-float-pill button:hover{ background:rgba(255,255,255,0.14); transform:translateY(-3px) scale(1.07); }
@@ -719,6 +721,7 @@
      staggered pop-in on each result, which reads the same at a glance). */
   #cceSearchBar{
     display:none;
+    flex-shrink:0;
     position:relative;
   }
   .cce-search-pill{
