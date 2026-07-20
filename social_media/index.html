@@ -718,7 +718,7 @@ function marketDesignHtml(design, cards, quote, dateIso){
   }).join('');
 
   return '' +
-    '<div style="width:270px; background:#5FA79C; font-family:Calibri, Arial, sans-serif; overflow:hidden;">' +
+    '<div style="background:#5FA79C; font-family:Calibri, Arial, sans-serif;">' +
       '<div style="background:#0B4A45; padding:12px 14px; text-align:center;">' +
         '<div style="color:#fff; font-family:Cambria, Georgia, serif; font-weight:700; font-size:12px; letter-spacing:.3px;">TODAY&rsquo;S MARKET MOVE:</div>' +
         '<div style="color:#DCEDEA; font-size:8px; margin-top:2px;">' + escapeHtml_((list[0] && list[0].title) || '') + '</div>' +
@@ -744,6 +744,8 @@ function marketDesignHtml(design, cards, quote, dateIso){
     '</div>';
 }
 
+const MU_SQUARE_SIZE = 270; // must stay square (1:1) no matter how much text is added — content scales down to fit, never grows the box or gets clipped
+
 function renderMarketDesigns(){
   const dateIso = document.getElementById('muDate').value || todayIso();
   const grid = document.getElementById('muDesignsGrid');
@@ -755,9 +757,32 @@ function renderMarketDesigns(){
           '<input type="checkbox" ' + (checked ? 'checked' : '') + ' tabindex="-1">' +
           '<span>' + escapeHtml_(d.name) + '</span>' +
         '</div>' +
-        '<div class="design-canvas-wrap"><div class="design-node" id="node_' + d.id + '">' + marketDesignHtml(d, muCards, muQuote, dateIso) + '</div></div>' +
+        '<div class="design-canvas-wrap"><div class="design-node" id="node_' + d.id + '" style="width:' + MU_SQUARE_SIZE + 'px; height:' + MU_SQUARE_SIZE + 'px; overflow:hidden; position:relative;">' +
+          '<div id="inner_' + d.id + '" style="width:' + MU_SQUARE_SIZE + 'px;">' + marketDesignHtml(d, muCards, muQuote, dateIso) + '</div>' +
+        '</div></div>' +
       '</div>';
   }).join('');
+  MU_DESIGNS.forEach(d => fitSquareToContent_(document.getElementById('inner_' + d.id), MU_SQUARE_SIZE));
+}
+
+// Measures the inner content's natural height and, if it's taller than the
+// square, shrinks it down (as a single uniform scale — smaller fonts/icons/
+// spacing, not cropped/cut off) so it always fits exactly inside a
+// MU_SQUARE_SIZE x MU_SQUARE_SIZE box. Two passes: the first gives a rough
+// scale estimate, the second re-measures at the corrected width (text wraps
+// differently at different widths) for a tight fit.
+function fitSquareToContent_(inner, size){
+  if (!inner) return;
+  inner.style.transform = 'none';
+  inner.style.transformOrigin = 'top left';
+  inner.style.width = size + 'px';
+  const h0 = inner.scrollHeight;
+  if (h0 <= size) return; // fits already, no scaling needed
+  const s0 = size / h0;
+  inner.style.width = (size / s0) + 'px';
+  const h1 = inner.scrollHeight;
+  const s1 = size / h1;
+  inner.style.transform = 'scale(' + s1 + ')';
 }
 function toggleMuDesign(id, checked){
   muSelectedDesigns[id] = checked;
