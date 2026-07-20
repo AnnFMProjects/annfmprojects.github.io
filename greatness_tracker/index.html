@@ -800,10 +800,13 @@ function deleteLogHistoryEntry(index){
   persistDraftLocal();
   renderLogHistory();
 }
-// "+" next to the history header — opens a small popup asking what to log,
-// then routes it through the SAME Talk-and-Fill parse-and-review flow the
-// bottom log bar uses, so she sees exactly what category/day it landed on
-// before anything is applied. This is the manual-entry path.
+// "+" next to the history header — opens a small popup asking what to log.
+// PURE LOG, NO GRID EFFECT: runs the free local parser just to guess a
+// category/day for display in the log entry's summary line (so she can see
+// "what was added, which category, which day" at a glance), but never
+// calls applyPayload — nothing here ever touches gridState.sections or
+// gridState.themeDayCalls. This is deliberately separate from the bottom
+// log bar's handleLogSubmit(), which DOES write to the grid.
 function addQuickLogEntry(){
   document.getElementById('quickLogInput').value = '';
   document.getElementById('quickLogModalOverlay').classList.add('open');
@@ -814,8 +817,21 @@ function submitQuickLogModal(){
   const text = document.getElementById('quickLogInput').value.trim();
   if (!text) return;
   closeQuickLogModal();
-  document.getElementById('gtLogInput').value = text;
-  handleLogSubmit();
+  const parsed = parseLogText(text);
+  const summaryParts = (parsed.updates || []).map(function(u){
+    const sectionDef = SECTIONS.find(function(s){ return s.id === u.section; });
+    const label = sectionDef ? sectionDef.label : u.section;
+    return (u.note ? ('"' + u.note + '"') : u.count) + ' ' + label + ' — ' + u.day;
+  });
+  if (!gridState.logHistory) gridState.logHistory = [];
+  gridState.logHistory.push({
+    time: new Date().toLocaleString([], { weekday:'short', hour:'2-digit', minute:'2-digit' }),
+    text: text,
+    summary: summaryParts.length ? (summaryParts.join(', ') + ' (log only — not added to grid)') : '',
+  });
+  persistDraftLocal();
+  renderLogHistory();
+  document.getElementById('gtLogStatus').textContent = 'Logged.';
 }
 
 // Applies a { updates:[{section,day,count,note?}], theme_day_calls?:{} } payload
