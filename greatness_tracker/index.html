@@ -775,10 +775,23 @@ function applyPayload(payload){
         row[dayIdx] = (count === 1 && u.note) ? u.note : 1;
         placed++;
       }
+    } else if (u.note){
+      // A title/name for a 'sum' section (e.g. "Week In Review" for
+      // videos) — lands as its own labeled box rather than an anonymous
+      // number, same idea as a counta name (sectionTotal() already counts
+      // a non-numeric box as 1).
+      if (sectionDef.growable){
+        let row = rows.find(r => r[dayIdx] == null);
+        if (!row){ row = DAYS.map(()=>null); rows.push(row); }
+        row[dayIdx] = u.note;
+      } else {
+        const existing = rows[0][dayIdx];
+        rows[0][dayIdx] = (existing == null || existing === '') ? u.note : (String(existing) + '; ' + u.note);
+      }
     } else {
       rows[0][dayIdx] = (Number(rows[0][dayIdx]) || 0) + count;
     }
-    messages.push(count + ' ' + sectionDef.label + ' — ' + DAYS[dayIdx]);
+    messages.push((u.note ? ('"' + u.note + '"') : count) + ' ' + sectionDef.label + ' — ' + DAYS[dayIdx]);
   });
   const tdc = payload.theme_day_calls || payload.themeDayCalls;
   if (tdc){
@@ -850,9 +863,11 @@ function parseLogText(text){
   clauses.forEach(clause => {
     const rule = SECTION_RULES.find(r => r.re.test(clause));
     if (!rule) return;
-    const sectionDef = SECTIONS.find(s => s.id === rule.id);
     const update = { section: rule.id, day: extractDay(clause.length > 3 ? clause : text), count: extractCount(clause) || 1 };
-    if (sectionDef && sectionDef.mode === 'counta') update.note = extractName(clause);
+    // Works for every section, not just counta ones — "Week In Review video
+    // on Monday" should land "Week In Review" in the videos box, same as a
+    // name landing in a Face to Face box.
+    update.note = extractName(clause);
     updates.push(update);
   });
   return { updates: updates, unresolved: updates.length === 0 };
@@ -968,7 +983,7 @@ function tafRenderReview(){
         '<label style="font-size:12px; color:var(--navy); font-weight:700; min-width:150px;">' + label + '</label>' +
         '<input data-taf-count type="number" min="1" value="' + (u.count || 1) + '" style="width:60px; padding:6px; border:1px solid var(--line); border-radius:5px; font-size:13px;">' +
         '<select data-taf-day style="padding:6px; border:1px solid var(--line); border-radius:5px; font-size:13px;">' + dayOptions + '</select>' +
-        (isCounta ? '<input data-taf-note type="text" placeholder="Name (optional)" value="' + escapeHtml(u.note || '') + '" style="flex:1; min-width:120px; padding:6px; border:1px solid var(--line); border-radius:5px; font-size:13px;">' : '') +
+        '<input data-taf-note type="text" placeholder="' + (isCounta ? 'Name (optional)' : 'Title/note (optional)') + '" value="' + escapeHtml(u.note || '') + '" style="flex:1; min-width:120px; padding:6px; border:1px solid var(--line); border-radius:5px; font-size:13px;">' +
       '</div>';
     }).join('');
     html += tdcKeys.map(k => {
@@ -1022,6 +1037,10 @@ function tafComposeClaudePrompt_(){
     'person, not just a tally — if she names the person(s), put the name in "note" (e.g. "John Smith").',
     'If count > 1 for one of these sections, only include "note" when a single specific name applies',
     'to all of them; otherwise omit "note" and just report the count.',
+    '',
+    'For videos / thank_you_cards / leads_non_internet / deals / pre_apps: these are normally a plain',
+    'tally, but if she gives a title or short description (e.g. "Week In Review video" -> "note":',
+    '"Week In Review"), put that in "note" instead of just a count — that becomes the box\'s label.',
     '',
     'This week\'s tally so far (context only — do not repeat it back, just use it to help disambiguate):',
     JSON.stringify(currentTally),
