@@ -123,7 +123,9 @@
   .gt-theme-item{ display:flex; flex-direction:column; gap:6px; font-size:12px; padding:8px 0; border-bottom:1px solid var(--slate-light); }
   .gt-theme-item label{ display:flex; align-items:center; gap:4px; cursor:pointer; }
   .gt-theme-item > span{ font-weight:600; color:var(--ink); }
-  .gt-theme-options{ display:flex; gap:14px; }
+  .gt-theme-options{ display:flex; align-items:center; gap:14px; }
+  .gt-theme-clear{ margin-left:auto; border:none; background:none; padding:0; color:var(--slate); font-size:10.5px; cursor:pointer; }
+  .gt-theme-clear:hover{ color:#B3261E; }
 
   .gt-log-bar{ position:sticky; bottom:0; background:#fff; border-top:1px solid var(--line); padding:10px 24px; display:flex; gap:8px; z-index:10; }
   .gt-log-bar input{ flex:1; padding:9px 12px; font-size:13px; border:1px solid var(--line); border-radius:6px; }
@@ -740,6 +742,7 @@ function renderThemeDayCalls(){
       '<div class="gt-theme-options">'+
         '<label><input type="radio" name="tdc_'+item.id+'" '+(val===true?'checked':'')+' onchange="setThemeDayCall(\''+item.id+'\', true)"> Yes</label>'+
         '<label><input type="radio" name="tdc_'+item.id+'" '+(val===false?'checked':'')+' onchange="setThemeDayCall(\''+item.id+'\', false)"> No</label>'+
+        '<button type="button" class="gt-theme-clear" onclick="clearThemeDayCall(\''+item.id+'\')">&times; Clear</button>'+
       '</div>'+
     '</div>';
   }).join('');
@@ -747,6 +750,11 @@ function renderThemeDayCalls(){
 function setThemeDayCall(id, val){
   gridState.themeDayCalls[id] = val;
   persistDraftLocal();
+}
+function clearThemeDayCall(id){
+  gridState.themeDayCalls[id] = null;
+  persistDraftLocal();
+  renderThemeDayCalls();
 }
 
 function renderLogHistory(){
