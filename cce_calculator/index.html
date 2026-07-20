@@ -546,14 +546,17 @@
     gap:10px;
     max-width:calc(100vw - 20px);
   }
-  /* Hidden state — everything collapses away except the toggle button
-     itself, which flips its own label between Hide/Show. Actually applied
-     display:none only AFTER the pop-out animation below finishes (see
-     cceNavToggleCollapse_), so the collapse itself is animated, not instant. */
-  #cceFloatingBarWrap.cce-nav-collapsed > *:not(#cceNavCollapseWrap){ display:none !important; }
-  /* Gooey-style pop in/out for the 3 floating bars on Hide/Show — blur +
-     scale with a spring bounce, staggered per bar (concept ported from the
-     referenced GooeySearch component's staggered result pop-in). */
+  /* Hide/Show now only ever collapses the "full nav" (#cceNavBar — the
+     Client/Page/Loan Estimate/Section/Save/Export group, or the empty-state
+     "+ Add Loan Estimate") — Talk and Fill and Search stay up regardless, so
+     Save/Export have somewhere to "come back" to (see body.cce-nav-hidden
+     rules below). Actually applied display:none only AFTER the pop-out
+     animation finishes (see cceNavToggleCollapse_), so the collapse itself
+     is animated, not instant. */
+  #cceFloatingBarWrap.cce-nav-collapsed #cceNavBar{ display:none !important; }
+  /* Gooey-style pop in/out for #cceNavBar on Hide/Show — blur + scale with a
+     spring bounce (concept ported from the referenced GooeySearch
+     component's staggered result pop-in). */
   @keyframes cceNavPopIn{
     from{ opacity:0; transform:scale(.3); filter:blur(8px); }
     to{ opacity:1; transform:scale(1); filter:blur(0); }
@@ -564,6 +567,16 @@
   }
   .cce-nav-pop-in{ animation:cceNavPopIn .5s cubic-bezier(.34,1.56,.64,1) both; }
   .cce-nav-pop-out{ animation:cceNavPopOut .32s ease-in both; }
+  /* Save/Export "come back" while the full nav is hidden — on the Talk and
+     Fill line always, and inline in each loan estimate's header/footer
+     (next to + Add Loan Estimate / Remove) when at least one exists. Hidden
+     by default; body.cce-nav-hidden is toggled by cceNavToggleCollapse_. */
+  .cce-quick-btn{ display:none; }
+  body.cce-nav-hidden .cce-quick-btn{ display:inline-flex; }
+  .cce-quick-btn.cce-quick-save{ background:var(--good); color:#fff; font-weight:600; align-items:center; justify-content:center; min-width:50px; }
+  .cce-quick-btn.cce-quick-save:hover{ background:#3A8362; }
+  .cce-quick-btn.cce-quick-export{ background:var(--gold); color:var(--navy-deep); font-weight:600; align-items:center; gap:4px; }
+  .cce-quick-btn.cce-quick-export:hover{ background:#D9B76A; }
   #cceNavBar, .cce-float-pill{
     display:none;
     flex-shrink:0;
@@ -847,6 +860,8 @@
 <div id="cceFloatingBarWrap">
 <div id="cceNavTalkFillBar" class="cce-float-pill">
   <button id="cceNavTalkFillBtn" onclick="tafOpen()" title="Talk and Fill" data-tip="Talk and Fill">&#127908; Talk and Fill</button>
+  <button class="cce-quick-btn cce-quick-save" onclick="cceSaveBtnClick_(this)" title="Save" data-tip="Save this client"><span class="cce-save-label">Save</span></button>
+  <button class="cce-quick-btn cce-quick-export" onclick="cceNavExportBtnClick()" title="Export" data-tip="Export"><svg class="dl-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v11m0 0l-4.5-4.5M12 14l4.5-4.5M5 19h14" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>Export</button>
 </div>
 <div id="cceNavBar">
   <button id="cceNavAddLoanBtn" onclick="openLoanTypeModal()" title="Add Loan Estimate" data-tip="Add Loan Estimate" style="display:none;">+ Add Loan Estimate</button>
@@ -1629,6 +1644,8 @@
       <div class="loan-block-header-buttons">
         <button class="export-btn" style="padding:6px 12px; font-size:11px;" onclick="openLoanTypeModal()">+ Add Loan Estimate</button>
         <button class="export-btn" style="padding:6px 12px; font-size:11px; background:var(--slate-light); color:var(--navy);" onclick="removeLoanBlock(this)">Remove</button>
+        <button class="export-btn cce-quick-btn cce-quick-save" style="padding:6px 12px; font-size:11px;" onclick="cceSaveBtnClick_(this)" title="Save this client">Save</button>
+        <button class="export-btn cce-quick-btn cce-quick-export" style="padding:6px 12px; font-size:11px;" onclick="cceNavExportBtnClick()" title="Export">Export</button>
       </div>
     </div>
     <div class="cce-body">
@@ -1921,6 +1938,8 @@
       <div class="loan-block-header-buttons">
         <button class="export-btn" style="padding:6px 12px; font-size:11px;" onclick="openLoanTypeModal()">+ Add Loan Estimate</button>
         <button class="export-btn" style="padding:6px 12px; font-size:11px; background:var(--slate-light); color:var(--navy);" onclick="removeLoanBlock(this)">Remove</button>
+        <button class="export-btn cce-quick-btn cce-quick-save" style="padding:6px 12px; font-size:11px;" onclick="cceSaveBtnClick_(this)" title="Save this client">Save</button>
+        <button class="export-btn cce-quick-btn cce-quick-export" style="padding:6px 12px; font-size:11px;" onclick="cceNavExportBtnClick()" title="Export">Export</button>
       </div>
     </div>
   </div>
@@ -6284,10 +6303,12 @@ function cceKineticHtml_(word){
     + '</span>';
 }
 
-// The nav bar's Save button (moved here from the toolbar 2026-07-20, per
-// Ann's request — no separate toolbar Save button anymore).
-async function cceNavSaveBtnClick(){
-  const btn = document.getElementById('cceNavSaveBtn');
+// Shared by every Save button in the app (the main nav bar's, plus the
+// quick-access copies that appear on the Talk and Fill line and in each
+// loan estimate's header/footer while the full nav is hidden — see
+// cceNavToggleCollapse_) — runs the kinetic Saving/Saved animation on
+// whichever specific button was actually clicked.
+async function cceSaveBtnClick_(btn){
   if (btn.disabled) return;
   const original = btn.innerHTML;
   btn.disabled = true;
@@ -6300,6 +6321,12 @@ async function cceNavSaveBtnClick(){
     btn.innerHTML = original;
     btn.disabled = false;
   }
+}
+
+// The main nav bar's own Save button (moved here from the toolbar
+// 2026-07-20, per Ann's request — no separate toolbar Save button anymore).
+function cceNavSaveBtnClick(){
+  cceSaveBtnClick_(document.getElementById('cceNavSaveBtn'));
 }
 
 // Clears only the client-identifying parts of the page (client name + loan
@@ -7231,19 +7258,18 @@ function cceNavPlayPop_(el, className, delayMs){
   el.classList.add(className);
 }
 
-// Hides everything in the floating bar system except the toggle button
-// itself — useful on narrow screens where the vertically-stacked nav can
-// take up a lot of the viewport. Visible (not collapsed) by default on
-// every fresh page load; not persisted across reloads on purpose. Each of
-// the 3 bars pops in/out with a staggered blur+scale spring (see
-// cceNavPopIn/cceNavPopOut) instead of an instant show/hide — order runs
-// closest-to-the-toggle-button first on the way out, and furthest-first
-// (unfurling outward) on the way back in.
+// Hides the "full nav" (#cceNavBar — Client/Page/Loan Estimate/Section/
+// Save/Export, or the empty-state "+ Add Loan Estimate") — Talk and Fill
+// and Search stay up regardless. While hidden, Save/Export "come back" on
+// the Talk and Fill line and inline in each loan estimate's header/footer
+// (see the body.cce-nav-hidden CSS + the .cce-quick-btn copies in the HTML/
+// template) so neither action becomes unreachable. Visible (not collapsed)
+// by default on every fresh page load; not persisted across reloads on
+// purpose. #cceNavBar pops in/out with a blur+scale spring (see
+// cceNavPopIn/cceNavPopOut) instead of an instant show/hide.
 function cceNavToggleCollapse_(){
   const wrap = document.getElementById('cceFloatingBarWrap');
-  const talkFill = document.getElementById('cceNavTalkFillBar');
   const navBar = document.getElementById('cceNavBar');
-  const searchBar = document.getElementById('cceSearchBar');
   const btn = document.getElementById('cceNavCollapseBtn');
   const collapsing = !wrap.classList.contains('cce-nav-collapsed');
 
@@ -7251,24 +7277,22 @@ function cceNavToggleCollapse_(){
     btn.textContent = 'Show';
     btn.title = 'Show nav';
     btn.setAttribute('data-tip', 'Show nav');
-    cceNavPlayPop_(searchBar, 'cce-nav-pop-out', 0);
-    cceNavPlayPop_(navBar, 'cce-nav-pop-out', 80);
-    cceNavPlayPop_(talkFill, 'cce-nav-pop-out', 160);
+    document.body.classList.add('cce-nav-hidden');
+    cceNavPlayPop_(navBar, 'cce-nav-pop-out', 0);
     setTimeout(() => {
       wrap.classList.add('cce-nav-collapsed');
-      [talkFill, navBar, searchBar].forEach(el => el.classList.remove('cce-nav-pop-out'));
-    }, 160 + 320 + 20);
+      navBar.classList.remove('cce-nav-pop-out');
+    }, 320 + 20);
   } else {
     wrap.classList.remove('cce-nav-collapsed');
+    document.body.classList.remove('cce-nav-hidden');
     btn.textContent = 'Hide';
     btn.title = 'Hide nav';
     btn.setAttribute('data-tip', 'Hide nav');
-    cceNavPlayPop_(talkFill, 'cce-nav-pop-in', 0);
-    cceNavPlayPop_(navBar, 'cce-nav-pop-in', 80);
-    cceNavPlayPop_(searchBar, 'cce-nav-pop-in', 160);
+    cceNavPlayPop_(navBar, 'cce-nav-pop-in', 0);
     setTimeout(() => {
-      [talkFill, navBar, searchBar].forEach(el => el.classList.remove('cce-nav-pop-in'));
-    }, 160 + 500 + 20);
+      navBar.classList.remove('cce-nav-pop-in');
+    }, 500 + 20);
   }
 }
 
