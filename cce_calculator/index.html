@@ -547,8 +547,23 @@
     max-width:calc(100vw - 20px);
   }
   /* Hidden state — everything collapses away except the toggle button
-     itself, which flips its own label between Hide/Show. */
+     itself, which flips its own label between Hide/Show. Actually applied
+     display:none only AFTER the pop-out animation below finishes (see
+     cceNavToggleCollapse_), so the collapse itself is animated, not instant. */
   #cceFloatingBarWrap.cce-nav-collapsed > *:not(#cceNavCollapseWrap){ display:none !important; }
+  /* Gooey-style pop in/out for the 3 floating bars on Hide/Show — blur +
+     scale with a spring bounce, staggered per bar (concept ported from the
+     referenced GooeySearch component's staggered result pop-in). */
+  @keyframes cceNavPopIn{
+    from{ opacity:0; transform:scale(.3); filter:blur(8px); }
+    to{ opacity:1; transform:scale(1); filter:blur(0); }
+  }
+  @keyframes cceNavPopOut{
+    from{ opacity:1; transform:scale(1); filter:blur(0); }
+    to{ opacity:0; transform:scale(.3); filter:blur(8px); }
+  }
+  .cce-nav-pop-in{ animation:cceNavPopIn .5s cubic-bezier(.34,1.56,.64,1) both; }
+  .cce-nav-pop-out{ animation:cceNavPopOut .32s ease-in both; }
   #cceNavBar, .cce-float-pill{
     display:none;
     flex-shrink:0;
@@ -7206,17 +7221,55 @@ function updateCceNavBar_(){
   updateCceNavSectionGroup_(blocks);
 }
 
+// Restarts a CSS animation on el by re-triggering it (class removed, forced
+// reflow, class re-added) — needed since just re-adding the same class name
+// doesn't restart an already-finished animation.
+function cceNavPlayPop_(el, className, delayMs){
+  el.classList.remove('cce-nav-pop-in', 'cce-nav-pop-out');
+  void el.offsetWidth;
+  el.style.animationDelay = delayMs + 'ms';
+  el.classList.add(className);
+}
+
 // Hides everything in the floating bar system except the toggle button
 // itself — useful on narrow screens where the vertically-stacked nav can
 // take up a lot of the viewport. Visible (not collapsed) by default on
-// every fresh page load; not persisted across reloads on purpose.
+// every fresh page load; not persisted across reloads on purpose. Each of
+// the 3 bars pops in/out with a staggered blur+scale spring (see
+// cceNavPopIn/cceNavPopOut) instead of an instant show/hide — order runs
+// closest-to-the-toggle-button first on the way out, and furthest-first
+// (unfurling outward) on the way back in.
 function cceNavToggleCollapse_(){
   const wrap = document.getElementById('cceFloatingBarWrap');
-  const collapsed = wrap.classList.toggle('cce-nav-collapsed');
+  const talkFill = document.getElementById('cceNavTalkFillBar');
+  const navBar = document.getElementById('cceNavBar');
+  const searchBar = document.getElementById('cceSearchBar');
   const btn = document.getElementById('cceNavCollapseBtn');
-  btn.textContent = collapsed ? 'Show' : 'Hide';
-  btn.title = collapsed ? 'Show nav' : 'Hide nav';
-  btn.setAttribute('data-tip', collapsed ? 'Show nav' : 'Hide nav');
+  const collapsing = !wrap.classList.contains('cce-nav-collapsed');
+
+  if (collapsing){
+    btn.textContent = 'Show';
+    btn.title = 'Show nav';
+    btn.setAttribute('data-tip', 'Show nav');
+    cceNavPlayPop_(searchBar, 'cce-nav-pop-out', 0);
+    cceNavPlayPop_(navBar, 'cce-nav-pop-out', 80);
+    cceNavPlayPop_(talkFill, 'cce-nav-pop-out', 160);
+    setTimeout(() => {
+      wrap.classList.add('cce-nav-collapsed');
+      [talkFill, navBar, searchBar].forEach(el => el.classList.remove('cce-nav-pop-out'));
+    }, 160 + 320 + 20);
+  } else {
+    wrap.classList.remove('cce-nav-collapsed');
+    btn.textContent = 'Hide';
+    btn.title = 'Hide nav';
+    btn.setAttribute('data-tip', 'Hide nav');
+    cceNavPlayPop_(talkFill, 'cce-nav-pop-in', 0);
+    cceNavPlayPop_(navBar, 'cce-nav-pop-in', 80);
+    cceNavPlayPop_(searchBar, 'cce-nav-pop-in', 160);
+    setTimeout(() => {
+      [talkFill, navBar, searchBar].forEach(el => el.classList.remove('cce-nav-pop-in'));
+    }, 160 + 500 + 20);
+  }
 }
 
 let cceNavScrollTicking = false;
