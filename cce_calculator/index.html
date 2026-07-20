@@ -547,7 +547,7 @@
     gap:10px;
     max-width:calc(100vw - 20px);
   }
-  #cceNavBar{
+  #cceNavBar, .cce-float-pill{
     display:none;
     background:var(--navy);
     color:#fff;
@@ -573,7 +573,7 @@
     display:block;
     margin-bottom:1px;
   }
-  #cceNavBar button{
+  #cceNavBar button, .cce-float-pill button{
     position:relative;
     background:transparent;
     color:#fff;
@@ -585,11 +585,11 @@
     font-family:Calibri, Arial, sans-serif;
     transition:transform .18s cubic-bezier(.34,1.56,.64,1), background .15s ease;
   }
-  #cceNavBar button:hover{ background:rgba(255,255,255,0.14); transform:translateY(-3px) scale(1.07); }
-  #cceNavBar button:disabled{ opacity:0.35; cursor:default; }
-  #cceNavBar button:disabled:hover{ background:transparent; transform:none; }
+  #cceNavBar button:hover, .cce-float-pill button:hover{ background:rgba(255,255,255,0.14); transform:translateY(-3px) scale(1.07); }
+  #cceNavBar button:disabled, .cce-float-pill button:disabled{ opacity:0.35; cursor:default; }
+  #cceNavBar button:disabled:hover, .cce-float-pill button:disabled:hover{ background:transparent; transform:none; }
   /* Floating tooltip pill, GlassDock-style: fades + slides up above the button on hover */
-  #cceNavBar button[data-tip]::after{
+  #cceNavBar button[data-tip]::after, .cce-float-pill button[data-tip]::after{
     content:attr(data-tip);
     position:absolute;
     bottom:calc(100% + 10px);
@@ -610,8 +610,8 @@
     transition:opacity .18s ease, transform .18s ease;
     z-index:1;
   }
-  #cceNavBar button[data-tip]:hover::after{ opacity:1; transform:translate(-50%, 0); }
-  #cceNavBar button[data-tip]:disabled::after{ display:none; }
+  #cceNavBar button[data-tip]:hover::after, .cce-float-pill button[data-tip]:hover::after{ opacity:1; transform:translate(-50%, 0); }
+  #cceNavBar button[data-tip]:disabled::after, .cce-float-pill button[data-tip]:disabled::after{ display:none; }
   .cce-nav-label{
     font-size:11.5px;
     color:#C9CEDA;
@@ -823,9 +823,10 @@
   <button onclick="location.reload()">Refresh Now</button>
 </div>
 <div id="cceFloatingBarWrap">
-<div id="cceNavBar">
+<div id="cceNavTalkFillBar" class="cce-float-pill">
   <button id="cceNavTalkFillBtn" onclick="tafOpen()" title="Talk and Fill" data-tip="Talk and Fill">&#127908; Talk and Fill</button>
-  <div class="cce-nav-divider"></div>
+</div>
+<div id="cceNavBar">
   <div class="cce-client-stepper" id="cceClientStepper">
     <button class="cce-stepper-btn cce-stepper-minus" onclick="openDeleteClientModal()" title="Delete this client" aria-label="Delete this client">&minus;</button>
     <button class="cce-stepper-label" onclick="toggleSidePanel('left')" title="View saved clients">Client</button>
@@ -6930,7 +6931,7 @@ function cceBuildSearchIndex_(){
     items.push({ type:'panel', icon:'&#9635;', text: label, context: context.trim(), el: panel, key: (label+' '+context).toLowerCase() });
   });
 
-  document.querySelectorAll('#cceNavBar button, .cce-toolbar button').forEach(btn => {
+  document.querySelectorAll('#cceNavBar button, .cce-float-pill button, .cce-toolbar button').forEach(btn => {
     if (btn.closest('#cceSearchBar')) return;
     const titleLabel = (btn.title || btn.dataset.tip || '').trim();
     const textLabel = btn.textContent.replace(/\s+/g, ' ').trim();
@@ -7140,6 +7141,7 @@ function updateCceNavBar_(){
   const bar = document.getElementById('cceNavBar');
   bar.style.display = blocks.length ? 'flex' : 'none';
   document.getElementById('cceSearchBar').style.display = blocks.length ? 'block' : 'none';
+  document.getElementById('cceNavTalkFillBar').style.display = blocks.length ? 'flex' : 'none';
   if (!blocks.length) return;
   if (altViewActive) altViewApplyCurrent_(blocks);
   updateCceNavEstimateGroup_(blocks);
