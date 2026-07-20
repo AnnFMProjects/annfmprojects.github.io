@@ -98,11 +98,23 @@
     padding:14px 16px;
     box-shadow:inset 0 1px 3px rgba(16,27,51,0.06);
   }
-  .gt-history-header{ display:flex; flex-direction:column; gap:2px; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid var(--line); }
-  .gt-history-header span:first-child{ font-weight:700; font-size:12px; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; }
+  .gt-history-header{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid var(--line); }
+  .gt-history-header-text{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .gt-history-header-text span:first-child{ font-weight:700; font-size:12px; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; }
   .gt-history-sub{ font-size:10px; color:var(--slate); }
+  .gt-history-quick-add{
+    flex-shrink:0; width:22px; height:22px; border-radius:50%; border:1px solid var(--line); background:#fff;
+    color:var(--navy); font-size:15px; line-height:1; font-weight:700; cursor:pointer; padding:0;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .gt-history-quick-add:hover{ background:var(--gold); border-color:var(--gold); }
   .gt-history-list{ display:flex; flex-direction:column; gap:8px; max-height:340px; overflow-y:auto; }
-  .gt-history-entry{ background:#fff; border:1px solid var(--line); border-radius:6px; padding:8px 10px; font-size:11.5px; }
+  .gt-history-entry{ position:relative; background:#fff; border:1px solid var(--line); border-radius:6px; padding:8px 22px 8px 10px; font-size:11.5px; }
+  .gt-history-delete{
+    position:absolute; top:4px; right:4px; width:16px; height:16px; padding:0; border:none; border-radius:3px;
+    background:transparent; color:var(--slate); font-size:13px; line-height:16px; text-align:center; cursor:pointer;
+  }
+  .gt-history-delete:hover{ background:#f5d9d9; color:#B3261E; }
   .gt-history-time{ font-size:9.5px; color:var(--slate); font-family:Consolas, Menlo, monospace; margin-bottom:2px; }
   .gt-history-text{ color:var(--ink); font-style:italic; }
   .gt-history-summary{ color:var(--good); font-size:10.5px; margin-top:3px; }
@@ -239,8 +251,11 @@
 
         <div class="gt-history-card">
           <div class="gt-history-header">
-            <span>Logged Activity History</span>
-            <span class="gt-history-sub">This week's Talk-and-Fill submissions</span>
+            <div class="gt-history-header-text">
+              <span>Logged Activity History</span>
+              <span class="gt-history-sub">This week's Talk-and-Fill submissions</span>
+            </div>
+            <button type="button" class="gt-history-quick-add" title="Quick log — marks that you did something today, no details needed" onclick="addQuickLogEntry()">+</button>
           </div>
           <div id="gtLogHistoryList" class="gt-history-list"></div>
         </div>
@@ -737,18 +752,41 @@ function setThemeDayCall(id, val){
 function renderLogHistory(){
   const container = document.getElementById('gtLogHistoryList');
   if (!container) return;
-  const entries = (gridState.logHistory || []).slice().reverse();
-  if (!entries.length){
+  const list = gridState.logHistory || [];
+  if (!list.length){
     container.innerHTML = '<div class="gt-history-empty">No activity logged yet this week — entries you submit below will show up here.</div>';
     return;
   }
-  container.innerHTML = entries.map(e =>
-    '<div class="gt-history-entry">'+
+  // Show newest first, but keep each entry's ORIGINAL array index (not its
+  // display position) so the delete button removes the right one.
+  const entries = list.map((e, i) => ({ e: e, i: i })).reverse();
+  container.innerHTML = entries.map(function(item){
+    const e = item.e;
+    return '<div class="gt-history-entry">'+
+      '<button type="button" class="gt-history-delete" title="Delete this entry" onclick="deleteLogHistoryEntry('+item.i+')">&times;</button>'+
       '<div class="gt-history-time">'+escapeHtml(e.time || '')+'</div>'+
       '<div class="gt-history-text">&ldquo;'+escapeHtml(e.text || '')+'&rdquo;</div>'+
       (e.summary ? '<div class="gt-history-summary">'+escapeHtml(e.summary)+'</div>' : '')+
-    '</div>'
-  ).join('');
+    '</div>';
+  }).join('');
+}
+function deleteLogHistoryEntry(index){
+  if (!gridState.logHistory) return;
+  gridState.logHistory.splice(index, 1);
+  persistDraftLocal();
+  renderLogHistory();
+}
+// "+" next to the history header — a one-click marker that something got
+// done today, with no details and no effect on the grid/totals.
+function addQuickLogEntry(){
+  if (!gridState.logHistory) gridState.logHistory = [];
+  gridState.logHistory.push({
+    time: new Date().toLocaleString([], { weekday:'short', hour:'2-digit', minute:'2-digit' }),
+    text: 'Quick log — marked as done',
+    summary: '',
+  });
+  persistDraftLocal();
+  renderLogHistory();
 }
 
 // Applies a { updates:[{section,day,count,note?}], theme_day_calls?:{} } payload
@@ -1493,6 +1531,13 @@ function runImportJson(){
     if (!proceed){ statusEl.style.color = 'var(--slate)'; statusEl.textContent = 'Import canceled.'; return; }
   }
   const added = mergeImportedGridData_(parsed);
+  const summaryText = added ? ('Added ' + added + ' new entr' + (added === 1 ? 'y' : 'ies') + ' from import') : 'No new entries — already up to date';
+  if (!gridState.logHistory) gridState.logHistory = [];
+  gridState.logHistory.push({
+    time: new Date().toLocaleString([], { weekday:'short', hour:'2-digit', minute:'2-digit' }),
+    text: 'JSON imported',
+    summary: summaryText,
+  });
   shrinkSections();
   renderGrid();
   renderThemeDayCalls();
