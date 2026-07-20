@@ -614,7 +614,8 @@ function renderGrid(){
       }
       DAYS.forEach((day, di) => {
         const val = row[di];
-        html += '<td class="gt-cell"><input type="text" inputmode="numeric" class="gt-cell-input" data-section="'+sectionDef.id+'" data-row="'+ri+'" data-day="'+di+'" value="'+(val==null?'':escapeHtml(String(val)))+'"></td>';
+        const numericKeypad = sectionDef.mode === 'sum' ? ' inputmode="numeric"' : '';
+        html += '<td class="gt-cell"><input type="text"'+numericKeypad+' class="gt-cell-input" placeholder="'+(sectionDef.mode==='counta'?'name':'')+'" data-section="'+sectionDef.id+'" data-row="'+ri+'" data-day="'+di+'" value="'+(val==null?'':escapeHtml(String(val)))+'"></td>';
       });
       if (ri === 0){
         const total = sectionTotal(sectionDef);
@@ -691,7 +692,11 @@ function applyPayload(payload){
       while (placed < count){
         let row = rows.find(r => r[dayIdx] == null);
         if (!row){ row = DAYS.map(()=>null); rows.push(row); }
-        row[dayIdx] = u.note || 1;
+        // A name only ever applies to a single box — with count > 1 we don't
+        // know which of several people the one extracted name belongs to,
+        // so those extra boxes get a plain 1 (still counted, still editable
+        // by hand afterward) instead of repeating the same name count times.
+        row[dayIdx] = (count === 1 && u.note) ? u.note : 1;
         placed++;
       }
     } else {
@@ -751,6 +756,17 @@ function extractDay(text){
   for (const k in DAY_WORDS){ if (new RegExp('\\b'+k+'\\b','i').test(t)) return DAY_WORDS[k]; }
   return dayLabelFor(new Date());
 }
+// Best-effort guess at a person's name in a clause, for sections whose boxes
+// are meant to hold a name rather than a bare tally (mode:'counta'). Grabs
+// runs of capitalized words, skipping day names — always shown back to Ann
+// in the review step so a wrong/missed guess is easy to fix by hand.
+const NAME_SKIP_WORDS = new Set(['Mon','Monday','Tues','Tuesday','Wed','Wednesday','Thurs','Thursday',
+  'Fri','Friday','Sat','Saturday','Sun','Sunday','Weekend','Today','Yesterday','I']);
+function extractName(text){
+  const runs = text.match(/\b[A-Z][a-zA-Z'-]*(?:\s+[A-Z][a-zA-Z'-]*)*\b/g) || [];
+  const filtered = runs.map(r => r.split(/\s+/).filter(w => !NAME_SKIP_WORDS.has(w)).join(' ')).filter(Boolean);
+  return filtered.length ? filtered[0] : null;
+}
 function parseLogText(text){
   const clauses = text.split(/\band\b|[,;]/i).map(c => c.trim()).filter(Boolean);
   if (!clauses.length) clauses.push(text);
@@ -758,7 +774,10 @@ function parseLogText(text){
   clauses.forEach(clause => {
     const rule = SECTION_RULES.find(r => r.re.test(clause));
     if (!rule) return;
-    updates.push({ section: rule.id, day: extractDay(clause.length > 3 ? clause : text), count: extractCount(clause) || 1 });
+    const sectionDef = SECTIONS.find(s => s.id === rule.id);
+    const update = { section: rule.id, day: extractDay(clause.length > 3 ? clause : text), count: extractCount(clause) || 1 };
+    if (sectionDef && sectionDef.mode === 'counta') update.note = extractName(clause);
+    updates.push(update);
   });
   return { updates: updates, unresolved: updates.length === 0 };
 }
@@ -867,11 +886,13 @@ function tafRenderReview(){
     let html = updates.map(u => {
       const sectionDef = SECTIONS.find(s => s.id === u.section);
       const label = sectionDef ? sectionDef.label : u.section;
+      const isCounta = sectionDef && sectionDef.mode === 'counta';
       const dayOptions = DAYS.map(d => '<option value="' + d + '"' + (d === u.day ? ' selected' : '') + '>' + d + '</option>').join('');
-      return '<div data-taf-update data-section="' + u.section + '" style="display:flex; align-items:center; gap:8px;">' +
+      return '<div data-taf-update data-section="' + u.section + '" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">' +
         '<label style="font-size:12px; color:var(--navy); font-weight:700; min-width:150px;">' + label + '</label>' +
         '<input data-taf-count type="number" min="1" value="' + (u.count || 1) + '" style="width:60px; padding:6px; border:1px solid var(--line); border-radius:5px; font-size:13px;">' +
         '<select data-taf-day style="padding:6px; border:1px solid var(--line); border-radius:5px; font-size:13px;">' + dayOptions + '</select>' +
+        (isCounta ? '<input data-taf-note type="text" placeholder="Name (optional)" value="' + escapeHtml(u.note || '') + '" style="flex:1; min-width:120px; padding:6px; border:1px solid var(--line); border-radius:5px; font-size:13px;">' : '') +
       '</div>';
     }).join('');
     html += tdcKeys.map(k => {
@@ -921,6 +942,11 @@ function tafComposeClaudePrompt_(){
     '"day" must be one of: Mon, Tues, Wed, Thurs, Fri, Weekend (Weekend covers both Sat and Sun).',
     'If she doesn\'t say which day, assume today, which is: ' + dayLabelFor(new Date()) + '.',
     '',
+    'For face_to_face / break_bread / great_phone_calls / events: each is tracked one box per',
+    'person, not just a tally — if she names the person(s), put the name in "note" (e.g. "John Smith").',
+    'If count > 1 for one of these sections, only include "note" when a single specific name applies',
+    'to all of them; otherwise omit "note" and just report the count.',
+    '',
     'This week\'s tally so far (context only — do not repeat it back, just use it to help disambiguate):',
     JSON.stringify(currentTally),
     '',
@@ -957,10 +983,12 @@ function tafApplyClaudeReply(){
 function tafApplyConfirmed(){
   const updates = [];
   document.querySelectorAll('#tafReviewList [data-taf-update]').forEach(row => {
+    const noteEl = row.querySelector('[data-taf-note]');
     updates.push({
       section: row.dataset.section,
       count: parseInt(row.querySelector('[data-taf-count]').value, 10) || 1,
       day: row.querySelector('[data-taf-day]').value,
+      note: noteEl ? noteEl.value.trim() || null : null,
     });
   });
   const theme_day_calls = {};
