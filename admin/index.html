@@ -92,10 +92,47 @@
   #admNotAuthorized{ padding:48px 24px; text-align:center; color:var(--slate); }
 
   .adm-mtv-body{ display:flex; gap:16px; align-items:flex-start; }
-  .adm-mtv-nav{ width:200px; flex:0 0 200px; font-size:11.5px; max-height:70vh; overflow-y:auto; border:1px solid var(--line); border-radius:8px; background:#fff; }
+  .adm-mtv-nav-col{ width:220px; flex:0 0 220px; position:sticky; top:12px; }
+  .adm-mtv-nav-filter{ width:100%; box-sizing:border-box; padding:7px 9px; border:1px solid var(--line); border-radius:6px 6px 0 0; border-bottom:none; font-size:11.5px; font-family:inherit; }
+  .adm-mtv-nav{ font-size:11.5px; max-height:65vh; overflow-y:auto; border:1px solid var(--line); border-radius:0 0 8px 8px; background:#fff; }
   .adm-mtv-nav a{ display:block; padding:6px 10px; color:var(--navy); text-decoration:none; border-bottom:1px solid var(--slate-light); }
+  .adm-mtv-nav a[data-level="1"]{ font-weight:700; text-transform:uppercase; font-size:10px; letter-spacing:.3px; color:var(--slate); background:var(--slate-light); }
+  .adm-mtv-nav a[data-level="3"], .adm-mtv-nav a[data-level="4"]{ padding-left:20px; font-weight:400; color:var(--slate); font-size:11px; }
   .adm-mtv-nav a:hover{ background:var(--slate-light); }
-  .adm-mtv-pre{ flex:1; background:#fff; border:1px solid var(--line); border-radius:8px; padding:16px; font-family:Consolas, Monaco, monospace; font-size:11px; line-height:1.5; white-space:pre-wrap; max-height:70vh; overflow-y:auto; margin:0; }
+  .adm-mtv-nav a.active{ background:rgba(201,162,75,0.18); color:#8A6A1F; font-weight:700; }
+  .adm-mtv-nav-empty{ padding:8px 10px; color:var(--slate); font-size:11.5px; }
+  .adm-mtv-doc{ flex:1; min-width:0; background:#fff; border:1px solid var(--line); border-radius:10px; padding:20px 26px; max-height:78vh; overflow-y:auto; font-size:13px; line-height:1.62; scroll-behavior:smooth; }
+  .adm-mtv-doc h1{ font-family:Cambria, Georgia, serif; color:var(--navy); font-size:20px; margin:0 0 14px; padding-bottom:8px; border-bottom:2px solid var(--gold); }
+  .adm-mtv-doc h2{ font-family:Cambria, Georgia, serif; color:var(--navy); font-size:16.5px; margin:28px 0 10px; padding-top:16px; border-top:1px solid var(--line); }
+  .adm-mtv-doc h2:first-child{ margin-top:0; padding-top:0; border-top:none; }
+  .adm-mtv-doc h3{ color:var(--navy); font-size:13.5px; font-weight:700; margin:18px 0 8px; }
+  .adm-mtv-doc h4{ color:var(--slate); font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; margin:14px 0 6px; }
+  .adm-mtv-p{ margin:0 0 10px; color:var(--ink); }
+  .adm-mtv-code{ background:var(--slate-light); color:#8A2E5C; padding:1px 5px; border-radius:4px; font-family:Consolas, Monaco, monospace; font-size:11.5px; }
+  .adm-mtv-hr{ border:none; border-top:1px solid var(--line); margin:20px 0; }
+  .adm-mtv-list{ margin:0 0 12px; padding-left:22px; }
+  .adm-mtv-list li{ margin-bottom:5px; }
+  .adm-mtv-check{ list-style:none; margin-left:-22px; display:flex; gap:7px; align-items:flex-start; }
+  .adm-mtv-check input{ margin-top:3px; flex:0 0 auto; }
+  .adm-mtv-check.is-done span{ color:var(--slate); text-decoration:line-through; }
+  .adm-mtv-empty-msg{ color:var(--slate); font-style:italic; }
+  .adm-mtv-table-wrap{ overflow-x:auto; margin:0 0 16px; }
+  .adm-mtv-table{ border-collapse:collapse; width:100%; font-size:11.5px; }
+  .adm-mtv-table th, .adm-mtv-table td{ border:1px solid var(--line); padding:7px 9px; text-align:left; vertical-align:top; }
+  .adm-mtv-table thead th{ background:var(--navy); color:#fff; font-size:10.5px; text-transform:uppercase; letter-spacing:.3px; }
+  .adm-mtv-table tbody tr:nth-child(even){ background:var(--slate-light); }
+  .adm-mtv-table-empty{ color:var(--slate); font-style:italic; text-align:center; }
+  .adm-mtv-badge{ display:inline-block; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; padding:3px 7px; border-radius:9px; background:var(--slate-light); color:var(--slate); white-space:nowrap; }
+  .adm-mtv-badge[data-status="open"]{ background:rgba(201,162,75,0.18); color:#8A6A1F; }
+  .adm-mtv-badge[data-status="released"], .adm-mtv-badge[data-status="done"]{ background:rgba(47,107,79,0.14); color:var(--good); }
+  .adm-mtv-badge[data-status="ready"]{ background:rgba(27,42,74,0.12); color:var(--navy); }
+  .adm-mtv-badge[data-status="pending"]{ background:rgba(179,38,30,0.10); color:var(--bad); }
+  .adm-mtv-more{ font-size:10.5px; color:var(--navy); font-weight:700; white-space:nowrap; text-decoration:none; }
+  .adm-mtv-more:hover{ text-decoration:underline; }
+  @media (max-width: 880px){
+    .adm-mtv-body{ flex-direction:column; }
+    .adm-mtv-nav-col{ width:100%; position:static; }
+  }
 
   /* MODALS */
   .adm-modal-overlay{
@@ -249,8 +286,11 @@
       </div>
       <div id="myturnError" class="adm-error"></div>
       <div class="adm-mtv-body">
-        <div class="adm-mtv-nav" id="myturnNav"></div>
-        <pre class="adm-mtv-pre" id="myturnContent">Nothing synced yet — a Claude Code session needs to call syncMyturnSnapshot after its next MYTURN.md edit.</pre>
+        <div class="adm-mtv-nav-col">
+          <input type="text" id="myturnNavFilter" class="adm-mtv-nav-filter" placeholder="Filter sections…" oninput="mtvFilterNav_(this.value)">
+          <div class="adm-mtv-nav" id="myturnNav"></div>
+        </div>
+        <div class="adm-mtv-doc" id="myturnContent">Nothing synced yet — a Claude Code session needs to call syncMyturnSnapshot after its next MYTURN.md edit.</div>
       </div>
     </div>
 
@@ -974,8 +1014,10 @@ function exportRequestsAs(format){
 
 // ===========================================================================
 // MYTURN LIVE VIEW — read-only render of whatever a session last synced via
-// syncMyturnSnapshot (see MYTURN.md's own standing rule). Light sectioning
-// via a client-side split on "## " headers, no markdown renderer.
+// syncMyturnSnapshot (see MYTURN.md's own standing rule). A small hand-rolled
+// markdown renderer (headings/tables/lists/checklists/inline code+bold, no
+// external library) turns the raw file into real formatted HTML instead of a
+// monospace text dump, with a real anchor-based section nav.
 // ===========================================================================
 async function loadMyturnSnapshot(){
   const errEl = document.getElementById('myturnError');
@@ -985,39 +1027,194 @@ async function loadMyturnSnapshot(){
     const label = document.getElementById('myturnSyncedAtLabel');
     if (!data.content){
       label.textContent = 'Never synced.';
-      document.getElementById('myturnContent').textContent = 'Nothing synced yet — a Claude Code session needs to call syncMyturnSnapshot after its next MYTURN.md edit.';
+      document.getElementById('myturnContent').innerHTML = '<p class="adm-mtv-empty-msg">Nothing synced yet — a Claude Code session needs to call syncMyturnSnapshot after its next MYTURN.md edit.</p>';
       document.getElementById('myturnNav').innerHTML = '';
       return;
     }
     label.textContent = 'Last synced: ' + new Date(data.syncedAt).toLocaleString();
-    document.getElementById('myturnContent').textContent = data.content;
-    renderMyturnNav_(data.content);
+    const rendered = renderMyturnMarkdown_(data.content);
+    document.getElementById('myturnContent').innerHTML = rendered.html;
+    renderMyturnNav_(rendered.headings);
   } catch (err) {
     errEl.textContent = err.message;
   }
 }
-function renderMyturnNav_(content){
-  const nav = document.getElementById('myturnNav');
-  const lines = content.split('\n');
-  const headings = [];
-  lines.forEach(function(line, idx){
-    const m = line.match(/^(#{1,4})\s+(.*)/);
-    if (m && m[1].length >= 2) headings.push({ text: m[2], lineIndex: idx });
-  });
-  if (!headings.length){ nav.innerHTML = '<div style="padding:8px 10px; color:var(--slate);">No sections found.</div>'; return; }
-  nav.innerHTML = headings.map(function(h, i){
-    return '<a href="#" onclick="scrollMyturnTo(' + i + '); return false;">' + escapeHtml_(h.text) + '</a>';
-  }).join('');
-  window._myturnHeadings = headings;
-  window._myturnLines = lines;
+
+const MTV_STATUS_WORDS_ = { OPEN:'open', RELEASED:'released', DONE:'done', READY:'ready', PENDING:'pending' };
+let mtvCellCounter_ = 0;
+
+function mtvSlug_(text, used){
+  const base = text.toLowerCase().replace(/[`*_]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'section';
+  let slug = base, i = 2;
+  while (used.has(slug)) { slug = base + '-' + i; i++; }
+  used.add(slug);
+  return slug;
 }
-function scrollMyturnTo(i){
-  const h = window._myturnHeadings[i];
-  if (!h) return;
-  const pre = document.getElementById('myturnContent');
-  const charOffset = window._myturnLines.slice(0, h.lineIndex).join('\n').length;
-  const ratio = charOffset / pre.textContent.length;
-  pre.scrollTop = ratio * pre.scrollHeight;
+function mtvInline_(text){
+  let html = escapeHtml_(String(text == null ? '' : text).replace(/\\\|/g, '|'));
+  html = html.replace(/`([^`]+)`/g, '<code class="adm-mtv-code">$1</code>');
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  return html;
+}
+function mtvSplitTableRow_(line){
+  const PH = '';
+  const protected_ = line.replace(/\\\|/g, PH);
+  const trimmed = protected_.trim().replace(/^\|/, '').replace(/\|$/, '');
+  return trimmed.split('|').map(function(c){ return c.replace(new RegExp(PH, 'g'), '\\|').trim(); });
+}
+function mtvRenderTable_(headerCells, rows){
+  let out = '<div class="adm-mtv-table-wrap"><table class="adm-mtv-table"><thead><tr>';
+  headerCells.forEach(function(h){ out += '<th>' + mtvInline_(h) + '</th>'; });
+  out += '</tr></thead><tbody>';
+  if (!rows.length){
+    out += '<tr><td colspan="' + headerCells.length + '" class="adm-mtv-table-empty">— empty —</td></tr>';
+  }
+  rows.forEach(function(cells){
+    out += '<tr>';
+    cells.forEach(function(cellRaw){
+      const cellText = cellRaw.trim();
+      const statusClass = MTV_STATUS_WORDS_[cellText.toUpperCase()];
+      if (statusClass){
+        out += '<td><span class="adm-mtv-badge" data-status="' + statusClass + '">' + escapeHtml_(cellText) + '</span></td>';
+      } else if (cellText.length > 260){
+        const uid = 'mtvcell' + (mtvCellCounter_++);
+        out += '<td>'
+          + '<span id="' + uid + '-short">' + mtvInline_(cellText.slice(0, 220)) + '&hellip; <a href="#" class="adm-mtv-more" onclick="toggleMtvCell_(\'' + uid + '\'); return false;">Show more</a></span>'
+          + '<span id="' + uid + '-full" style="display:none;">' + mtvInline_(cellText) + ' <a href="#" class="adm-mtv-more" onclick="toggleMtvCell_(\'' + uid + '\'); return false;">Show less</a></span>'
+          + '</td>';
+      } else {
+        out += '<td>' + mtvInline_(cellText) + '</td>';
+      }
+    });
+    out += '</tr>';
+  });
+  out += '</tbody></table></div>';
+  return out;
+}
+function toggleMtvCell_(uid){
+  const s = document.getElementById(uid + '-short');
+  const f = document.getElementById(uid + '-full');
+  if (!s || !f) return;
+  const showingShort = s.style.display !== 'none';
+  s.style.display = showingShort ? 'none' : '';
+  f.style.display = showingShort ? '' : 'none';
+}
+function renderMyturnMarkdown_(content){
+  const lines = content.split('\n');
+  const used = new Set();
+  const headings = [];
+  let html = '';
+  let listBuf = null;
+  let i = 0;
+
+  function flushList(){
+    if (!listBuf) return;
+    if (listBuf.type === 'checklist'){
+      html += '<ul class="adm-mtv-list">' + listBuf.items.join('') + '</ul>';
+    } else {
+      const tag = listBuf.type;
+      html += '<' + tag + ' class="adm-mtv-list">' + listBuf.items.join('') + '</' + tag + '>';
+    }
+    listBuf = null;
+  }
+
+  while (i < lines.length){
+    const line = lines[i];
+
+    const hm = line.match(/^(#{1,4})\s+(.*)/);
+    if (hm){
+      flushList();
+      const level = hm[1].length;
+      const text = hm[2].trim();
+      const id = mtvSlug_(text, used);
+      headings.push({ id: id, text: text, level: level });
+      html += '<h' + level + ' id="' + id + '" class="adm-mtv-h">' + mtvInline_(text) + '</h' + level + '>';
+      i++; continue;
+    }
+
+    if (/^-{3,}\s*$/.test(line.trim())){
+      flushList();
+      html += '<hr class="adm-mtv-hr">';
+      i++; continue;
+    }
+
+    if (/^\s*\|/.test(line) && lines[i + 1] && /^\s*\|?[\s:-]+\|/.test(lines[i + 1])){
+      flushList();
+      const headerCells = mtvSplitTableRow_(line);
+      i += 2;
+      const rows = [];
+      while (i < lines.length && /^\s*\|/.test(lines[i])){
+        rows.push(mtvSplitTableRow_(lines[i]));
+        i++;
+      }
+      html += mtvRenderTable_(headerCells, rows);
+      continue;
+    }
+
+    const cm = line.match(/^[\t ]*[-*]\s+\[([ xX])\]\s+(.*)/);
+    if (cm){
+      if (!listBuf || listBuf.type !== 'checklist') { flushList(); listBuf = { type: 'checklist', items: [] }; }
+      const checked = cm[1].toLowerCase() === 'x';
+      listBuf.items.push('<li class="adm-mtv-check' + (checked ? ' is-done' : '') + '"><input type="checkbox" disabled' + (checked ? ' checked' : '') + '><span>' + mtvInline_(cm[2]) + '</span></li>');
+      i++; continue;
+    }
+
+    const om = line.match(/^[\t ]*(\d+)\.\s+(.*)/);
+    if (om){
+      if (!listBuf || listBuf.type !== 'ol') { flushList(); listBuf = { type: 'ol', items: [] }; }
+      listBuf.items.push('<li>' + mtvInline_(om[2]) + '</li>');
+      i++; continue;
+    }
+
+    const bm = line.match(/^[\t ]*[-*]\s+(.*)/);
+    if (bm){
+      if (!listBuf || listBuf.type !== 'ul') { flushList(); listBuf = { type: 'ul', items: [] }; }
+      listBuf.items.push('<li>' + mtvInline_(bm[1]) + '</li>');
+      i++; continue;
+    }
+
+    if (!line.trim()){
+      flushList();
+      i++; continue;
+    }
+
+    flushList();
+    const para = [line.trim()];
+    i++;
+    while (i < lines.length && lines[i].trim()
+      && !/^#{1,4}\s+/.test(lines[i]) && !/^\s*\|/.test(lines[i])
+      && !/^[\t ]*[-*]\s+/.test(lines[i]) && !/^[\t ]*\d+\.\s+/.test(lines[i])
+      && !/^-{3,}\s*$/.test(lines[i].trim())){
+      para.push(lines[i].trim());
+      i++;
+    }
+    html += '<p class="adm-mtv-p">' + mtvInline_(para.join(' ')) + '</p>';
+  }
+  flushList();
+  return { html: html, headings: headings };
+}
+function renderMyturnNav_(headings){
+  const nav = document.getElementById('myturnNav');
+  window._myturnHeadings = headings;
+  if (!headings.length){ nav.innerHTML = '<div class="adm-mtv-nav-empty">No sections found.</div>'; return; }
+  nav.innerHTML = headings.map(function(h){
+    return '<a href="#' + h.id + '" data-level="' + h.level + '" onclick="return mtvNavClick_(event, \'' + h.id + '\');">' + escapeHtml_(h.text) + '</a>';
+  }).join('');
+}
+function mtvNavClick_(evt, id){
+  evt.preventDefault();
+  const target = document.getElementById(id);
+  if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  document.querySelectorAll('.adm-mtv-nav a').forEach(function(a){ a.classList.remove('active'); });
+  evt.currentTarget.classList.add('active');
+  return false;
+}
+function mtvFilterNav_(q){
+  const query = q.trim().toLowerCase();
+  document.querySelectorAll('.adm-mtv-nav a').forEach(function(a){
+    a.style.display = (!query || a.textContent.toLowerCase().indexOf(query) !== -1) ? '' : 'none';
+  });
 }
 
 // ===========================================================================
