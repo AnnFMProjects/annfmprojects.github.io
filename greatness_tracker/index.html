@@ -614,8 +614,11 @@ function renderGrid(){
       }
       DAYS.forEach((day, di) => {
         const val = row[di];
-        const numericKeypad = sectionDef.mode === 'sum' ? ' inputmode="numeric"' : '';
-        html += '<td class="gt-cell"><input type="text"'+numericKeypad+' class="gt-cell-input" placeholder="'+(sectionDef.mode==='counta'?'name':'')+'" data-section="'+sectionDef.id+'" data-row="'+ri+'" data-day="'+di+'" value="'+(val==null?'':escapeHtml(String(val)))+'"></td>';
+        // No inputmode="numeric" here on purpose — even the "sum" sections
+        // (Videos/Thank You Cards/Leads/Deals/Pre-Apps) sometimes need a
+        // name or a short note instead of a bare number, so every cell gets
+        // a normal text keyboard on mobile, not a digits-only one.
+        html += '<td class="gt-cell"><input type="text" class="gt-cell-input" placeholder="'+(sectionDef.mode==='counta'?'name':'')+'" data-section="'+sectionDef.id+'" data-row="'+ri+'" data-day="'+di+'" value="'+(val==null?'':escapeHtml(String(val)))+'"></td>';
       });
       if (ri === 0){
         const total = sectionTotal(sectionDef);
