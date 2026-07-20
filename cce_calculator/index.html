@@ -543,15 +543,19 @@
     left:50%;
     transform:translateX(-50%);
     z-index:1500;
-    background:var(--navy);
+    background:rgba(27,42,74,0.72);
+    -webkit-backdrop-filter:blur(20px) saturate(180%);
+    backdrop-filter:blur(20px) saturate(180%);
     color:#fff;
     font-family:Calibri, Arial, sans-serif;
-    border-radius:10px;
-    box-shadow:0 4px 18px rgba(16,27,51,0.28);
+    border-radius:18px;
+    border:1px solid rgba(255,255,255,0.16);
+    box-shadow:0 10px 34px rgba(16,27,51,0.38);
     align-items:center;
     gap:4px;
-    padding:5px;
+    padding:7px;
     max-width:calc(100vw - 20px);
+    transition:box-shadow .2s ease;
   }
   .cce-nav-group{
     display:flex;
@@ -568,18 +572,44 @@
     margin-bottom:1px;
   }
   #cceNavBar button{
+    position:relative;
     background:transparent;
     color:#fff;
     border:none;
-    border-radius:5px;
+    border-radius:8px;
     padding:7px 9px;
     font-size:13px;
     cursor:pointer;
     font-family:Calibri, Arial, sans-serif;
+    transition:transform .18s cubic-bezier(.34,1.56,.64,1), background .15s ease;
   }
-  #cceNavBar button:hover{ background:rgba(255,255,255,0.14); }
+  #cceNavBar button:hover{ background:rgba(255,255,255,0.14); transform:translateY(-3px) scale(1.07); }
   #cceNavBar button:disabled{ opacity:0.35; cursor:default; }
-  #cceNavBar button:disabled:hover{ background:transparent; }
+  #cceNavBar button:disabled:hover{ background:transparent; transform:none; }
+  /* Floating tooltip pill, GlassDock-style: fades + slides up above the button on hover */
+  #cceNavBar button[data-tip]::after{
+    content:attr(data-tip);
+    position:absolute;
+    bottom:calc(100% + 10px);
+    left:50%;
+    transform:translate(-50%, 6px);
+    background:#0B1220;
+    color:#fff;
+    border:1px solid rgba(255,255,255,0.18);
+    font-size:11px;
+    font-weight:600;
+    letter-spacing:.2px;
+    white-space:nowrap;
+    padding:6px 10px;
+    border-radius:7px;
+    box-shadow:0 6px 16px rgba(0,0,0,0.35);
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .18s ease, transform .18s ease;
+    z-index:1;
+  }
+  #cceNavBar button[data-tip]:hover::after{ opacity:1; transform:translate(-50%, 0); }
+  #cceNavBar button[data-tip]:disabled::after{ display:none; }
   .cce-nav-label{
     font-size:11.5px;
     color:#C9CEDA;
@@ -638,8 +668,8 @@
     <div>
       <span class="cce-nav-group-caption">Page</span>
       <div>
-        <button id="cceNavToTopBtn" onclick="cceNavToTop()" title="Scroll to top">&#9650;</button>
-        <button id="cceNavToBottomBtn" onclick="cceNavToBottom()" title="Scroll to bottom">&#9660;</button>
+        <button id="cceNavToTopBtn" onclick="cceNavToTop()" title="Scroll to top" data-tip="Scroll to top">&#9650;</button>
+        <button id="cceNavToBottomBtn" onclick="cceNavToBottom()" title="Scroll to bottom" data-tip="Scroll to bottom">&#9660;</button>
       </div>
     </div>
   </div>
@@ -648,9 +678,9 @@
     <div>
       <span class="cce-nav-group-caption">Loan Estimate</span>
       <div>
-        <button id="cceNavEstimatePrevBtn" onclick="cceNavEstimateGo(-1)" title="Previous loan estimate">&#9664;</button>
+        <button id="cceNavEstimatePrevBtn" onclick="cceNavEstimateGo(-1)" title="Previous loan estimate" data-tip="Previous loan estimate">&#9664;</button>
         <span id="cceNavEstimateLabel" class="cce-nav-label"></span>
-        <button id="cceNavEstimateNextBtn" onclick="cceNavEstimateGo(1)" title="Next loan estimate">&#9654;</button>
+        <button id="cceNavEstimateNextBtn" onclick="cceNavEstimateGo(1)" title="Next loan estimate" data-tip="Next loan estimate">&#9654;</button>
       </div>
     </div>
   </div>
@@ -659,14 +689,15 @@
     <div>
       <span class="cce-nav-group-caption">Section</span>
       <div>
-        <button id="cceNavPrevBtn" onclick="cceNavGo(-1)" title="Previous section">&#9664;</button>
+        <button id="cceNavPrevBtn" onclick="cceNavGo(-1)" title="Previous section" data-tip="Previous section">&#9664;</button>
         <span id="cceNavLabel" class="cce-nav-label"></span>
-        <button id="cceNavNextBtn" onclick="cceNavGo(1)" title="Next section">&#9654;</button>
+        <button id="cceNavNextBtn" onclick="cceNavGo(1)" title="Next section" data-tip="Next section">&#9654;</button>
       </div>
     </div>
   </div>
-  <div class="cce-nav-divider"></div>
-  <button id="cceNavAltViewBtn" onclick="toggleAltView()" title="Switch to a PAG-style left/center/right editor layout for the current estimate">ALT VIEW</button>
+  <!-- ALT VIEW button temporarily hidden per Ann's request (2026-07-20) — pending nav redesign.
+       toggleAltView()/enterAltView()/exitAltView() left fully intact; re-add this button (and its divider) to bring it back. -->
+  <button id="cceNavAltViewBtn" onclick="toggleAltView()" title="Switch to a PAG-style left/center/right editor layout for the current estimate" style="display:none;">ALT VIEW</button>
   <div class="cce-nav-divider"></div>
   <button id="cceNavExportBtn" onclick="cceNavExportBtnClick()" title="Export"><svg class="dl-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v11m0 0l-4.5-4.5M12 14l4.5-4.5M5 19h14" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg> Export</button>
 </div>
