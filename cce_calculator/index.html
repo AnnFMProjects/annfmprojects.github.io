@@ -2380,8 +2380,8 @@ const RATE_CONFIG = {
     rates:{ rateLow:0.011, rateHigh:0.0145, threshold:400000 } },
   IL: { govSource:'IL Dept. of Revenue (35 ILCS 200/31-10 state tax, /31-20 county tax); Chicago Municipal Code §3-33-030/040 for city-specific rates.', govAsOf:'July 2026',
     rates:{ transferTaxRate:0.0015 } },
-  MD: { govSource:'MD Tax-Property Article Title 13 (state transfer tax) and Title 12 (recordation tax, rate set per jurisdiction).', govAsOf:'July 2026',
-    rates:{ stateTransferRate:0.005, recordationPlaceholderRate:0.01 } },
+  MD: { govSource:'MD Tax-Property Article Title 13 (state transfer tax) and Title 12 (recordation tax, rate + exemption set per jurisdiction) — county rates/exemptions per Gordon Feinblatt LLC rate summary, eff. 10/1/2025.', govAsOf:'July 2026',
+    rates:{ stateTransferRate:0.005 } },
   MA: { govSource:'Mass. Gen. Laws c.64D §1 (deed excise tax); Barnstable County Registry of Deeds fee schedule; Nantucket/Dukes Land Bank rules.', govAsOf:'July 2026',
     rates:{ perUnitRate:2.28 } },
   MI: { govSource:'MCL 207.525 (state transfer tax) and MCL 207.504 (county transfer tax).', govAsOf:'July 2026',
@@ -2763,14 +2763,59 @@ const STATE_DATA = {
     verified:true,
     get asOf(){ return RATE_CONFIG.MD.govAsOf; },
     get source(){ return RATE_CONFIG.MD.govSource; },
-    counties: null,
+    pinnedCounties: ['Montgomery','Baltimore County','Anne Arundel','Prince George\'s','Baltimore City'],
+    counties: {
+      'Montgomery': { tiered:true, exemption:100000 },
+      'Baltimore County': { recRate:0.005, exemption:22000 },
+      'Anne Arundel': { recRate:0.007, exemption:0 },
+      'Prince George\'s': { recRate:0.0055, exemption:0 },
+      'Baltimore City': { recRate:0.01, exemption:22000 },
+      'Allegany': { recRate:0.007, exemption:50000 },
+      'Calvert': { recRate:0.01, exemption:0 },
+      'Caroline': { recRate:0.0105, exemption:25000 },
+      'Carroll': { recRate:0.013, exemption:0 },
+      'Cecil': { recRate:0.0082, exemption:0 },
+      'Charles': { recRate:0.014, exemption:0 },
+      'Dorchester': { recRate:0.01, exemption:30000 },
+      'Frederick': { recRate:0.014, exemption:0 },
+      'Garrett': { recRate:0.007, exemption:50000 },
+      'Harford': { recRate:0.0066, exemption:0 },
+      'Howard': { recRate:0.005, exemption:0 },
+      'Kent': { recRate:0.0066, exemption:0 },
+      'Queen Anne\'s': { recRate:0.0099, exemption:0 },
+      'St. Mary\'s': { recRate:0.008, exemption:30000 },
+      'Somerset': { recRate:0.0066, exemption:0 },
+      'Talbot': { recRate:0.012, exemption:50000 },
+      'Washington': { recRate:0.0076, exemption:50000 },
+      'Wicomico': { recRate:0.007, exemption:0 },
+      'Worcester': { recRate:0.0066, exemption:50000 },
+      'Other MD County (verify rate manually)': { recRate:null, exemption:0 }
+    },
     transferTax(price, c){
       const rate = RATE_CONFIG.MD.rates.stateTransferRate;
-      return { amount: price*rate, note: 'MD STATE transfer tax only (' + (rate*100) + '%, customarily split 50/50 buyer/seller; 0.25% for first-time MD buyers, paid by seller). Does NOT include county transfer tax (0%-1.5%, ~19 of 24 jurisdictions) — add manually for your county' };
+      return { amount: price*rate, note: 'MD STATE transfer tax only (' + (rate*100) + '%, customarily split 50/50 buyer/seller; 0.25% for first-time MD buyers, paid by seller). Does NOT include county transfer tax (0%-1.5%+, ~19 of 24 jurisdictions) — add manually for your county' };
     },
     mortgageTax(loanAmt, c){
-      const rate = RATE_CONFIG.MD.rates.recordationPlaceholderRate;
-      return { amount: loanAmt*rate, note: 'PLACEHOLDER ONLY — MD recordation tax is set PER COUNTY, ranging $2.50/$500 (Baltimore/Howard) to $7.00/$500 (Charles/Frederick/Talbot). This uses a ' + (rate*100) + '% statewide placeholder — override with your actual county rate before using with a client' };
+      if (c.tiered){
+        // Montgomery County — tiered recordation tax, $/$500 converted to decimal rate per bracket
+        const tiers = [{upTo:500000,rate:0.0089},{upTo:600000,rate:0.0135},{upTo:750000,rate:0.0204},{upTo:1000000,rate:0.02156},{upTo:Infinity,rate:0.0227}];
+        const taxable = Math.max(0, loanAmt - (c.exemption||0));
+        let amount = 0, prev = 0;
+        for (const t of tiers){
+          if (taxable <= prev) break;
+          const capHere = Math.min(taxable, t.upTo);
+          amount += (capHere - prev) * t.rate;
+          prev = capHere;
+        }
+        return { amount, note: 'Montgomery Co. tiered recordation tax ($4.45/$500 up to $500K, rising to $11.35/$500 above $1M) after the $' + c.exemption.toLocaleString() + ' owner-occupied principal-residence exemption — BORROWER-paid. Assumes owner-occupied; remove exemption manually for investment property' };
+      }
+      if (c.recRate == null){
+        return { amount: 0, manualOnly:true, note: 'No rate on file for this county — MD recordation tax is set per jurisdiction (roughly 0.5%-1.4% of loan amount, plus a per-county owner-occupied exemption in some counties). Enter your county\'s actual rate manually.' };
+      }
+      const taxable = Math.max(0, loanAmt - (c.exemption||0));
+      const amount = taxable * c.recRate;
+      const exemptionNote = c.exemption ? (' after the $' + c.exemption.toLocaleString() + ' owner-occupied principal-residence exemption') : '';
+      return { amount, note: 'County recordation tax ' + (c.recRate*100).toFixed(2) + '% of loan amount' + exemptionNote + ' — BORROWER-paid. Source: Gordon Feinblatt LLC MD recordation/transfer tax summary, eff. 10/1/2025. Assumes owner-occupied where an exemption applies; remove manually for investment property.' };
     },
     mansionTax(){ return noTax('Maryland has no mansion tax. Baltimore City has a "yield tax" surcharge (15% of recordation + 40% of city transfer tax) on transactions over $1M — verify manually if applicable'); }
   },
@@ -3220,7 +3265,7 @@ function applyGovernmentFees(container, price, loanAmt){
       return;
     }
 
-    if (govAuto.checked){
+    if (govAuto.checked && !results[key].manualOnly){
       input.value = results[key].amount.toFixed(2);
       input.disabled = true;
       badge.textContent = 'Auto';
