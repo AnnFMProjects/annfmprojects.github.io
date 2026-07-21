@@ -1,0 +1,1817 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Calls — FM Home Loans</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="../assets/api.js"></script>
+<script src="../assets/broadcast.js"></script>
+<script src="../assets/legal.js"></script>
+<script src="../export/xlsx-helpers.js"></script>
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+  :root{ --paper:#FBFAF7; --ink:#1E2430; --good:#2F6B4F; --bad:#B3261E; }
+  *{ box-sizing:border-box; }
+  html, body{ height:100%; margin:0; }
+  .dc-wrap{
+    font-family:Calibri, "Segoe UI", Arial, sans-serif;
+    background:var(--paper); color:var(--ink);
+    width:100%; margin:0; min-height:100vh; display:flex; flex-direction:column;
+  }
+  .export-btn{
+    background:var(--gold); color:var(--navy-deep); border:none; font-weight:700;
+    font-size:12px; padding:8px 14px; border-radius:6px; cursor:pointer;
+    font-family:Calibri, Arial, sans-serif; transition:transform .1s ease, box-shadow .15s ease; white-space:nowrap;
+  }
+  .export-btn:hover{ box-shadow:0 4px 14px rgba(0,0,0,.25); transform:translateY(-1px); }
+  .export-btn:active{ transform:translateY(0); }
+  .export-btn-outline{ background:var(--slate-light); color:var(--navy); }
+  .export-btn:disabled{ opacity:.5; cursor:not-allowed; }
+
+  .dc-header{
+    background:linear-gradient(135deg,var(--navy) 0%, var(--navy-deep) 100%); color:#fff;
+    padding:14px 24px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;
+  }
+  .dc-header-left{ display:flex; align-items:center; gap:14px; }
+  .dc-header-left a{ color:#F4D9A0; font-size:12px; text-decoration:none; }
+  .dc-header-title{ font-family:Cambria, Georgia, serif; font-size:19px; font-weight:700; }
+  .dc-header-right{ display:flex; align-items:center; gap:10px; font-size:12px; flex-wrap:wrap; }
+  .dc-header-right a{ color:#F4D9A0; }
+
+  .save-status{ font-size:11.5px; min-height:16px; padding:4px 24px; }
+  .save-status.ok{ color:var(--good); }
+  .save-status.err{ color:var(--bad); }
+
+  .dc-layout{ display:grid; grid-template-columns:300px 1fr; gap:20px; align-items:start; padding:14px 24px 0; }
+  @media (max-width:900px){ .dc-layout{ grid-template-columns:1fr; } }
+  .dc-sidebar-col{ display:flex; flex-direction:column; gap:16px; }
+  .dc-card{ background:#fff; border:1px solid var(--line); border-radius:10px; padding:14px 16px; }
+  .dc-card h4{ color:var(--navy); margin:0 0 8px; font-size:13px; }
+  .dc-card .dc-hint{ font-size:11px; color:var(--slate); line-height:1.5; margin:0 0 8px; }
+
+  .dropzone{
+    border:2px dashed var(--line); border-radius:8px; padding:18px; text-align:center;
+    font-size:12px; color:var(--slate); cursor:pointer; background:var(--slate-light);
+  }
+  .dropzone.drag{ border-color:var(--gold); background:rgba(201,162,75,0.1); }
+  .dropzone img{ max-width:100%; max-height:160px; border-radius:6px; margin-top:8px; }
+
+  .dc-content{ display:flex; flex-direction:column; gap:16px; min-width:0; }
+
+  /* LIST FOR TODAY GRID */
+  .dc-grid-wrap{ overflow:auto; }
+  .dc-grid{ border-collapse:collapse; width:100%; font-size:12px; min-width:820px; }
+  .dc-grid th{ background:var(--navy); color:#fff; font-size:11px; padding:7px 6px; position:sticky; top:0; text-align:left; }
+  .dc-grid td{ border:1px solid var(--line); padding:3px 5px; vertical-align:top; }
+  .dc-grid tr.dc-priority td{ background:rgba(201,162,75,0.14); }
+  .dc-grid tr.dc-missing-phone td.dc-number-cell{ background:rgba(179,38,30,0.08); }
+  .dc-cell-input{
+    display:block; width:100%; border:none; background:transparent; font-size:12px;
+    padding:3px 2px; resize:none; overflow:hidden; white-space:pre-wrap; word-break:break-word;
+    font-family:inherit; line-height:1.35;
+  }
+  .dc-cell-input:focus{ outline:1px solid var(--gold); background:#fff; }
+  .dc-col-purpose{ width:150px; } .dc-col-name{ width:170px; } .dc-col-number{ width:130px; }
+  .dc-col-actions{ width:96px; }
+  .dc-row-actions{ display:flex; flex-wrap:wrap; gap:3px; }
+  .dc-mini-btn{ font-size:11px; line-height:1; padding:3px 5px; border:1px solid var(--line); background:#fff; border-radius:4px; cursor:pointer; color:var(--slate); }
+  .dc-mini-btn:hover{ background:var(--slate-light); color:var(--navy); }
+  .dc-mini-btn.del:hover{ background:#f5d9d9; color:var(--bad); border-color:#f0c4c4; }
+  .dc-badge{ display:inline-block; font-size:9px; font-weight:700; padding:1px 5px; border-radius:8px; background:var(--slate-light); color:var(--slate); margin-left:4px; vertical-align:middle; }
+  .dc-badge.prio{ background:rgba(201,162,75,0.22); color:#8A6A1F; }
+  .dc-badge.edited{ background:rgba(47,107,79,0.15); color:var(--good); }
+  .dc-empty{ font-size:12.5px; color:var(--slate); font-style:italic; padding:22px; text-align:center; }
+  .dc-drag-over{ border-top:2px solid var(--gold) !important; }
+
+  .dc-batch-note{ font-size:11px; color:var(--slate); padding:6px 0; }
+  .dc-source-tag{ font-size:10px; color:var(--slate); }
+
+  /* MANUAL ENTRY REPEATING FORM */
+  .dc-manual-row{ display:grid; grid-template-columns:64px 1fr 1fr 28px; gap:6px; margin-bottom:6px; }
+  .dc-manual-row-2{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-bottom:8px; }
+  .dc-manual-row input, .dc-manual-row select, .dc-manual-row-2 input{ padding:6px 7px; border:1px solid var(--line); border-radius:5px; font-size:12px; font-family:inherit; width:100%; }
+  .dc-manual-block{ border:1px solid var(--line); border-radius:8px; padding:10px; margin-bottom:8px; background:var(--slate-light); }
+
+  /* MODALS */
+  .dc-modal-overlay{
+    display:none; position:fixed; inset:0; background:rgba(16,27,51,0.55); z-index:2000;
+    align-items:center; justify-content:center; padding:20px;
+    opacity:0; transition:opacity .22s cubic-bezier(.16,1,.3,1), display .22s allow-discrete;
+  }
+  .dc-modal-overlay.open{ display:flex; opacity:1; }
+  @starting-style{ .dc-modal-overlay.open{ opacity:0; } }
+  .dc-modal{
+    background:#fff; border-radius:10px; max-width:620px; width:100%; max-height:86vh;
+    overflow-y:auto; padding:22px; font-family:Calibri, Arial, sans-serif;
+    opacity:1; transform:scale(1) translateY(0);
+    transition:opacity .24s cubic-bezier(.16,1,.3,1), transform .24s cubic-bezier(.16,1,.3,1);
+  }
+  .dc-modal-overlay:not(.open) .dc-modal{ opacity:0; transform:scale(.94) translateY(10px); }
+  @starting-style{ .dc-modal-overlay.open .dc-modal{ opacity:0; transform:scale(.94) translateY(10px); } }
+  @media (prefers-reduced-motion:reduce){ .dc-modal-overlay, .dc-modal{ transition:none !important; } }
+  .dc-modal h3{ margin-top:0; color:var(--navy); }
+  .saved-row{ display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid var(--slate-light); font-size:12.5px; }
+  .saved-row:last-child{ border-bottom:none; }
+  .saved-row-actions{ display:flex; gap:6px; }
+
+  .dc-ocr-table{ border-collapse:collapse; width:100%; font-size:11.5px; margin-top:8px; }
+  .dc-ocr-table th, .dc-ocr-table td{ border:1px solid var(--line); padding:3px 5px; }
+  .dc-ocr-table th{ background:var(--slate-light); color:var(--navy); }
+  .dc-ocr-table input{ width:100%; border:none; font-size:11.5px; font-family:inherit; }
+  .dc-ocr-table input:focus{ outline:1px solid var(--gold); }
+
+  .dc-map-row{ display:grid; grid-template-columns:1fr 200px; gap:8px; align-items:center; padding:5px 0; border-bottom:1px solid var(--slate-light); font-size:12px; }
+  .dc-map-row select{ padding:5px; border:1px solid var(--line); border-radius:5px; font-size:12px; }
+  .field-row{ display:flex; align-items:center; gap:8px; }
+  .field-row label{ font-size:12px; color:var(--slate); }
+  .field-row input{ padding:6px 8px; border:1px solid var(--line); border-radius:5px; font-size:12px; }
+</style>
+
+<div class="dc-wrap">
+
+  <!-- LOGIN GATE -->
+  <div id="loginGateOverlay" style="display:flex; position:fixed; inset:0; background:var(--paper); z-index:3000; align-items:center; justify-content:center; padding:20px;">
+    <div id="loginGateChecking" style="display:none; text-align:center; font-family:Calibri, Arial, sans-serif; color:var(--slate);">
+      <div style="width:28px; height:28px; margin:0 auto 12px; border:3px solid var(--line); border-top-color:var(--navy); border-radius:50%; animation:loginGateSpin 0.8s linear infinite;"></div>
+      Checking your session&hellip;
+    </div>
+    <style>@keyframes loginGateSpin { to { transform: rotate(360deg); } }</style>
+    <div id="loginGateForm" style="background:#fff; border:1px solid var(--line); border-radius:10px; max-width:400px; width:100%; padding:28px; font-family:Calibri, Arial, sans-serif; box-shadow:0 6px 24px rgba(16,27,51,0.12);">
+      <h3 style="margin-top:0; color:var(--navy);">Daily Calls</h3>
+      <div style="font-size:10px; color:#8A6A1F; background:rgba(201,162,75,0.16); border:1px solid rgba(201,162,75,0.45); padding:5px 9px; border-radius:4px; margin-bottom:14px;">Internal tool for FM Home Loans staff. Not a public FM Home Loans website or login.</div>
+      <div style="text-align:center; font-size:10.5px; color:var(--slate); margin-bottom:12px;">By continuing, you agree to our <a href="#" onclick="openLegalModal('tos'); return false;">Terms of Service</a> and <a href="#" onclick="openLegalModal('privacy'); return false;">Privacy Policy</a>.</div>
+      <div class="field-row" style="align-items:flex-start; flex-direction:column; gap:4px;">
+        <label>Email</label>
+        <input type="email" id="loginEmail" style="width:100%; box-sizing:border-box; text-align:left;" autocomplete="username">
+      </div>
+      <div class="field-row" style="align-items:flex-start; flex-direction:column; gap:4px; margin-top:10px;">
+        <label>Password</label>
+        <input type="password" id="loginPassword" style="width:100%; box-sizing:border-box; text-align:left;" autocomplete="current-password" onkeydown="if(event.key==='Enter') attemptLogin();">
+      </div>
+      <div id="loginError" style="color:var(--bad); font-size:12px; margin-top:10px; min-height:14px;"></div>
+      <button class="export-btn" style="width:100%; margin-top:14px; background:var(--navy); color:#fff; padding:11px;" onclick="attemptLogin()">Login</button>
+      <div style="text-align:center; margin-top:12px;">
+        <a href="#" onclick="openRequestLoginModal(); return false;" style="color:#8A6A1F; font-size:12px;">Request Login</a>
+      </div>
+      <div style="text-align:center; margin-top:10px; padding-top:10px; border-top:1px solid var(--line); font-size:10.5px; color:var(--slate);">
+        This tool is restricted to a small number of accounts — logging in doesn't guarantee access.
+      </div>
+    </div>
+  </div>
+
+  <!-- TERMS / PRIVACY MODALS (shared content via assets/legal.js) -->
+  <div id="legalTosOverlay" class="dc-modal-overlay" style="z-index:3100;" onclick="if(event.target===this) closeLegalModal('tos');">
+    <div class="dc-modal" style="max-width:640px;">
+      <h3>Terms of Service</h3>
+      <div id="legalTosBody" style="font-size:13px; color:var(--slate); line-height:1.55;"></div>
+      <button class="export-btn" style="margin-top:16px;" onclick="closeLegalModal('tos')">Close</button>
+    </div>
+  </div>
+  <div id="legalPrivacyOverlay" class="dc-modal-overlay" style="z-index:3100;" onclick="if(event.target===this) closeLegalModal('privacy');">
+    <div class="dc-modal" style="max-width:640px;">
+      <h3>Privacy Policy</h3>
+      <div id="legalPrivacyBody" style="font-size:13px; color:var(--slate); line-height:1.55;"></div>
+      <button class="export-btn" style="margin-top:16px;" onclick="closeLegalModal('privacy')">Close</button>
+    </div>
+  </div>
+  <script>
+  const LEGAL_DOCS_ = {
+    tos: ['../legal/terms-of-service.md', 'legalTosOverlay', 'legalTosBody'],
+    privacy: ['../legal/privacy-policy.md', 'legalPrivacyOverlay', 'legalPrivacyBody']
+  };
+  function openLegalModal(kind){ const d = LEGAL_DOCS_[kind]; if (d) FM_LEGAL.show(d[0], d[1], d[2]); }
+  function closeLegalModal(kind){ const d = LEGAL_DOCS_[kind]; if (d) document.getElementById(d[1]).classList.remove('open'); }
+  </script>
+  <script>
+  (function(){
+    try {
+      if (localStorage.getItem('cce_session_token')) {
+        document.getElementById('loginGateForm').style.display = 'none';
+        document.getElementById('loginGateChecking').style.display = 'block';
+      }
+    } catch (e) {}
+  })();
+  </script>
+
+  <!-- REQUEST LOGIN MODAL -->
+  <div id="requestLoginModalOverlay" class="dc-modal-overlay" style="z-index:3001;" onclick="if(event.target===this) closeRequestLoginModal();">
+    <div class="dc-modal" style="max-width:420px;">
+      <h3>Request Login</h3>
+      <p style="font-size:12.5px; color:var(--slate); line-height:1.5;">Choose your name, email, and a password. This sends a request for approval — you won't be able to log in until it's approved. (Same account works across all FM Home Loans internal tools.)</p>
+      <div class="field-row" style="align-items:flex-start; flex-direction:column; gap:4px;">
+        <label>Name</label>
+        <input type="text" id="reqLoginName" style="width:100%; box-sizing:border-box; text-align:left;">
+      </div>
+      <div class="field-row" style="align-items:flex-start; flex-direction:column; gap:4px; margin-top:10px;">
+        <label>Email</label>
+        <input type="email" id="reqLoginEmail" style="width:100%; box-sizing:border-box; text-align:left;" autocomplete="username">
+      </div>
+      <div class="field-row" style="align-items:flex-start; flex-direction:column; gap:4px; margin-top:10px;">
+        <label>Password <span style="font-size:10.5px; color:var(--slate);">At least 8 characters</span></label>
+        <input type="password" id="reqLoginPassword" style="width:100%; box-sizing:border-box; text-align:left;" autocomplete="new-password">
+      </div>
+      <div class="field-row" style="align-items:flex-start; flex-direction:column; gap:4px; margin-top:10px;">
+        <label>Confirm Password</label>
+        <input type="password" id="reqLoginPasswordConfirm" style="width:100%; box-sizing:border-box; text-align:left;" autocomplete="new-password" onkeydown="if(event.key==='Enter') attemptRequestLogin();">
+      </div>
+      <div id="reqLoginError" style="color:var(--bad); font-size:12px; margin-top:10px; min-height:14px;"></div>
+      <div id="reqLoginSuccess" style="color:var(--good); font-size:12px; margin-top:10px; display:none;">Request sent — you'll be able to log in once it's approved.</div>
+      <div style="margin-top:14px; display:flex; gap:8px; justify-content:flex-end;">
+        <button class="export-btn export-btn-outline" onclick="closeRequestLoginModal()">Cancel</button>
+        <button class="export-btn" style="background:var(--navy); color:#fff;" onclick="attemptRequestLogin()">Send Request</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOP BAR -->
+  <div class="dc-header">
+    <div class="dc-header-left">
+      <a href="../">&larr; Back to Home</a>
+      <div class="dc-header-title">Daily Calls</div>
+    </div>
+    <div class="dc-header-right">
+      <span id="accountNote"></span>
+      <button class="export-btn" onclick="openSavedModal()">Saved Days</button>
+      <button class="export-btn" onclick="saveDay()">Save</button>
+      <button class="export-btn" onclick="exportCsv()">Export CSV</button>
+      <button class="export-btn" onclick="exportXlsx()">Export Excel</button>
+      <button class="export-btn" onclick="exportPdf()">Export PDF</button>
+    </div>
+  </div>
+  <div id="dcSaveStatus" class="save-status"></div>
+
+  <div id="dcNotAuthorized" style="display:none; padding:48px 24px; text-align:center; color:var(--slate);">
+    This tool isn't enabled for your account. Contact Ann if you think that's wrong.
+  </div>
+
+  <div id="dcMain" style="display:none; flex:1; flex-direction:column;">
+    <div class="dc-layout">
+      <div class="dc-sidebar-col">
+
+        <div class="dc-card">
+          <h4>Upload Jungo exports</h4>
+          <p class="dc-hint">Drop one or more <b>.xlsx</b> or <b>.csv</b> files (Daily Update, Realtor lists, Closing-Date+Realtor, Pre-App). Multiple realtor files in one batch are merged and de-duped by realtor.</p>
+          <div class="dropzone" id="fileDropzone" onclick="document.getElementById('fileInput').click()">
+            Click to choose files, or drag them here
+          </div>
+          <input type="file" id="fileInput" accept=".xlsx,.csv" multiple style="display:none;" onchange="handleFilesPicked(this.files)">
+          <div id="uploadStatus" style="font-size:11px; color:var(--slate); margin-top:8px; min-height:14px;"></div>
+          <div style="display:flex; gap:6px; margin-top:8px;">
+            <label style="font-size:11px; color:var(--slate); display:flex; align-items:center; gap:5px;">Day date <input type="date" id="dcDateOf" style="padding:4px; border:1px solid var(--line); border-radius:5px; font-size:11px;"></label>
+          </div>
+        </div>
+
+        <div class="dc-card">
+          <h4>Monday — PhoneBurner screenshot</h4>
+          <p class="dc-hint">Upload/paste a PhoneBurner screenshot, or paste the table text, then pick the row numbers to add.</p>
+          <div class="dropzone" id="mondayDropzone" onclick="document.getElementById('mondayImageInput').click()">
+            Click to upload, or paste (Ctrl/Cmd+V) a screenshot
+            <img id="mondayImagePreview" style="display:none;">
+          </div>
+          <input type="file" id="mondayImageInput" accept="image/*" style="display:none;" onchange="handleMondayImageFile(this.files[0])">
+          <div style="margin-top:8px;">
+            <button class="export-btn" id="mondayReadBtn" onclick="readMondayScreenshot()" disabled>Read Screenshot</button>
+            <span id="mondayOcrStatus" style="font-size:11px; color:var(--slate); margin-left:6px;"></span>
+          </div>
+          <label style="font-size:11px; font-weight:700; color:var(--slate); display:block; margin-top:8px;">Table text (editable)</label>
+          <textarea id="mondayText" rows="4" placeholder="Name  Mobile  Last Referral Date  Called Today  Last Touch Date  Last Touch" style="width:100%; box-sizing:border-box; font-size:11px; padding:7px; border:1px solid var(--line); border-radius:6px; font-family:Consolas,Menlo,monospace;"></textarea>
+          <div style="margin-top:8px;">
+            <button class="export-btn export-btn-outline" onclick="parseMondayText()">Preview Rows</button>
+          </div>
+        </div>
+
+        <div class="dc-card">
+          <h4>Manual realtor / loan entry</h4>
+          <p class="dc-hint">Add realtors not in Jungo (from the Loan Log). Saved to Manual Contacts so their phone auto-fills next time.</p>
+          <div id="manualEntryRows"></div>
+          <button class="export-btn export-btn-outline" style="font-size:11px;" onclick="addManualEntryRow()">+ Add Another</button>
+          <div style="margin-top:8px;">
+            <button class="export-btn" onclick="commitManualEntries()">Add to List</button>
+          </div>
+          <div id="manualEntryStatus" style="font-size:11px; color:var(--good); margin-top:6px; min-height:14px;"></div>
+        </div>
+
+        <div class="dc-card">
+          <h4>Want to Call (priority)</h4>
+          <p class="dc-hint">Flag people to push to the top of the list. Flags persist and re-apply whenever that person is parsed again.</p>
+          <button class="export-btn export-btn-outline" style="font-size:11px;" onclick="openWantToCallModal()">Review current list &amp; flags</button>
+        </div>
+
+      </div>
+
+      <div class="dc-content">
+        <div class="dc-card" style="padding:12px 14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <div>
+              <h4 style="margin:0;">List for Today</h4>
+              <div class="dc-batch-note" id="listSummary">No rows yet — upload a file or add rows manually.</div>
+            </div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <button class="export-btn export-btn-outline" style="font-size:11px;" onclick="addBlankRow()">+ Add Row</button>
+              <button class="export-btn export-btn-outline" style="font-size:11px;" onclick="clearListConfirm()">Clear</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="dc-card" style="padding:0;">
+          <div class="dc-grid-wrap">
+            <table class="dc-grid">
+              <thead>
+                <tr>
+                  <th class="dc-col-purpose">Purpose of Call</th>
+                  <th class="dc-col-name">Full Name</th>
+                  <th class="dc-col-number">Number</th>
+                  <th>Description</th>
+                  <th class="dc-col-actions">Order / Edit</th>
+                </tr>
+              </thead>
+              <tbody id="dcListBody"></tbody>
+            </table>
+          </div>
+          <div id="dcListEmpty" class="dc-empty">Nothing here yet.</div>
+        </div>
+
+        <div class="dc-card" id="preAppCard" style="display:none;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <div>
+              <h4 style="margin:0;">Pre-App Last 14 Days</h4>
+              <div class="dc-batch-note" id="preAppSummary"></div>
+            </div>
+            <button class="export-btn" style="font-size:11px;" onclick="exportPreAppPdf()">Export Pre-App PDF</button>
+          </div>
+          <div class="dc-grid-wrap" style="margin-top:8px;">
+            <table class="dc-grid" style="min-width:600px;">
+              <thead><tr><th>Full Name</th><th>Mobile</th><th>Pre-Approved</th><th>Last Touch</th><th>Stage</th></tr></thead>
+              <tbody id="preAppBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding:14px 24px 18px; font-size:10.5px; color:var(--slate); line-height:1.5;">
+      Internal tool for FM Home Loans staff — turns Jungo daily/weekly exports into a ready-to-call list and PhoneBurner import. Not a public FM Home Loans website or service.
+    </div>
+  </div>
+
+  <!-- SAVED DAYS MODAL -->
+  <div id="savedModalOverlay" class="dc-modal-overlay" onclick="if(event.target===this) closeSavedModal();">
+    <div class="dc-modal">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3 style="margin:0;">Saved Days</h3>
+        <button class="export-btn export-btn-outline" style="padding:4px 8px; font-size:11px;" onclick="closeSavedModal()">&times; Close</button>
+      </div>
+      <div id="savedListBody" style="margin-top:12px;"></div>
+    </div>
+  </div>
+
+  <!-- MONDAY PREVIEW MODAL -->
+  <div id="mondayModalOverlay" class="dc-modal-overlay" onclick="if(event.target===this) closeMondayModal();">
+    <div class="dc-modal" style="max-width:720px;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3 style="margin:0;">PhoneBurner rows</h3>
+        <button class="export-btn export-btn-outline" style="padding:4px 8px; font-size:11px;" onclick="closeMondayModal()">&times; Close</button>
+      </div>
+      <p style="font-size:12px; color:var(--slate); margin:8px 0;">Fix any OCR mistakes below, then enter the row numbers you want to add.</p>
+      <div style="overflow:auto;"><table class="dc-ocr-table"><thead id="mondayHead"></thead><tbody id="mondayPreviewBody"></tbody></table></div>
+      <div class="field-row" style="margin-top:12px;">
+        <label>Rows to add</label>
+        <input type="text" id="mondaySelection" placeholder="e.g. 1, 3, 5-7" style="flex:1;">
+        <button class="export-btn" onclick="commitMondayRows()">Add Selected</button>
+      </div>
+      <div id="mondayCommitStatus" style="font-size:11.5px; color:var(--good); margin-top:8px; min-height:14px;"></div>
+    </div>
+  </div>
+
+  <!-- WANT-TO-CALL MODAL -->
+  <div id="wantToCallModalOverlay" class="dc-modal-overlay" onclick="if(event.target===this) closeWantToCallModal();">
+    <div class="dc-modal" style="max-width:560px;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3 style="margin:0;">Want to Call</h3>
+        <button class="export-btn export-btn-outline" style="padding:4px 8px; font-size:11px;" onclick="closeWantToCallModal()">&times; Close</button>
+      </div>
+      <p style="font-size:12px; color:var(--slate); margin:8px 0;">Tick anyone you want pushed to the top. Saved immediately.</p>
+      <div id="wantToCallList" style="max-height:52vh; overflow-y:auto;"></div>
+    </div>
+  </div>
+
+  <!-- GENERIC MAPPER MODAL -->
+  <div id="mapperModalOverlay" class="dc-modal-overlay" onclick="if(event.target===this) closeMapperModal();">
+    <div class="dc-modal" style="max-width:640px;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3 style="margin:0;">Map columns</h3>
+        <button class="export-btn export-btn-outline" style="padding:4px 8px; font-size:11px;" onclick="closeMapperModal()">&times; Close</button>
+      </div>
+      <p style="font-size:12px; color:var(--slate); margin:8px 0;" id="mapperFileNote"></p>
+      <div class="field-row" style="margin-bottom:8px;">
+        <label>Header row #</label>
+        <input type="number" id="mapperHeaderRow" min="1" style="width:80px;" onchange="rerenderMapper()">
+        <span style="font-size:11px; color:var(--slate);">(1-based; change if the wrong row is used as headers)</span>
+      </div>
+      <div id="mapperRows"></div>
+      <label style="font-size:12px; color:var(--navy); display:flex; align-items:center; gap:6px; margin-top:10px;">
+        <input type="checkbox" id="mapperSaveTemplate" checked> Remember this mapping for files with these columns
+      </label>
+      <div id="mapperError" style="color:var(--bad); font-size:12px; margin-top:8px; min-height:14px;"></div>
+      <div style="margin-top:12px; display:flex; gap:8px; justify-content:flex-end;">
+        <button class="export-btn export-btn-outline" onclick="closeMapperModal()">Cancel</button>
+        <button class="export-btn" style="background:var(--navy); color:#fff;" onclick="applyMapper()">Add Rows</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ===========================================================================
+// DC_API — mirrors GT_API/SOCIAL_API. Shares assets/api.js core + the same
+// 'cce_session_token' localStorage key, so a login in any tool carries over.
+// The 12 action strings below MUST match the ACTIONS map in backend Code.gs.
+// ===========================================================================
+const DC_API = (function(){
+  const core = createFmApiCore();
+  return Object.assign({}, core, {
+    // DailyCallsRecords (Drive-blob CRUD)
+    saveDailyCallsRecord: async function(payload){ const d = await core.call('saveDailyCallsRecord', payload); return { recordId:d.recordId, record:d.record }; },
+    listDailyCallsRecords: async function(filters){ const d = await core.call('listDailyCallsRecords', filters || {}); return d.records; },
+    getDailyCallsRecord: async function(recordId){ return core.call('getDailyCallsRecord', { recordId:recordId }); },
+    deleteDailyCallsRecord: async function(recordId){ const d = await core.call('deleteDailyCallsRecord', { recordId:recordId }); return d.deleted; },
+    // DailyCallsManualContacts (plain sheet)
+    saveDailyCallsManualContact: async function(payload){ const d = await core.call('saveDailyCallsManualContact', payload); return d.contact; },
+    listDailyCallsManualContacts: async function(){ const d = await core.call('listDailyCallsManualContacts', {}); return d.contacts; },
+    deleteDailyCallsManualContact: async function(contactId){ const d = await core.call('deleteDailyCallsManualContact', { contactId:contactId }); return d.deleted; },
+    // DailyCallsMappingTemplates (plain sheet)
+    saveDailyCallsMappingTemplate: async function(payload){ const d = await core.call('saveDailyCallsMappingTemplate', payload); return d.template; },
+    listDailyCallsMappingTemplates: async function(){ const d = await core.call('listDailyCallsMappingTemplates', {}); return d.templates; },
+    deleteDailyCallsMappingTemplate: async function(templateId){ const d = await core.call('deleteDailyCallsMappingTemplate', { templateId:templateId }); return d.deleted; },
+    // DailyCallsWantToCall (plain sheet)
+    saveDailyCallsWantToCall: async function(payload){ const d = await core.call('saveDailyCallsWantToCall', payload); return d.flags; },
+    listDailyCallsWantToCall: async function(){ const d = await core.call('listDailyCallsWantToCall', {}); return d.flags; },
+  });
+})();
+
+// ===========================================================================
+// LOGIN GATE — same pattern as Greatness Tracker: whoAmI() then a real gated
+// action (listDailyCallsRecords); a thrown error means not-authorized.
+// ===========================================================================
+let currentAccount = null;
+
+async function initSession(){
+  if (!DC_API.isLoggedIn()){ showLoginGate('form'); return; }
+  showLoginGate('checking');
+  try {
+    currentAccount = await DC_API.whoAmI();
+    hideLoginGate();
+    await checkDailyCallsAuthorization();
+  } catch (err) {
+    DC_API.logout();
+    showLoginGate('form');
+  }
+}
+async function checkDailyCallsAuthorization(){
+  try {
+    await DC_API.listDailyCallsRecords({});
+    document.getElementById('dcNotAuthorized').style.display = 'none';
+    document.getElementById('dcMain').style.display = 'flex';
+    const note = document.getElementById('accountNote');
+    if (note) note.innerHTML = 'Logged in as ' + escapeHtml(currentAccount.Name) + ' <a href="#" onclick="logoutAccount(); return false;">Logout</a>';
+    initTool();
+  } catch (err) {
+    document.getElementById('dcMain').style.display = 'none';
+    document.getElementById('dcNotAuthorized').style.display = 'block';
+  }
+}
+function showLoginGate(mode){
+  document.getElementById('loginGateOverlay').style.display = 'flex';
+  const checking = mode === 'checking';
+  document.getElementById('loginGateForm').style.display = checking ? 'none' : 'block';
+  document.getElementById('loginGateChecking').style.display = checking ? 'block' : 'none';
+}
+function hideLoginGate(){ document.getElementById('loginGateOverlay').style.display = 'none'; }
+function logoutAccount(){ DC_API.logout(); currentAccount = null; location.reload(); }
+async function attemptLogin(){
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  errEl.textContent = '';
+  if (!email || !password){ errEl.textContent = 'Enter your email and password.'; return; }
+  try {
+    currentAccount = await DC_API.login(email, password);
+    document.getElementById('loginPassword').value = '';
+    hideLoginGate();
+    await checkDailyCallsAuthorization();
+  } catch (err) { errEl.textContent = err.message; }
+}
+function openRequestLoginModal(){
+  ['reqLoginName','reqLoginEmail','reqLoginPassword','reqLoginPasswordConfirm'].forEach(id => { document.getElementById(id).value = ''; });
+  document.getElementById('reqLoginError').textContent = '';
+  document.getElementById('reqLoginSuccess').style.display = 'none';
+  document.getElementById('requestLoginModalOverlay').classList.add('open');
+}
+function closeRequestLoginModal(){ document.getElementById('requestLoginModalOverlay').classList.remove('open'); }
+async function attemptRequestLogin(){
+  const name = document.getElementById('reqLoginName').value.trim();
+  const email = document.getElementById('reqLoginEmail').value.trim();
+  const password = document.getElementById('reqLoginPassword').value;
+  const confirmPw = document.getElementById('reqLoginPasswordConfirm').value;
+  const errEl = document.getElementById('reqLoginError');
+  errEl.textContent = '';
+  if (!name || !email || !password){ errEl.textContent = 'Name, email, and password are all required.'; return; }
+  if (password.length < 8){ errEl.textContent = 'Password must be at least 8 characters.'; return; }
+  if (password !== confirmPw){ errEl.textContent = "Passwords don't match."; return; }
+  try { await DC_API.requestLogin(name, email, password); document.getElementById('reqLoginSuccess').style.display = 'block'; }
+  catch (err) { errEl.textContent = err.message; }
+}
+
+// ===========================================================================
+// SHARED HELPERS
+// ===========================================================================
+function escapeHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function todayIso(){ const d = new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
+function uid(){ return 'r' + Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
+function digitsOnly(s){ return String(s||'').replace(/\D/g,''); }
+
+// Normalized identity key for dedup + Want-to-Call matching: lowercased name
+// + last 10 phone digits.
+function identityKeyFor(name, number){
+  const n = String(name||'').trim().toLowerCase().replace(/\s+/g,' ');
+  const p = digitsOnly(number).slice(-10);
+  return n + '|' + p;
+}
+function normalizeName(s){ return String(s||'').trim().replace(/\s+/g,' '); }
+
+// Keyword header matcher — never a fixed column position. Returns the index
+// of the first header cell that contains ALL mustContain terms and NONE of
+// the mustNotContain terms (case-insensitive), or -1.
+function findColIndex_(headerRow, mustContain, mustNotContain){
+  mustContain = (mustContain||[]).map(s => s.toLowerCase());
+  mustNotContain = (mustNotContain||[]).map(s => s.toLowerCase());
+  for (let i = 0; i < headerRow.length; i++){
+    const h = String(headerRow[i]||'').toLowerCase();
+    if (!h) continue;
+    if (mustContain.every(t => h.indexOf(t) !== -1) && !mustNotContain.some(t => h.indexOf(t) !== -1)) return i;
+  }
+  return -1;
+}
+// Same, but starting the search at/after a given column (used for the two
+// side-by-side blocks in the realtor report, where the same header label
+// appears in both the Listing and Buying halves).
+function findColIndexFrom_(headerRow, startCol, endCol, mustContain, mustNotContain){
+  mustContain = (mustContain||[]).map(s => s.toLowerCase());
+  mustNotContain = (mustNotContain||[]).map(s => s.toLowerCase());
+  const end = (endCol == null || endCol > headerRow.length) ? headerRow.length : endCol;
+  for (let i = startCol; i < end; i++){
+    const h = String(headerRow[i]||'').toLowerCase();
+    if (!h) continue;
+    if (mustContain.every(t => h.indexOf(t) !== -1) && !mustNotContain.some(t => h.indexOf(t) !== -1)) return i;
+  }
+  return -1;
+}
+
+// Jungo/Salesforce exports append summary + legal footer rows below the data
+// ("Total" / "Sum" / "Count", "Confidential Information - Do Not Distribute",
+// "Copyright © … salesforce.com …"). These must never be parsed as contacts.
+function isJungoFooterRow_(row){
+  const joined = (row||[]).map(c => String(c||'').trim()).filter(Boolean).join(' ').toLowerCase();
+  if (!joined) return false;
+  return /^(total|count|sum)\b/.test(joined)
+    || joined.indexOf('confidential information') !== -1
+    || joined.indexOf('salesforce.com') !== -1
+    || joined.indexOf('do not distribute') !== -1
+    || joined.indexOf('copyright') !== -1;
+}
+// A real person/realtor name always contains at least one letter — guards
+// against stray numeric summary cells ("11", "10") becoming contacts.
+function looksLikeName_(s){ return /[a-zA-Z]/.test(String(s||'')); }
+
+// Read a file (xlsx or csv) into a SheetJS grid (array of arrays of strings).
+function gridFromArrayBuffer_(ab){
+  const wb = XLSX.read(ab, { type:'array' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  return XLSX.utils.sheet_to_json(ws, { header:1, raw:false, defval:'' });
+}
+
+// Parse a date-ish string ("7/13/2026" or "6/30/2026, 12:00 PM") -> Date or
+// null. Tolerant: unparseable returns null (caller decides whether to drop).
+function parseLooseDate_(s){
+  if (!s) return null;
+  const str = String(s).split(',')[0].trim();
+  const m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (m){
+    let y = parseInt(m[3],10); if (y < 100) y += 2000;
+    const d = new Date(y, parseInt(m[1],10)-1, parseInt(m[2],10));
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(str);
+  return isNaN(d.getTime()) ? null : d;
+}
+function yearsBetween_(closeDate, ref){
+  if (!closeDate) return null;
+  const r = ref || new Date();
+  let y = r.getFullYear() - closeDate.getFullYear();
+  return y;
+}
+function ageFrom_(birth, ref){
+  if (!birth) return null;
+  const r = ref || new Date();
+  let a = r.getFullYear() - birth.getFullYear();
+  const m = r.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && r.getDate() < birth.getDate())) a--;
+  return a;
+}
+// The Sunday that ends the current week (used for CD-Sent "this week" test).
+function endOfWeekSunday_(ref){
+  const d = new Date(ref || new Date()); d.setHours(0,0,0,0);
+  const day = d.getDay(); // 0 Sun..6 Sat
+  d.setDate(d.getDate() + (7 - day) % 7);
+  return d;
+}
+function startOfWeekMonday_(ref){
+  const d = new Date(ref || new Date()); d.setHours(0,0,0,0);
+  const day = d.getDay();
+  d.setDate(d.getDate() + ((day === 0 ? -6 : 1) - day));
+  return d;
+}
+</script>
+
+<script>
+// ===========================================================================
+// UNIFIED ROW MODEL + STATE
+// { rowId, purpose, fullName, number, description, sourceType, identityKey,
+//   priority, manuallyEdited, missingPhone, sortIndex, raw }
+// ===========================================================================
+let dcRows = [];            // the "List for Today"
+let dcPreApp = [];          // Pre-App rows (separate PDF only)
+let currentRecordId = null;
+let currentDateOf = todayIso();
+let wantToCallSet = {};     // identityKey -> displayName
+let manualContactsByName = {}; // normalized name -> {phone}
+let sourceBatches = [];     // [{fileName, format, count}]
+
+const PURPOSES = ['Birthday','Home Anniversary','Closed Last 30 Days','CD Sent This Week','Referred Last 7 Days','Pre-Approved','Realtor Call','Closing Realtor','Pre-App','PhoneBurner Group','Other'];
+
+function makeRow(fields){
+  const r = Object.assign({
+    rowId: uid(), purpose:'Other', fullName:'', number:'', description:'',
+    sourceType:'', identityKey:'', priority:false, manuallyEdited:false,
+    missingPhone:false, sortIndex:0, raw:null
+  }, fields);
+  if (!r.identityKey) r.identityKey = identityKeyFor(r.fullName, r.number);
+  if (!r.number) r.missingPhone = true;
+  return r;
+}
+
+const DRAFT_KEY = 'dc_draft_current';
+function persistDraft(){
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({
+      recordId: currentRecordId, dateOf: currentDateOf, rows: dcRows,
+      preApp: dcPreApp, sourceBatches: sourceBatches
+    }));
+  } catch (e) {}
+}
+function loadDraft(){
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (e) { return null; }
+}
+
+async function initTool(){
+  document.getElementById('dcDateOf').value = currentDateOf;
+  const draft = loadDraft();
+  if (draft){
+    dcRows = draft.rows || [];
+    dcPreApp = draft.preApp || [];
+    sourceBatches = draft.sourceBatches || [];
+    currentRecordId = draft.recordId || null;
+    currentDateOf = draft.dateOf || todayIso();
+    document.getElementById('dcDateOf').value = currentDateOf;
+  }
+  addManualEntryRow();
+  renderList();
+  renderPreApp();
+  try { const flags = await DC_API.listDailyCallsWantToCall(); applyWantToCallFlags_(flags); } catch(e){}
+  try { const contacts = await DC_API.listDailyCallsManualContacts(); indexManualContacts_(contacts); } catch(e){}
+}
+function indexManualContacts_(contacts){
+  manualContactsByName = {};
+  (contacts||[]).forEach(c => {
+    const key = normalizeName(c.Name).toLowerCase();
+    if (key) manualContactsByName[key] = { phone: c.Phone || '', role: c.Role || '' };
+  });
+}
+function applyWantToCallFlags_(flags){
+  wantToCallSet = {};
+  (flags||[]).forEach(f => { if (f.IdentityKey) wantToCallSet[f.IdentityKey] = f.DisplayName || ''; });
+  // Re-apply to any rows already on the list.
+  dcRows.forEach(r => { r.priority = !!wantToCallSet[r.identityKey]; });
+  sortByPriorityInitial_();
+  renderList();
+}
+</script>
+
+<script>
+// ===========================================================================
+// PARSERS — each consumes a SheetJS grid. detectFormat_ tries each validator
+// in order; on no match the caller falls through to the generic mapper.
+// ===========================================================================
+
+// Return 'dailyUpdateWide' | 'realtorFlat' | 'closingDateRealtor' |
+// 'preAppFlat' | 'appOwnExport' | 'appOwnCsv' | null.
+// The flat single-header formats (realtor / closing-realtor / pre-app) are
+// checked BEFORE the wide multi-section check: a flat file's header row can
+// otherwise trip findWideSectionRow_'s keyword heuristic, so we only fall
+// through to the wide parser once the flat validators have all declined.
+function detectFormat_(grid){
+  if (isAppOwnXlsx_(grid)) return 'appOwnExport';
+  if (isAppOwnCsv_(grid)) return 'appOwnCsv';
+  const hdr = findFirstHeaderRow_(grid);
+  if (hdr !== -1){
+    const h = grid[hdr];
+    const hasListing = findColIndex_(h, ['realtor','listing agent'], ['phone','mobile','*']) !== -1;
+    const hasBuying = findColIndex_(h, ['realtor','buying agent'], ['phone','mobile','*']) !== -1;
+    const firstNonEmpty = String((h.find(c => String(c||'').trim())) || '').toLowerCase();
+    if (hasListing && hasBuying){
+      if (firstNonEmpty.indexOf('closing date') === 0) return 'closingDateRealtor';
+      return 'realtorFlat';
+    }
+    if (isPreAppHeader_(h)) return 'preAppFlat';
+  }
+  if (findWideSectionRow_(grid) !== -1) return 'dailyUpdateWide';
+  return null;
+}
+
+function isPreAppHeader_(h){
+  const hasName = findColIndex_(h, ['full name'], []) !== -1 || findColIndex_(h, ['borrower name','full name'], []) !== -1;
+  const hasPreApp = findColIndex_(h, ['pre-app'], []) !== -1 || findColIndex_(h, ['pre app'], []) !== -1 || findColIndex_(h, ['pre-approved'], []) !== -1;
+  const hasStage = findColIndex_(h, ['stage'], []) !== -1;
+  return hasName && hasPreApp && hasStage;
+}
+
+// The app's own XLSX export re-import: header row "Purpose of Call, Full
+// Name, Number, Description".
+function isAppOwnXlsx_(grid){
+  for (let i = 0; i < Math.min(grid.length, 6); i++){
+    const h = grid[i];
+    if (findColIndex_(h, ['purpose of call'], []) !== -1 && findColIndex_(h, ['full name'], []) !== -1 && findColIndex_(h, ['description'], []) !== -1) return true;
+  }
+  return false;
+}
+// The app's own PhoneBurner CSV: header row "Name, Phone, Description".
+function isAppOwnCsv_(grid){
+  const h = grid[0] || [];
+  const nm = String(h[0]||'').trim().toLowerCase();
+  const ph = String(h[1]||'').trim().toLowerCase();
+  const de = String(h[2]||'').trim().toLowerCase();
+  return nm === 'name' && ph === 'phone' && de === 'description' && h.length <= 4;
+}
+
+// The "section title" row in a wide Daily-Update / Thursday export — a sparse
+// row whose non-empty cells are recognizable section names. Returns its index
+// or -1. The header row is always the next non-empty row below it.
+const WIDE_SECTION_KEYWORDS = ['birthday','closed','referred','anniversar','pre-approved','pre approved','cd sent'];
+function findWideSectionRow_(grid){
+  for (let i = 0; i < grid.length; i++){
+    const row = grid[i] || [];
+    const nonEmpty = row.map((c,ci)=>({c:String(c||'').trim().toLowerCase(),ci})).filter(x=>x.c);
+    if (nonEmpty.length < 2 || nonEmpty.length > 8) continue;
+    const matches = nonEmpty.filter(x => WIDE_SECTION_KEYWORDS.some(k => x.c.indexOf(k) !== -1));
+    if (matches.length >= 2) return i;
+  }
+  return -1;
+}
+function findFirstHeaderRow_(grid){
+  // The real header row is the one with the MOST field-keyword hits (not just
+  // the first row that has one) — a Jungo export has several sparse "Filtered
+  // By" / sub-title rows above the real headers, and some of those contain a
+  // stray keyword (e.g. "Loans with Borrower Name:"), so a first-match scan
+  // would stop too early on the sub-title row instead of the true header.
+  const KW = ['full name','borrower name','mobile','phone','realtor','listing agent',
+    'buying agent','property address','property city','loan amount','closing date',
+    'stage','pre-app','pre-approved','last touch','referred by','next birthday','birthdate'];
+  let bestRow = -1, bestScore = 1;
+  for (let i = 0; i < Math.min(grid.length, 40); i++){
+    const row = grid[i] || [];
+    const cells = row.map(c => String(c||'').toLowerCase());
+    if (cells.filter(c => c.trim()).length < 2) continue;
+    let score = 0;
+    cells.forEach(c => { if (KW.some(k => c.indexOf(k) !== -1)) score++; });
+    if (score > bestScore){ bestScore = score; bestRow = i; }
+  }
+  return bestRow;
+}
+
+// --- Parser 1: Daily Update wide (multi-section) --------------------------
+// Splits the columns into per-section spans (bounded by each section title's
+// column), then reads rows under each span until a blank/"Total" row.
+function parseDailyUpdateWide_(grid, sourceFile){
+  const secRow = findWideSectionRow_(grid);
+  if (secRow === -1) return [];
+  // Header row = next non-empty row.
+  let hdrRow = secRow + 1;
+  while (hdrRow < grid.length && (grid[hdrRow]||[]).every(c => !String(c||'').trim())) hdrRow++;
+  const headers = grid[hdrRow] || [];
+  const sectionCells = (grid[secRow]||[]).map((c,ci)=>({title:String(c||'').trim(),ci})).filter(x=>x.title);
+  const rows = [];
+  const now = new Date();
+  const eow = endOfWeekSunday_(now);
+  const sow = startOfWeekMonday_(now);
+
+  sectionCells.forEach((sec, si) => {
+    const startCol = sec.ci;
+    const endCol = (si+1 < sectionCells.length) ? sectionCells[si+1].ci : headers.length;
+    const title = sec.title.toLowerCase();
+    // Column lookups relative to this span.
+    const col = (must, mustNot) => findColIndexFrom_(headers, startCol, endCol, must, mustNot);
+
+    // Read data rows for this span from hdrRow+1 down until an all-blank span
+    // or a "Total" marker in this span.
+    const dataStart = hdrRow + 1;
+    for (let r = dataStart; r < grid.length; r++){
+      const row = grid[r] || [];
+      const span = [];
+      for (let c = startCol; c < endCol; c++) span.push(String(row[c]||'').trim());
+      if (span.every(v => !v)) break;                 // section ends at first blank row in its span
+      if (span.some(v => /^total$/i.test(v))) break;  // or a Total marker
+
+      const built = buildWideRow_(title, headers, row, col, { now, eow, sow });
+      if (built) rows.push(built);
+    }
+  });
+  return rows;
+}
+
+function buildWideRow_(title, headers, row, col, ctx){
+  function val(ci){ return ci === -1 ? '' : String(row[ci]||'').trim(); }
+
+  if (title.indexOf('birthday') !== -1){
+    const nameCol = col(['full name'], []); const mobCol = col(['mobile'], []);
+    const bdCol = col(['birthdate'], []);
+    const name = val(nameCol); if (!name) return null;
+    const birth = parseLooseDate_(val(bdCol));
+    // "Turning N" matches Ann's hand-built lists: N is the person's age as of
+    // the list date (ageFrom_ already decrements when the birthday hasn't
+    // landed yet), e.g. a 7/17/1981 birthday on a 7/16 list reads "Turning 44".
+    const age = ageFrom_(birth, ctx.now);
+    const desc = [val(bdCol), age != null ? ('Turning ' + age) : ''].filter(Boolean).join('\n');
+    return makeRow({ purpose:'Birthday', fullName:name, number:val(mobCol), description:desc, sourceType:'dailyUpdateWide' });
+  }
+
+  if (title.indexOf('anniversar') !== -1){
+    const nameCol = findColIndexFromBorrowerFull_(headers, col);
+    const mobCol = col(['borrower name','mobile'], ['co borrower','co-borrower']);
+    const closeCol = col(['closing date'], []);
+    const procCol = col(['processor'], []);
+    const leadCol = col(['lead specialist'], []);
+    const purposeCol = col(['loan purpose'], []);
+    const coNameCol = col(['first name','co borrower'], []) !== -1 ? col(['first name','co borrower'], []) : col(['first name','(co'], []);
+    const coMobCol = col(['mobile','co borrower'], []) !== -1 ? col(['mobile','co borrower'], []) : col(['mobile','(co'], []);
+    const name = val(nameCol); if (!name) return null;
+    const close = parseLooseDate_(val(closeCol));
+    const yrs = yearsBetween_(close, ctx.now);
+    const proc = val(procCol) || val(leadCol);
+    const lines = [];
+    if (val(purposeCol)) lines.push(val(purposeCol));
+    if (val(closeCol)) lines.push('Closing Date: ' + val(closeCol));
+    if (yrs != null) lines.push('(' + yrs + ' Year' + (yrs===1?'':'s') + ' Ago!)');
+    if (proc) lines.push('Processor: ' + proc);
+    const coName = val(coNameCol), coMob = val(coMobCol);
+    if (coName || coMob){ lines.push(''); lines.push('Co-Borrower:'); lines.push((coName ? coName + ': ' : '') + coMob); }
+    return makeRow({ purpose:'Home Anniversary', fullName:name, number:val(mobCol), description:lines.join('\n'), sourceType:'dailyUpdateWide' });
+  }
+
+  if (title.indexOf('closed') !== -1 || title.indexOf('cd sent') !== -1){
+    // CLOSED-last-30 span also carries CD-Sent — emit a Closed row (drop
+    // future-dated closings) and, independently, a CD-Sent-this-week row.
+    const nameCol = findColIndexFromBorrowerFull_(headers, col);
+    const mobCol = col(['borrower name','mobile'], []);
+    const closeCol = col(['closing date'], []);
+    const cdCol = col(['cd sent'], []);
+    const leadCol = col(['lead specialist'], []) !== -1 ? col(['lead specialist'], []) : col(['processor'], []);
+    const name = val(nameCol); if (!name) return null;
+    const out = [];
+    // Closed Last 30 Days — keep unparseable dates, drop future closings.
+    const close = parseLooseDate_(val(closeCol));
+    if (!close || close <= ctx.now){
+      const lines = [];
+      if (val(closeCol)) lines.push('Closing Date: ' + val(closeCol));
+      if (val(leadCol)) lines.push('Lead Specialist: ' + val(leadCol));
+      out.push(makeRow({ purpose:'Closed Last 30 Days', fullName:name, number:val(mobCol), description:lines.join('\n'), sourceType:'dailyUpdateWide' }));
+    }
+    // CD Sent This Week — only if CD Sent date falls in the current week.
+    const cd = parseLooseDate_(val(cdCol));
+    if (val(cdCol) && (!cd || (cd >= ctx.sow && cd <= ctx.eow))){
+      out.push(makeRow({ purpose:'CD Sent This Week', fullName:name, number:val(mobCol), description:'CD Sent: ' + val(cdCol), sourceType:'dailyUpdateWide' }));
+    }
+    // buildWideRow_ returns one row; return the array via a sentinel so the
+    // caller can spread it.
+    return out.length === 1 ? out[0] : (out.length ? { __multi:out } : null);
+  }
+
+  if (title.indexOf('referred') !== -1){
+    const nameCol = col(['full name'], ['borrower']);
+    const mobCol = col(['mobile'], ['borrower']);
+    const refByCol = col(['referred by'], []) !== -1 ? col(['referred by'], []) : col(['referred'], []);
+    const name = val(nameCol); if (!name) return null;
+    const desc = val(refByCol) ? ('Referred By: ' + val(refByCol)) : '';
+    return makeRow({ purpose:'Referred Last 7 Days', fullName:name, number:val(mobCol), description:desc, sourceType:'dailyUpdateWide' });
+  }
+
+  if (title.indexOf('pre-approved') !== -1 || title.indexOf('pre approved') !== -1){
+    const nameCol = col(['full name'], ['borrower']);
+    const mobCol = col(['mobile'], ['borrower']);
+    const pmCol = col(['pre-approved last'], []) !== -1 ? col(['pre-approved last'], []) : col(['last modified'], []);
+    const name = val(nameCol); if (!name) return null;
+    const desc = val(pmCol) ? ('Pre-Approved: ' + val(pmCol)) : '';
+    return makeRow({ purpose:'Pre-Approved', fullName:name, number:val(mobCol), description:desc, sourceType:'dailyUpdateWide' });
+  }
+
+  return null;
+}
+// Prefer "Borrower Name: Full Name" but fall back to a plain "Full Name"
+// within the span.
+function findColIndexFromBorrowerFull_(headers, col){
+  let c = col(['borrower name','full name'], ['co borrower','co-borrower']);
+  if (c === -1) c = col(['full name'], []);
+  return c;
+}
+
+// --- Parser 2 & 3: Realtor grouping (shared) ------------------------------
+// Groups both agent slots per loan row by realtor identity into one row per
+// realtor. description = one "LA|BA | Borrower | City | Address" line per
+// loan, newline-joined.
+function buildRealtorRowsFromPairs_(grid, sourceType){
+  const hdrRow = findFirstHeaderRow_(grid);
+  if (hdrRow === -1) return [];
+  const headers = grid[hdrRow];
+  const laAnchor = findColIndex_(headers, ['realtor','listing agent'], ['phone','mobile','*']);
+  const baAnchor = findColIndex_(headers, ['realtor','buying agent'], ['phone','mobile','*']);
+  if (laAnchor === -1 && baAnchor === -1) return [];
+
+  // Block boundaries: LA block is [laAnchor, baAnchor); BA block is [baAnchor, end).
+  const blocks = [];
+  if (laAnchor !== -1){
+    const end = (baAnchor !== -1 && baAnchor > laAnchor) ? baAnchor : headers.length;
+    blocks.push({ role:'LA', anchor:laAnchor, start:laAnchor, end:end });
+  }
+  if (baAnchor !== -1){
+    const start = baAnchor;
+    blocks.push({ role:'BA', anchor:baAnchor, start:start, end:headers.length });
+  }
+
+  const realtors = new Map(); // key -> { displayName, phone, loans:[] }
+  const seenLoan = new Set();
+
+  for (let r = hdrRow + 1; r < grid.length; r++){
+    const row = grid[r] || [];
+    if (row.every(c => !String(c||'').trim())) continue;
+    if (isJungoFooterRow_(row)) continue;
+    blocks.forEach(b => {
+      const nameCol = b.anchor;
+      const phoneCol = findColIndexFrom_(headers, b.start, b.end, ['phone'], []) !== -1
+        ? findColIndexFrom_(headers, b.start, b.end, ['phone'], [])
+        : findColIndexFrom_(headers, b.start, b.end, ['mobile'], ['borrower']);
+      const addrCol = findColIndexFrom_(headers, b.start, b.end, ['property address'], []);
+      const cityCol = findColIndexFrom_(headers, b.start, b.end, ['property city'], []);
+      const borrCol = findColIndexFrom_(headers, b.start, b.end, ['borrower name','full name'], []);
+      const closeCol = findColIndexFrom_(headers, b.start, b.end, ['closing date'], []);
+      const rawName = String(row[nameCol]||'').trim();
+      if (!rawName || !looksLikeName_(rawName)) return;
+      const display = normalizeName(rawName);
+      const key = display.toLowerCase();
+      const borrower = String(row[borrCol]||'').trim();
+      const address = String(row[addrCol]||'').trim();
+      const city = String(row[cityCol]||'').trim();
+      const close = closeCol !== -1 ? String(row[closeCol]||'').trim() : '';
+      const loanKey = key + '|' + b.role + '|' + borrower.toLowerCase() + '|' + address.toLowerCase();
+      if (seenLoan.has(loanKey)) return;
+      seenLoan.add(loanKey);
+      if (!realtors.has(key)) realtors.set(key, { displayName:display, phone:'', loans:[] });
+      const rec = realtors.get(key);
+      const phone = phoneCol !== -1 ? String(row[phoneCol]||'').trim() : '';
+      if (phone && !rec.phone) rec.phone = phone;
+      rec.loans.push({ role:b.role, borrower, city, address, close });
+    });
+  }
+
+  const purpose = sourceType === 'closingDateRealtor' ? 'Closing Realtor' : 'Realtor Call';
+  const out = [];
+  Array.from(realtors.values())
+    .sort((a,b)=>a.displayName.localeCompare(b.displayName, undefined, {sensitivity:'base'}))
+    .forEach(rec => {
+      // Backfill phone from Manual Contacts by name.
+      let phone = rec.phone;
+      if (!phone){ const mc = manualContactsByName[rec.displayName.toLowerCase()]; if (mc && mc.phone) phone = mc.phone; }
+      const desc = rec.loans.map(l => {
+        const base = l.role + ' | ' + (l.borrower||'?') + ' | ' + (l.city||'') + ' | ' + (l.address||'');
+        return sourceType === 'closingDateRealtor' && l.close ? (base + ' | Closing ' + l.close) : base;
+      }).join('\n');
+      out.push(makeRow({ purpose:purpose, fullName:rec.displayName, number:phone, description:desc, sourceType:sourceType }));
+    });
+  return out;
+}
+
+// --- Parser 4: Pre-App Last 14 Days (flat) --------------------------------
+// Dedupes repeated Jungo rows per borrower; reads until first fully-blank
+// row. Feeds its own standalone PDF only (never the daily unified table).
+function parsePreAppFlat_(grid){
+  const hdrRow = findFirstHeaderRow_(grid);
+  if (hdrRow === -1) return [];
+  const headers = grid[hdrRow];
+  const nameCol = findColIndex_(headers, ['full name'], []) !== -1 ? findColIndex_(headers, ['full name'], []) : findColIndex_(headers, ['borrower name','full name'], []);
+  const mobCol = findColIndex_(headers, ['mobile'], []);
+  const paCol = findColIndex_(headers, ['pre-app'], ['stage']) !== -1 ? findColIndex_(headers, ['pre-app'], ['stage']) : findColIndex_(headers, ['pre-approved'], []);
+  const ltCol = findColIndex_(headers, ['last touch'], ['date']);
+  const ltdCol = findColIndex_(headers, ['last touch','date'], []);
+  const stageCol = findColIndex_(headers, ['stage'], []);
+  const refByCol = findColIndex_(headers, ['referred by'], []);
+  const seen = new Set();
+  const out = [];
+  for (let r = hdrRow + 1; r < grid.length; r++){
+    const row = grid[r] || [];
+    if (row.every(c => !String(c||'').trim())) break;
+    if (isJungoFooterRow_(row)) continue;
+    const name = String(row[nameCol]||'').trim();
+    if (!name || !looksLikeName_(name)) continue;
+    const mobile = String(row[mobCol]||'').trim();
+    const pa = paCol !== -1 ? String(row[paCol]||'').trim() : '';
+    const lt = ltCol !== -1 ? String(row[ltCol]||'').trim() : '';
+    const ltd = ltdCol !== -1 ? String(row[ltdCol]||'').trim() : '';
+    const stage = stageCol !== -1 ? String(row[stageCol]||'').trim() : '';
+    const refBy = refByCol !== -1 ? String(row[refByCol]||'').trim() : '';
+    const key = [name, mobile, pa, lt, ltd, stage].join('|').toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ fullName:name, mobile, preApproved:pa, lastTouch:lt, lastTouchDate:ltd, stage, referredBy:refBy });
+  }
+  return out;
+}
+
+// --- App's own re-import ---------------------------------------------------
+function parseAppOwnXlsx_(grid){
+  let hdrRow = -1;
+  for (let i = 0; i < Math.min(grid.length,6); i++){ if (findColIndex_(grid[i], ['purpose of call'], []) !== -1){ hdrRow = i; break; } }
+  if (hdrRow === -1) return [];
+  const h = grid[hdrRow];
+  const pc = findColIndex_(h, ['purpose of call'], []);
+  const nc = findColIndex_(h, ['full name'], []);
+  const numc = findColIndex_(h, ['number'], []);
+  const dc = findColIndex_(h, ['description'], []);
+  const out = [];
+  for (let r = hdrRow+1; r < grid.length; r++){
+    const row = grid[r]||[];
+    const name = String(row[nc]||'').trim();
+    if (!name && !String(row[numc]||'').trim()) continue;
+    out.push(makeRow({ purpose:String(row[pc]||'Other').trim()||'Other', fullName:name, number:String(row[numc]||'').trim(), description:String(row[dc]||'').trim(), sourceType:'appOwnExport', manuallyEdited:true }));
+  }
+  return out;
+}
+function parseAppOwnCsv_(grid){
+  const out = [];
+  for (let r = 1; r < grid.length; r++){
+    const row = grid[r]||[];
+    const name = String(row[0]||'').trim();
+    if (!name && !String(row[1]||'').trim()) continue;
+    out.push(makeRow({ purpose:'PhoneBurner Group', fullName:name, number:String(row[1]||'').trim(), description:String(row[2]||'').trim(), sourceType:'appOwnCsv', manuallyEdited:true }));
+  }
+  return out;
+}
+</script>
+
+<script>
+// ===========================================================================
+// FILE INTAKE
+// ===========================================================================
+function handleFilesPicked(fileList){
+  const files = Array.from(fileList || []);
+  if (!files.length) return;
+  const status = document.getElementById('uploadStatus');
+  status.textContent = 'Reading ' + files.length + ' file(s)…';
+  let done = 0, added = 0;
+  const notes = [];
+  const process = (idx) => {
+    if (idx >= files.length){
+      status.textContent = added + ' row(s) added. ' + notes.join(' ');
+      renderList(); renderPreApp(); persistDraft();
+      return;
+    }
+    const file = files[idx];
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const grid = gridFromArrayBuffer_(new Uint8Array(reader.result));
+        const fmt = detectFormat_(grid);
+        const res = ingestGrid_(grid, fmt, file.name);
+        added += res.added; if (res.note) notes.push(res.note);
+      } catch (err){ notes.push('(' + file.name + ': ' + err.message + ')'); }
+      done++; process(idx+1);
+    };
+    reader.onerror = () => { notes.push('(' + file.name + ': unreadable)'); done++; process(idx+1); };
+    reader.readAsArrayBuffer(file);
+  };
+  process(0);
+}
+
+// Returns { added, note }. Falls through to the generic mapper on no match.
+function ingestGrid_(grid, fmt, fileName){
+  if (fmt === 'dailyUpdateWide'){
+    const rows = flattenMulti_(parseDailyUpdateWide_(grid, fileName));
+    addUnifiedRows_(rows); sourceBatches.push({ fileName, format:fmt, count:rows.length });
+    return { added: rows.length, note:'(' + fileName + ': Daily Update, ' + rows.length + ')' };
+  }
+  if (fmt === 'realtorFlat' || fmt === 'closingDateRealtor'){
+    const rows = buildRealtorRowsFromPairs_(grid, fmt);
+    addUnifiedRows_(rows); sourceBatches.push({ fileName, format:fmt, count:rows.length });
+    return { added: rows.length, note:'(' + fileName + ': ' + (fmt==='closingDateRealtor'?'Closing Realtor':'Realtor') + ', ' + rows.length + ')' };
+  }
+  if (fmt === 'preAppFlat'){
+    const rows = parsePreAppFlat_(grid);
+    dcPreApp = dcPreApp.concat(rows);
+    return { added: 0, note:'(' + fileName + ': Pre-App, ' + rows.length + ' → separate PDF)' };
+  }
+  if (fmt === 'appOwnExport'){
+    const rows = parseAppOwnXlsx_(grid); addUnifiedRows_(rows);
+    return { added: rows.length, note:'(' + fileName + ': app export re-imported, ' + rows.length + ')' };
+  }
+  if (fmt === 'appOwnCsv'){
+    const rows = parseAppOwnCsv_(grid); addUnifiedRows_(rows);
+    return { added: rows.length, note:'(' + fileName + ': PhoneBurner CSV re-imported, ' + rows.length + ')' };
+  }
+  // No built-in parser matched → generic mapper.
+  openMapperModal(grid, fileName);
+  return { added: 0, note:'(' + fileName + ': needs column mapping)' };
+}
+
+// buildWideRow_ may return a { __multi:[...] } sentinel — flatten those.
+function flattenMulti_(rows){
+  const out = [];
+  rows.forEach(r => { if (r && r.__multi) out.push.apply(out, r.__multi); else if (r) out.push(r); });
+  return out;
+}
+
+// Add unified rows with dedup (by identityKey+purpose), Want-to-Call priority,
+// and manual-edit protection.
+function addUnifiedRows_(rows){
+  rows.forEach(r => {
+    const dupKey = r.identityKey + '|' + r.purpose;
+    const existing = dcRows.find(x => (x.identityKey + '|' + x.purpose) === dupKey);
+    if (existing){
+      if (existing.manuallyEdited) return; // don't clobber a hand-fixed row
+      existing.description = r.description; existing.number = r.number; existing.missingPhone = !r.number;
+      return;
+    }
+    r.priority = !!wantToCallSet[r.identityKey];
+    r.sortIndex = dcRows.length;
+    dcRows.push(r);
+  });
+  sortByPriorityInitial_();
+}
+// Initial build-time sort only: priority rows to the top, stable otherwise.
+function sortByPriorityInitial_(){
+  dcRows.forEach((r,i) => { if (r.sortIndex == null) r.sortIndex = i; });
+  dcRows.sort((a,b) => {
+    if (!!b.priority !== !!a.priority) return (b.priority?1:0) - (a.priority?1:0);
+    return (a.sortIndex||0) - (b.sortIndex||0);
+  });
+  dcRows.forEach((r,i) => { r.sortIndex = i; });
+}
+</script>
+
+<script>
+// ===========================================================================
+// LIST FOR TODAY — fully editable grid (inline edit, reorder, delete, add).
+// ===========================================================================
+function renderList(){
+  const body = document.getElementById('dcListBody');
+  const empty = document.getElementById('dcListEmpty');
+  const summary = document.getElementById('listSummary');
+  if (!dcRows.length){
+    body.innerHTML = '';
+    empty.style.display = 'block';
+    summary.textContent = 'No rows yet — upload a file or add rows manually.';
+    return;
+  }
+  empty.style.display = 'none';
+  const prio = dcRows.filter(r => r.priority).length;
+  const missing = dcRows.filter(r => r.missingPhone).length;
+  summary.textContent = dcRows.length + ' row(s)' + (prio ? ' · ' + prio + ' priority' : '') + (missing ? ' · ' + missing + ' missing phone' : '');
+  body.innerHTML = dcRows.map((r, i) => {
+    const cls = (r.priority ? 'dc-priority ' : '') + (r.missingPhone ? 'dc-missing-phone' : '');
+    const badges = (r.priority ? '<span class="dc-badge prio">WTC</span>' : '') + (r.manuallyEdited ? '<span class="dc-badge edited">edited</span>' : '');
+    return '<tr class="' + cls + '" draggable="true" data-idx="' + i + '">' +
+      '<td class="dc-col-purpose"><textarea rows="1" class="dc-cell-input" data-idx="' + i + '" data-field="purpose">' + escapeHtml(r.purpose) + '</textarea></td>' +
+      '<td class="dc-col-name"><textarea rows="1" class="dc-cell-input" data-idx="' + i + '" data-field="fullName">' + escapeHtml(r.fullName) + '</textarea>' + badges + '</td>' +
+      '<td class="dc-col-number dc-number-cell"><textarea rows="1" class="dc-cell-input" data-idx="' + i + '" data-field="number">' + escapeHtml(r.number) + '</textarea>' +
+        (r.missingPhone ? '<button class="dc-mini-btn" style="margin-top:2px;" onclick="addToManualFromRow(' + i + ')">+ Manual Contact</button>' : '') + '</td>' +
+      '<td><textarea rows="1" class="dc-cell-input" data-idx="' + i + '" data-field="description">' + escapeHtml(r.description) + '</textarea></td>' +
+      '<td class="dc-col-actions"><div class="dc-row-actions">' +
+        '<button class="dc-mini-btn" title="Move up" onclick="moveRow(' + i + ',-1)">↑</button>' +
+        '<button class="dc-mini-btn" title="Move down" onclick="moveRow(' + i + ',1)">↓</button>' +
+        '<button class="dc-mini-btn" title="' + (r.priority?'Unflag':'Want to call') + '" onclick="toggleRowPriority(' + i + ')">' + (r.priority?'★':'☆') + '</button>' +
+        '<button class="dc-mini-btn del" title="Delete" onclick="deleteRow(' + i + ')">✕</button>' +
+      '</div></td>' +
+    '</tr>';
+  }).join('');
+  body.querySelectorAll('.dc-cell-input').forEach(autoSize_);
+}
+function autoSize_(el){ el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+
+function onListInput(e){
+  const t = e.target;
+  if (!t.classList || !t.classList.contains('dc-cell-input')) return;
+  autoSize_(t);
+}
+function onListChange(e){
+  const t = e.target;
+  if (!t.classList || !t.classList.contains('dc-cell-input')) return;
+  const i = +t.dataset.idx, field = t.dataset.field;
+  const row = dcRows[i]; if (!row) return;
+  row[field] = t.value;
+  row.manuallyEdited = true;
+  if (field === 'number'){ row.missingPhone = !t.value.trim(); }
+  if (field === 'fullName' || field === 'number'){ row.identityKey = identityKeyFor(row.fullName, row.number); }
+  persistDraft();
+  if (field === 'number' || field === 'fullName') renderList();
+}
+function moveRow(i, dir){
+  const j = i + dir;
+  if (j < 0 || j >= dcRows.length) return;
+  const tmp = dcRows[i]; dcRows[i] = dcRows[j]; dcRows[j] = tmp;
+  dcRows.forEach((r,k) => r.sortIndex = k);
+  renderList(); persistDraft();
+}
+function deleteRow(i){ dcRows.splice(i,1); dcRows.forEach((r,k)=>r.sortIndex=k); renderList(); persistDraft(); }
+function toggleRowPriority(i){
+  const r = dcRows[i]; r.priority = !r.priority;
+  saveWantToCallFlag_(r.identityKey, r.fullName, r.priority);
+  renderList(); persistDraft();
+}
+function addBlankRow(){
+  dcRows.push(makeRow({ purpose:'Other', manuallyEdited:true, sortIndex:dcRows.length }));
+  renderList(); persistDraft();
+}
+function clearListConfirm(){
+  if (!dcRows.length) return;
+  if (!confirm('Clear the whole List for Today? (Saved days are not affected.)')) return;
+  dcRows = []; dcPreApp = []; sourceBatches = []; currentRecordId = null;
+  renderList(); renderPreApp(); persistDraft();
+}
+
+// Drag-and-drop reorder.
+let dragFromIdx = null;
+function onListDragStart(e){ const tr = e.target.closest('tr'); if (!tr) return; dragFromIdx = +tr.dataset.idx; e.dataTransfer.effectAllowed = 'move'; }
+function onListDragOver(e){ e.preventDefault(); const tr = e.target.closest('tr'); if (tr) tr.classList.add('dc-drag-over'); }
+function onListDragLeave(e){ const tr = e.target.closest('tr'); if (tr) tr.classList.remove('dc-drag-over'); }
+function onListDrop(e){
+  e.preventDefault();
+  const tr = e.target.closest('tr'); if (!tr) return;
+  tr.classList.remove('dc-drag-over');
+  const to = +tr.dataset.idx;
+  if (dragFromIdx == null || dragFromIdx === to) return;
+  const moved = dcRows.splice(dragFromIdx, 1)[0];
+  dcRows.splice(to, 0, moved);
+  dcRows.forEach((r,k) => r.sortIndex = k);
+  dragFromIdx = null;
+  renderList(); persistDraft();
+}
+
+function renderPreApp(){
+  const card = document.getElementById('preAppCard');
+  const body = document.getElementById('preAppBody');
+  if (!dcPreApp.length){ card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  document.getElementById('preAppSummary').textContent = dcPreApp.length + ' unique borrower(s) — exported as its own PDF, not merged into the daily list.';
+  body.innerHTML = dcPreApp.map(p =>
+    '<tr><td>' + escapeHtml(p.fullName) + '</td><td>' + escapeHtml(p.mobile) + '</td><td>' + escapeHtml(p.preApproved) + '</td><td>' + escapeHtml(p.lastTouchDate || p.lastTouch) + '</td><td>' + escapeHtml(p.stage) + '</td></tr>'
+  ).join('');
+}
+</script>
+
+<script>
+// ===========================================================================
+// WANT-TO-CALL
+// ===========================================================================
+async function saveWantToCallFlag_(identityKey, displayName, on){
+  if (on) wantToCallSet[identityKey] = displayName; else delete wantToCallSet[identityKey];
+  try { await DC_API.saveDailyCallsWantToCall({ identityKey, displayName, on:!!on }); } catch(e){}
+}
+function openWantToCallModal(){
+  const list = document.getElementById('wantToCallList');
+  if (!dcRows.length){ list.innerHTML = '<div class="dc-empty">No rows on the list yet.</div>'; }
+  else {
+    list.innerHTML = dcRows.map((r,i) =>
+      '<label style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--slate-light); font-size:12.5px;">' +
+        '<input type="checkbox" ' + (r.priority?'checked':'') + ' onchange="toggleRowPriority(' + i + '); renderWantToCallRefresh(' + i + ', this.checked)">' +
+        '<span><b>' + escapeHtml(r.fullName) + '</b> — ' + escapeHtml(r.purpose) + '</span>' +
+      '</label>'
+    ).join('');
+  }
+  document.getElementById('wantToCallModalOverlay').classList.add('open');
+}
+function renderWantToCallRefresh(i, checked){ /* state already updated by toggleRowPriority */ }
+function closeWantToCallModal(){ document.getElementById('wantToCallModalOverlay').classList.remove('open'); }
+</script>
+
+<script>
+// ===========================================================================
+// MANUAL REALTOR / LOAN ENTRY (repeating inline form)
+// ===========================================================================
+let manualEntryCount = 0;
+function addManualEntryRow(){
+  manualEntryCount++;
+  const idx = manualEntryCount;
+  const wrap = document.getElementById('manualEntryRows');
+  const block = document.createElement('div');
+  block.className = 'dc-manual-block';
+  block.dataset.mid = idx;
+  block.innerHTML =
+    '<div class="dc-manual-row">' +
+      '<select data-f="role"><option value="LA">LA</option><option value="BA">BA</option></select>' +
+      '<input data-f="realtor" placeholder="Realtor name">' +
+      '<input data-f="phone" placeholder="Phone">' +
+      '<button class="dc-mini-btn del" title="Remove" onclick="this.closest(\'.dc-manual-block\').remove()">✕</button>' +
+    '</div>' +
+    '<div class="dc-manual-row-2">' +
+      '<input data-f="borrower" placeholder="Borrower name">' +
+      '<input data-f="city" placeholder="Property city">' +
+      '<input data-f="address" placeholder="Property address">' +
+    '</div>';
+  wrap.appendChild(block);
+}
+async function commitManualEntries(){
+  const blocks = Array.from(document.querySelectorAll('#manualEntryRows .dc-manual-block'));
+  const byRealtor = new Map();
+  let count = 0;
+  blocks.forEach(b => {
+    const get = f => { const el = b.querySelector('[data-f="' + f + '"]'); return el ? el.value.trim() : ''; };
+    const realtor = get('realtor'); if (!realtor) return;
+    const role = get('role'), phone = get('phone'), borrower = get('borrower'), city = get('city'), address = get('address');
+    const key = normalizeName(realtor).toLowerCase();
+    if (!byRealtor.has(key)) byRealtor.set(key, { displayName:normalizeName(realtor), phone:phone, loans:[] });
+    const rec = byRealtor.get(key);
+    if (phone && !rec.phone) rec.phone = phone;
+    rec.loans.push({ role, borrower, city, address });
+    count++;
+    // Upsert into Manual Contacts store.
+    if (phone) DC_API.saveDailyCallsManualContact({ name:normalizeName(realtor), phone, role }).catch(()=>{});
+    manualContactsByName[key] = { phone, role };
+  });
+  if (!byRealtor.size){ document.getElementById('manualEntryStatus').textContent = 'Enter at least a realtor name.'; return; }
+  const rows = [];
+  byRealtor.forEach(rec => {
+    const desc = rec.loans.map(l => (l.role||'LA') + ' | ' + (l.borrower||'?') + ' | ' + (l.city||'') + ' | ' + (l.address||'')).join('\n');
+    rows.push(makeRow({ purpose:'Realtor Call', fullName:rec.displayName, number:rec.phone, description:desc, sourceType:'manual', manuallyEdited:true }));
+  });
+  addUnifiedRows_(rows);
+  document.getElementById('manualEntryRows').innerHTML = '';
+  addManualEntryRow();
+  document.getElementById('manualEntryStatus').textContent = 'Added ' + byRealtor.size + ' realtor(s) from ' + count + ' loan row(s).';
+  renderList(); persistDraft();
+}
+async function addToManualFromRow(i){
+  const r = dcRows[i]; if (!r) return;
+  const phone = prompt('Phone number for ' + r.fullName + ':', '');
+  if (phone == null) return;
+  r.number = phone.trim(); r.missingPhone = !r.number; r.identityKey = identityKeyFor(r.fullName, r.number);
+  try { await DC_API.saveDailyCallsManualContact({ name:normalizeName(r.fullName), phone:r.number, role:'' }); } catch(e){}
+  manualContactsByName[normalizeName(r.fullName).toLowerCase()] = { phone:r.number, role:'' };
+  renderList(); persistDraft();
+}
+</script>
+
+<script>
+// ===========================================================================
+// MONDAY — PhoneBurner screenshot / paste flow
+// ===========================================================================
+let mondayImageDataUrl = null;
+let mondayPreviewRows = [];
+
+function handleMondayImageFile(file){
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    mondayImageDataUrl = e.target.result;
+    const img = document.getElementById('mondayImagePreview');
+    img.src = mondayImageDataUrl; img.style.display = 'block';
+    document.getElementById('mondayReadBtn').disabled = false;
+  };
+  reader.readAsDataURL(file);
+}
+(function setupMondayPaste(){
+  window.addEventListener('paste', e => {
+    const items = (e.clipboardData || {}).items || [];
+    for (let i = 0; i < items.length; i++){
+      if (items[i].type.indexOf('image') !== -1){ handleMondayImageFile(items[i].getAsFile()); break; }
+    }
+  });
+})();
+async function readMondayScreenshot(){
+  if (!mondayImageDataUrl) return;
+  const status = document.getElementById('mondayOcrStatus');
+  document.getElementById('mondayReadBtn').disabled = true;
+  status.textContent = 'Reading…';
+  try {
+    const result = await Tesseract.recognize(mondayImageDataUrl, 'eng');
+    document.getElementById('mondayText').value = result.data.text.trim();
+    status.textContent = 'Done — review text, then Preview Rows.';
+    parseMondayText();
+  } catch (err){ status.textContent = 'Could not read — paste the table text instead.'; }
+  finally { document.getElementById('mondayReadBtn').disabled = false; }
+}
+
+// Split pasted/OCR'd PhoneBurner table text into rows. Column shape is fixed
+// enough to map positionally: Name, Mobile, Last Referral Date, Called Today,
+// Last Touch Date, Last Touch.
+function splitPhoneBurnerTableText_(text){
+  const lines = String(text||'').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const rows = [];
+  lines.forEach(line => {
+    if (/^name\b/i.test(line) && /mobile/i.test(line)) return; // header line
+    // Split on tabs, or runs of 2+ spaces, or commas between cells.
+    let cells = line.split(/\t|\s{2,}|,(?=\s)/).map(c => c.trim()).filter(c => c !== '');
+    if (cells.length < 2) return;
+    const nameParts = [];
+    let ci = 0;
+    // Name = leading cells until we hit something phone-like.
+    while (ci < cells.length && !/\d{3}.*\d{4}/.test(cells[ci]) && !/^\(?\d{3}\)?[\s.-]?\d{3}/.test(cells[ci])){
+      nameParts.push(cells[ci]); ci++;
+    }
+    const name = nameParts.join(' ').trim() || cells[0];
+    const mobile = cells[ci] || '';
+    const rest = cells.slice(ci+1);
+    rows.push({ name, mobile, lastReferral: rest[0]||'', calledToday: rest[1]||'', lastTouchDate: rest[2]||'', lastTouch: rest.slice(3).join(' ')||'' });
+  });
+  return rows;
+}
+function parseMondayText(){
+  const text = document.getElementById('mondayText').value;
+  mondayPreviewRows = splitPhoneBurnerTableText_(text);
+  if (!mondayPreviewRows.length){ alert('No rows detected — check the pasted text.'); return; }
+  renderMondayPreview();
+  document.getElementById('mondayModalOverlay').classList.add('open');
+}
+function renderMondayPreview(){
+  const cols = ['name','mobile','lastReferral','calledToday','lastTouchDate','lastTouch'];
+  const labels = ['#','Name','Mobile','Last Referral','Called Today','Last Touch Date','Last Touch'];
+  document.getElementById('mondayHead').innerHTML = '<tr>' + labels.map(l => '<th>' + l + '</th>').join('') + '</tr>';
+  document.getElementById('mondayPreviewBody').innerHTML = mondayPreviewRows.map((r,i) =>
+    '<tr><td>' + (i+1) + '</td>' + cols.map(c =>
+      '<td><input value="' + escapeHtml(r[c]) + '" onchange="mondayPreviewRows[' + i + '][\'' + c + '\']=this.value"></td>'
+    ).join('') + '</tr>'
+  ).join('');
+}
+function closeMondayModal(){ document.getElementById('mondayModalOverlay').classList.remove('open'); }
+
+// Parse "1, 3, 5-7" into a set of 1-based row numbers.
+function parseSelectionList_(str, max){
+  const set = new Set();
+  String(str||'').split(',').forEach(part => {
+    part = part.trim(); if (!part) return;
+    const m = part.match(/^(\d+)\s*-\s*(\d+)$/);
+    if (m){ const a = +m[1], b = +m[2]; for (let n = Math.min(a,b); n <= Math.max(a,b); n++) if (n>=1 && n<=max) set.add(n); }
+    else { const n = +part; if (n>=1 && n<=max) set.add(n); }
+  });
+  return set;
+}
+function commitMondayRows(){
+  const sel = parseSelectionList_(document.getElementById('mondaySelection').value, mondayPreviewRows.length);
+  if (!sel.size){ document.getElementById('mondayCommitStatus').textContent = 'Enter row numbers first.'; return; }
+  const rows = [];
+  Array.from(sel).sort((a,b)=>a-b).forEach(n => {
+    const r = mondayPreviewRows[n-1];
+    const descParts = [];
+    if (r.lastReferral) descParts.push('Last Referral: ' + r.lastReferral);
+    if (r.lastTouchDate) descParts.push('Last Touch: ' + r.lastTouchDate);
+    if (r.lastTouch) descParts.push(r.lastTouch);
+    rows.push(makeRow({ purpose:'PhoneBurner Group', fullName:r.name, number:r.mobile, description:descParts.join('\n'), sourceType:'phoneburner' }));
+  });
+  addUnifiedRows_(rows);
+  document.getElementById('mondayCommitStatus').textContent = 'Added ' + rows.length + ' row(s).';
+  renderList(); persistDraft();
+  setTimeout(closeMondayModal, 900);
+}
+</script>
+
+<script>
+// ===========================================================================
+// GENERIC COLUMN MAPPER
+// ===========================================================================
+let mapperGrid = null;
+let mapperFileName = '';
+let mapperHeaderRowIdx = 0;
+
+function headerSignature_(headers){
+  return headers.map(h => String(h||'').trim().toLowerCase()).filter(Boolean).sort().join('||');
+}
+async function openMapperModal(grid, fileName){
+  mapperGrid = grid; mapperFileName = fileName;
+  // Try a saved template first.
+  const hdrRow = Math.max(0, findFirstHeaderRow_(grid));
+  mapperHeaderRowIdx = hdrRow;
+  document.getElementById('mapperHeaderRow').value = hdrRow + 1;
+  const sig = headerSignature_(grid[hdrRow] || []);
+  try {
+    const templates = await DC_API.listDailyCallsMappingTemplates();
+    const match = (templates||[]).find(t => t.HeaderSignature === sig);
+    if (match){
+      const mapping = JSON.parse(match.Mapping || '{}');
+      const rows = applyMappingToGrid_(grid, hdrRow, mapping);
+      addUnifiedRows_(rows); renderList(); persistDraft();
+      document.getElementById('uploadStatus').textContent = 'Applied a saved mapping for "' + fileName + '" (' + rows.length + ' rows).';
+      return;
+    }
+  } catch(e){}
+  document.getElementById('mapperFileNote').textContent = 'No built-in parser matched "' + fileName + '". Assign each column below.';
+  rerenderMapper();
+  document.getElementById('mapperModalOverlay').classList.add('open');
+}
+function rerenderMapper(){
+  mapperHeaderRowIdx = Math.max(0, (parseInt(document.getElementById('mapperHeaderRow').value,10)||1) - 1);
+  const headers = mapperGrid[mapperHeaderRowIdx] || [];
+  document.getElementById('mapperRows').innerHTML = headers.map((h,i) => {
+    const label = String(h||'').trim() || '(column ' + (i+1) + ')';
+    return '<div class="dc-map-row"><span>' + escapeHtml(label) + '</span>' +
+      '<select data-col="' + i + '">' +
+        '<option value="ignore">Ignore</option>' +
+        '<option value="name">Name</option>' +
+        '<option value="phone">Phone</option>' +
+        '<option value="desc">Include in Description</option>' +
+      '</select></div>';
+  }).join('');
+  // Best-guess defaults.
+  document.querySelectorAll('#mapperRows select').forEach(sel => {
+    const label = String(headers[+sel.dataset.col]||'').toLowerCase();
+    if (/full name|^name$|borrower name/.test(label)) sel.value = 'name';
+    else if (/phone|mobile/.test(label)) sel.value = 'phone';
+    else if (label.trim()) sel.value = 'desc';
+  });
+}
+function applyMappingToGrid_(grid, hdrRow, mapping){
+  const headers = grid[hdrRow] || [];
+  const nameCol = mapping.name, phoneCol = mapping.phone, descCols = mapping.desc || [];
+  const out = [];
+  for (let r = hdrRow+1; r < grid.length; r++){
+    const row = grid[r] || [];
+    if (row.every(c => !String(c||'').trim())) continue;
+    const name = String(row[nameCol]||'').trim();
+    const number = String(row[phoneCol]||'').trim();
+    if (!name && !number) continue;
+    const desc = descCols.map(ci => { const v = String(row[ci]||'').trim(); return v ? (String(headers[ci]||'').trim() + ': ' + v) : ''; }).filter(Boolean).join('\n');
+    out.push(makeRow({ purpose:'Other', fullName:name, number, description:desc, sourceType:'generic' }));
+  }
+  return out;
+}
+async function applyMapper(){
+  const selects = Array.from(document.querySelectorAll('#mapperRows select'));
+  let nameCol = -1, phoneCol = -1; const descCols = [];
+  selects.forEach(sel => {
+    const ci = +sel.dataset.col;
+    if (sel.value === 'name'){ if (nameCol === -1) nameCol = ci; }
+    else if (sel.value === 'phone'){ if (phoneCol === -1) phoneCol = ci; }
+    else if (sel.value === 'desc') descCols.push(ci);
+  });
+  const err = document.getElementById('mapperError');
+  if (nameCol === -1 || phoneCol === -1){ err.textContent = 'Assign exactly one Name column and one Phone column.'; return; }
+  const mapping = { name:nameCol, phone:phoneCol, desc:descCols };
+  const rows = applyMappingToGrid_(mapperGrid, mapperHeaderRowIdx, mapping);
+  addUnifiedRows_(rows); renderList(); persistDraft();
+  if (document.getElementById('mapperSaveTemplate').checked){
+    const headers = mapperGrid[mapperHeaderRowIdx] || [];
+    try { await DC_API.saveDailyCallsMappingTemplate({ headerSignature:headerSignature_(headers), headerSignatureRaw:JSON.stringify(headers), mapping:JSON.stringify(mapping) }); } catch(e){}
+  }
+  closeMapperModal();
+  document.getElementById('uploadStatus').textContent = 'Mapped "' + mapperFileName + '" (' + rows.length + ' rows).';
+}
+function closeMapperModal(){ document.getElementById('mapperModalOverlay').classList.remove('open'); }
+</script>
+
+<script>
+// ===========================================================================
+// SAVE / LOAD / DELETE (cloud) + EXPORTS (CSV / XLSX / PDF)
+// ===========================================================================
+function currentPayloadData_(){
+  return { rows:dcRows, preApp:dcPreApp, sourceBatches:sourceBatches };
+}
+async function saveDay(){
+  const status = document.getElementById('dcSaveStatus');
+  status.className = 'save-status'; status.textContent = 'Saving…';
+  currentDateOf = document.getElementById('dcDateOf').value || todayIso();
+  try {
+    const { recordId } = await DC_API.saveDailyCallsRecord({
+      recordId: currentRecordId || undefined,
+      dateOf: currentDateOf,
+      label: 'Daily Calls ' + currentDateOf,
+      status: 'final',
+      data: currentPayloadData_(),
+    });
+    currentRecordId = recordId; persistDraft();
+    status.className = 'save-status ok'; status.textContent = 'Saved.';
+  } catch (err){ status.className = 'save-status err'; status.textContent = err.message; }
+}
+function openSavedModal(){ document.getElementById('savedModalOverlay').classList.add('open'); loadSavedList(); }
+function closeSavedModal(){ document.getElementById('savedModalOverlay').classList.remove('open'); }
+async function loadSavedList(){
+  const body = document.getElementById('savedListBody');
+  body.innerHTML = '<div style="font-size:12px; color:var(--slate);">Loading…</div>';
+  try {
+    const records = await DC_API.listDailyCallsRecords({});
+    if (!records.length){ body.innerHTML = '<div style="font-size:12px; color:var(--slate);">No saved days yet.</div>'; return; }
+    body.innerHTML = records.map(r =>
+      '<div class="saved-row"><div><b>' + escapeHtml(r.Label || r.DateOf || '?') + '</b><br><span style="color:var(--slate); font-size:11px;">' + escapeHtml(r.ProcessorNameSnapshot || '') + ' · ' + escapeHtml((r.UpdatedAt || r.CreatedAt || '').slice(0,10)) + '</span></div>' +
+      '<div class="saved-row-actions">' +
+        '<button class="export-btn" style="padding:5px 9px; font-size:11px;" onclick="loadSavedRecord(\'' + r.RecordID + '\')">Load</button>' +
+        '<button class="export-btn export-btn-outline" style="padding:5px 9px; font-size:11px;" onclick="deleteSavedRecord(\'' + r.RecordID + '\')">Delete</button>' +
+      '</div></div>'
+    ).join('');
+  } catch (err){ body.innerHTML = '<div style="font-size:12px; color:var(--bad);">' + escapeHtml(err.message) + '</div>'; }
+}
+async function loadSavedRecord(recordId){
+  try {
+    const data = await DC_API.getDailyCallsRecord(recordId);
+    const d = data.data || {};
+    dcRows = d.rows || []; dcPreApp = d.preApp || []; sourceBatches = d.sourceBatches || [];
+    currentRecordId = recordId; currentDateOf = data.record.DateOf || todayIso();
+    document.getElementById('dcDateOf').value = currentDateOf;
+    renderList(); renderPreApp(); persistDraft(); closeSavedModal();
+  } catch (err){ alert(err.message); }
+}
+async function deleteSavedRecord(recordId){
+  if (!confirm('Delete this saved day? This cannot be undone.')) return;
+  try { await DC_API.deleteDailyCallsRecord(recordId); loadSavedList(); } catch (err){ alert(err.message); }
+}
+
+function sanitizeFilenamePart(s){ return String(s||'').replace(/[\/\\:*?"<>|]/g,'').trim(); }
+function buildFilename(ext){ return 'DailyCalls_' + sanitizeFilenamePart(currentDateOf) + '.' + ext; }
+const EXPORT_FILE_TYPE_INFO = {
+  csv:{ mime:'text/csv', ext:'csv', desc:'CSV File' },
+  xlsx:{ mime:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', ext:'xlsx', desc:'Excel Workbook' },
+  pdf:{ mime:'application/pdf', ext:'pdf', desc:'PDF Document' },
+};
+async function saveExportBlob(kind, blob, filename){
+  filename = filename || buildFilename(kind);
+  const info = EXPORT_FILE_TYPE_INFO[kind];
+  if (window.showSaveFilePicker){
+    try {
+      const handle = await window.showSaveFilePicker({ suggestedName:filename, types: info ? [{ description:info.desc, accept:{ [info.mime]:['.'+info.ext] } }] : undefined });
+      const w = await handle.createWritable(); await w.write(blob); await w.close(); return true;
+    } catch (err){ if (err && err.name === 'AbortError') return false; }
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  return true;
+}
+
+// CSV — PhoneBurner import shape: Name,Phone,Description (Purpose dropped).
+function csvEscape_(s){ const v = String(s==null?'':s); return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; }
+function buildDailyCsv_(){
+  const lines = ['Name,Phone,Description'];
+  dcRows.forEach(r => { lines.push([csvEscape_(r.fullName), csvEscape_(r.number), csvEscape_(r.description)].join(',')); });
+  return lines.join('\r\n');
+}
+async function exportCsv(){
+  const blob = new Blob([buildDailyCsv_()], { type:'text/csv' });
+  await saveExportBlob('csv', blob);
+}
+
+// XLSX — export/xlsx-helpers.js + JSZip, 4 on-screen columns, wrapped text.
+async function buildDailyXlsxBlob_(){
+  const cells = {};
+  function setCell(addr, opts){ cells[addr] = Object.assign({ s:0 }, opts); }
+  const headers = ['Purpose of Call','Full Name','Number','Description'];
+  headers.forEach((h,i) => setCell(colLetter(i+1) + '1', { t:'inlineStr', v:h, s:1 }));
+  dcRows.forEach((r, ri) => {
+    const rr = ri + 2;
+    setCell('A'+rr, { t:'inlineStr', v:r.purpose });
+    setCell('B'+rr, { t:'inlineStr', v:r.fullName });
+    setCell('C'+rr, { t:'inlineStr', v:r.number });
+    setCell('D'+rr, { t:'inlineStr', v:r.description, s:2 });
+  });
+  const stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+    '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>' +
+    '<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>' +
+    '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>' +
+    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+    '<cellXfs count="3">' +
+      '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+      '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +
+      '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf>' +
+    '</cellXfs>' +
+    '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/></styleSheet>';
+  const workbookXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+    '<sheets><sheet name="Daily Calls" sheetId="1" r:id="rId1"/></sheets></workbook>';
+  const workbookRelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>';
+  const contentTypesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+    '<Default Extension="xml" ContentType="application/xml"/>' +
+    '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+    '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
+    '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>';
+  const rootRelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>';
+  const zip = new JSZip();
+  zip.file('[Content_Types].xml', contentTypesXml);
+  zip.file('_rels/.rels', rootRelsXml);
+  zip.file('xl/workbook.xml', workbookXml);
+  zip.file('xl/_rels/workbook.xml.rels', workbookRelsXml);
+  zip.file('xl/styles.xml', stylesXml);
+  zip.file('xl/worksheets/sheet1.xml', sheetXml(cells, [18,22,16,60]));
+  return zip.generateAsync({ type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+}
+async function exportXlsx(){ const blob = await buildDailyXlsxBlob_(); await saveExportBlob('xlsx', blob); }
+
+// PDF — a single readable table (priority rows already at the top).
+function buildDailyPdfBlob_(){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'letter' });
+  const navy = [27,42,74];
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  let y = 40;
+  doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(navy[0],navy[1],navy[2]);
+  doc.text('Daily Calls — ' + currentDateOf, 40, y); y += 20;
+  const cols = [{x:40,w:95,k:'purpose'},{x:135,w:110,k:'fullName'},{x:245,w:85,k:'number'},{x:330,w:pageW-370,k:'description'}];
+  function header(){
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(0,0,0);
+    doc.text('Purpose', cols[0].x, y); doc.text('Full Name', cols[1].x, y); doc.text('Number', cols[2].x, y); doc.text('Description', cols[3].x, y);
+    y += 6; doc.setDrawColor(200,200,200); doc.line(40, y, pageW-40, y); y += 12;
+  }
+  header();
+  doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
+  dcRows.forEach(r => {
+    const descLines = doc.splitTextToSize(String(r.description||''), cols[3].w);
+    const nameLines = doc.splitTextToSize(String(r.fullName||''), cols[1].w);
+    const rowH = Math.max(descLines.length, nameLines.length, 1) * 10 + 6;
+    if (y + rowH > pageH - 40){ doc.addPage(); y = 40; header(); doc.setFont('helvetica','normal'); doc.setFontSize(8.5); }
+    doc.setTextColor(30,30,30);
+    doc.text(String(r.purpose||''), cols[0].x, y);
+    doc.text(nameLines, cols[1].x, y);
+    doc.text(String(r.number||''), cols[2].x, y);
+    doc.text(descLines, cols[3].x, y);
+    y += rowH;
+    doc.setDrawColor(235,235,235); doc.line(40, y-4, pageW-40, y-4);
+  });
+  return doc.output('blob');
+}
+async function exportPdf(){ const blob = buildDailyPdfBlob_(); await saveExportBlob('pdf', blob); }
+
+// Pre-App gets its own separate PDF.
+function exportPreAppPdf(){
+  if (!dcPreApp.length) return;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'letter' });
+  const navy = [27,42,74]; const pageW = doc.internal.pageSize.getWidth(); const pageH = doc.internal.pageSize.getHeight();
+  let y = 40;
+  doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(navy[0],navy[1],navy[2]);
+  doc.text('Pre-Apps — ' + currentDateOf, 40, y); y += 20;
+  const cols = [{x:40,label:'Full Name'},{x:180,label:'Mobile'},{x:280,label:'Pre-Approved'},{x:400,label:'Last Touch'},{x:490,label:'Stage'}];
+  function header(){ doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(0,0,0); cols.forEach(c=>doc.text(c.label,c.x,y)); y+=6; doc.setDrawColor(200,200,200); doc.line(40,y,pageW-40,y); y+=12; }
+  header(); doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
+  dcPreApp.forEach(p => {
+    if (y > pageH - 50){ doc.addPage(); y = 40; header(); doc.setFont('helvetica','normal'); doc.setFontSize(8.5); }
+    doc.setTextColor(30,30,30);
+    doc.text(String(p.fullName||''), cols[0].x, y);
+    doc.text(String(p.mobile||''), cols[1].x, y);
+    doc.text(String(p.preApproved||''), cols[2].x, y);
+    doc.text(String(p.lastTouchDate||p.lastTouch||''), cols[3].x, y);
+    doc.text(String(p.stage||''), cols[4].x, y);
+    y += 16;
+  });
+  saveExportBlob('pdf', doc.output('blob'), 'PreApps_' + sanitizeFilenamePart(currentDateOf) + '.pdf');
+}
+</script>
+
+<script>
+// ===========================================================================
+// WIRING
+// ===========================================================================
+function setupDropzone_(zoneId, onFiles){
+  const zone = document.getElementById(zoneId);
+  ['dragenter','dragover'].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); zone.classList.add('drag'); }));
+  ['dragleave','drop'].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); zone.classList.remove('drag'); }));
+  zone.addEventListener('drop', e => { if (e.dataTransfer && e.dataTransfer.files) onFiles(e.dataTransfer.files); });
+}
+window.addEventListener('DOMContentLoaded', function(){
+  setupDropzone_('fileDropzone', handleFilesPicked);
+  setupDropzone_('mondayDropzone', files => { if (files[0]) handleMondayImageFile(files[0]); });
+  const body = document.getElementById('dcListBody');
+  body.addEventListener('input', onListInput);
+  body.addEventListener('change', onListChange);
+  body.addEventListener('dragstart', onListDragStart);
+  body.addEventListener('dragover', onListDragOver);
+  body.addEventListener('dragleave', onListDragLeave);
+  body.addEventListener('drop', onListDrop);
+  document.getElementById('dcDateOf').addEventListener('change', function(){ currentDateOf = this.value || todayIso(); persistDraft(); });
+  initSession();
+  if (typeof initFmBroadcastPoll === 'function') initFmBroadcastPoll(DC_API);
+});
+</script>
