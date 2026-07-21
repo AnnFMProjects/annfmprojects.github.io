@@ -779,6 +779,8 @@ function exportTableGeneric_(format, title, headers, rows, filenamePrefix, jsonR
 let usersCache = [];
 const PERMISSION_LABELS = {
   superAdmin: 'Super Admin',
+  devTester: 'Dev Tester (view-only — writes never persist)',
+  assistant: 'Assistant (staff tier — includes Daily Calls access)',
   manageUsers: 'Manage Users',
   manageAppRequests: 'Manage App Requests',
   manageMyturn: 'Manage MYTURN',
