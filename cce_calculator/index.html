@@ -163,6 +163,85 @@
   }
   .export-btn:hover{ box-shadow:0 4px 14px rgba(0,0,0,.25); transform:translateY(-1px); }
   .export-btn:active{ transform:translateY(0); }
+
+  /* "07/21 Updated Rates" toggle button — ported from Ann's pasted React
+     GenerateButton reference (same shimmer/glow-border technique, vanilla
+     CSS since this file has no build step), hue fixed to FM Home Loans gold
+     (~42deg) instead of the original's configurable prop. */
+  .jul21-btn{
+    --border-radius:16px;
+    --padding:3px;
+    --transition:0.4s;
+    --button-color:#101010;
+    --highlight-color-hue:42deg;
+    position:relative;
+    display:inline-flex;
+    align-items:center;
+    user-select:none;
+    padding:5px 10px 5px 8px;
+    font-family:Calibri, Arial, sans-serif;
+    font-size:11px;
+    font-weight:700;
+    color:#e8e8e8;
+    background-color:var(--button-color);
+    box-shadow:
+      inset 0px 1px 1px rgba(255,255,255,.2),
+      inset 0px 2px 2px rgba(255,255,255,.15),
+      inset 0px 4px 4px rgba(255,255,255,.1),
+      0px -1px 1px rgba(0,0,0,.02),
+      0px -2px 2px rgba(0,0,0,.03),
+      0px -4px 4px rgba(0,0,0,.05);
+    border:solid 1px rgba(255,255,255,.133);
+    border-radius:var(--border-radius);
+    cursor:pointer;
+    transition:box-shadow var(--transition), border var(--transition), background-color var(--transition);
+  }
+  .jul21-btn::before{
+    content:"";
+    position:absolute;
+    top:calc(0px - var(--padding)); left:calc(0px - var(--padding));
+    width:calc(100% + var(--padding) * 2); height:calc(100% + var(--padding) * 2);
+    border-radius:calc(var(--border-radius) + var(--padding));
+    pointer-events:none;
+    background-image:linear-gradient(0deg, rgba(0,0,0,.267), rgba(0,0,0,.667));
+    z-index:-1;
+    transition:box-shadow var(--transition), filter var(--transition);
+    box-shadow:1px 1px 1px rgba(255,255,255,.133), 2px 2px 2px rgba(255,255,255,.067),
+      -1px -1px 1px rgba(0,0,0,.133), -2px -2px 2px rgba(0,0,0,.067);
+  }
+  .jul21-btn::after{
+    content:"";
+    position:absolute; top:0; left:0; width:100%; height:100%;
+    border-radius:inherit;
+    pointer-events:none;
+    background-image:linear-gradient(0deg, #fff, hsl(var(--highlight-color-hue), 100%, 70%), hsla(var(--highlight-color-hue), 100%, 70%, 50%), 8%, transparent);
+    opacity:0;
+    transition:opacity var(--transition), filter var(--transition);
+  }
+  .jul21-btn-svg{
+    width:13px; height:13px; margin-right:5px; flex-shrink:0;
+    fill:none; stroke:#e8e8e8;
+    animation:jul21-flicker 2s linear infinite;
+    filter:drop-shadow(0 0 2px rgba(255,255,255,.6));
+    transition:stroke var(--transition), filter var(--transition);
+  }
+  @keyframes jul21-flicker{ 50%{ opacity:.35; } }
+  .jul21-btn:hover{ border:solid 1px hsla(var(--highlight-color-hue), 100%, 80%, 40%); }
+  .jul21-btn:hover::before{
+    box-shadow:0 -8px 8px -6px rgba(255,255,255,.667) inset, 0 -16px 16px -8px hsla(var(--highlight-color-hue), 100%, 70%, 30%) inset,
+      1px 1px 1px rgba(255,255,255,.133), 2px 2px 2px rgba(255,255,255,.067), -1px -1px 1px rgba(0,0,0,.133), -2px -2px 2px rgba(0,0,0,.067);
+  }
+  .jul21-btn:hover::after{ opacity:1; mask-image:linear-gradient(0deg, #fff, transparent); }
+  .jul21-btn:hover .jul21-btn-svg{ stroke:#fff; filter:drop-shadow(0 0 3px hsl(var(--highlight-color-hue), 100%, 70%)); animation:none; }
+  /* Active/"on" state — toggled via data-active="true", set by toggleJul21Rates() */
+  .jul21-btn[data-active="true"]{ border:solid 1px hsla(var(--highlight-color-hue), 100%, 80%, 70%); background-color:hsla(var(--highlight-color-hue), 50%, 20%, .5); }
+  .jul21-btn[data-active="true"]::before{
+    box-shadow:0 -8px 12px -6px rgba(255,255,255,.667) inset, 0 -16px 16px -8px hsla(var(--highlight-color-hue), 100%, 70%, 80%) inset,
+      1px 1px 1px rgba(255,255,255,.267), 2px 2px 2px rgba(255,255,255,.133), -1px -1px 1px rgba(0,0,0,.133), -2px -2px 2px rgba(0,0,0,.067);
+  }
+  .jul21-btn[data-active="true"]::after{ opacity:1; mask-image:linear-gradient(0deg, #fff, transparent); filter:brightness(140%); }
+  .jul21-btn[data-active="true"] .jul21-btn-svg{ stroke:hsl(var(--highlight-color-hue), 100%, 75%); filter:drop-shadow(0 0 3px hsl(var(--highlight-color-hue), 100%, 70%)); animation:none; }
+  .jul21-btn[data-active="true"] .jul21-btn-label::after{ content:" \2713"; }
   @media (max-width: 640px){
     .cce-header-left, .cce-header-center, .cce-header-right{
       flex-basis:100%;
@@ -1860,7 +1939,7 @@ function closeLegalModal(kind){
       </div>
 
       <div class="panel" data-nav="titleGovFees">
-        <div class="panel-head"><span>Title &amp; Government Fees</span><span style="display:flex; align-items:center; gap:6px;"><span class="tag" data-fld="g3total"></span><button type="button" class="export-btn" style="padding:2px 8px; font-size:10px;" onclick="openAddCustomFieldModal(this.closest('.loan-block'), 'g3')">+ Field</button></span></div>
+        <div class="panel-head"><span style="display:flex; align-items:center; gap:10px;">Title &amp; Government Fees<button type="button" class="jul21-btn" data-fld="btn_jul21" data-active="false" onclick="toggleJul21Rates(this.closest('.loan-block'))" title="Toggle the {0.14} confirmed rate fixes (NY, DC, MD, NJ, MN, CT, OH) on or off for this loan estimate"><svg class="jul21-btn-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z"></path></svg><span class="jul21-btn-label">07/21 Updated Rates</span></button></span><span style="display:flex; align-items:center; gap:6px;"><span class="tag" data-fld="g3total"></span><button type="button" class="export-btn" style="padding:2px 8px; font-size:10px;" onclick="openAddCustomFieldModal(this.closest('.loan-block'), 'g3')">+ Field</button></span></div>
         <div class="panel-body">
           <div class="dev-banner-inline">Please check Title &amp; Government Fees, as this is in early development.</div>
           <div class="field-row" style="justify-content:flex-start; gap:10px; flex-wrap:wrap;">
@@ -1919,6 +1998,13 @@ function closeLegalModal(kind){
           </div>
           <div class="field-row" style="justify-content:flex-start; gap:6px; padding-top:0;">
             <label class="radio-opt" style="font-size:11px;"><input type="checkbox" data-fld="chk_show_transfertax" onchange="calc(this.closest('.loan-block'))"> Show Transfer Tax (case-by-case per contract — manual only)</label>
+          </div>
+          <div class="field-row" data-fld="row_flPropertyType" style="display:none;">
+            <label>Miami-Dade Property Type <span class="hint">Determines whether the county surtax applies — "Other" matches Madison Title's basis, "Single-Family" matches Stewart Rate's</span></label>
+            <select data-fld="flPropertyType" onchange="calc(this.closest('.loan-block'))">
+              <option value="other" selected>Other / Non-Single-Family (incl. surtax)</option>
+              <option value="singleFamily">Single-Family Residence (surtax waived)</option>
+            </select>
           </div>
           <div data-fld="customFieldsList_g3"></div>
         </div>
@@ -2816,6 +2902,48 @@ function txBracketPremium(amount){
   return tier.base + (amount - tier.floor) * tier.factor;
 }
 
+// NEW JERSEY — added as part of the {0.14} "07/21 Updated Rates" pass, gated
+// behind container._useJul21Rates so legacy behavior (NJ title/RTF/GPF all
+// $0/N/A) is unchanged unless the loan block's toggle is on. Verified exact
+// match against Madison/Stewart vendor data at all 5 tested price points.
+// Title: NJLTIRB Standard Underwriting Rate Schedule, eff. 11/1/2023.
+const NJ_TITLE_TIERS = [
+  { upTo:100000, rate:5.25 },
+  { upTo:500000, rate:4.25 },
+  { upTo:2000000, rate:2.75 },
+  { upTo:Infinity, rate:2.00 }
+];
+function njTitleBracketPremium(amount, tiers){
+  let premium = 0, prev = 0;
+  for (const t of tiers){
+    if (amount <= prev) break;
+    const capHere = Math.min(amount, t.upTo);
+    premium += ((capHere - prev)/1000) * t.rate;
+    prev = capHere;
+  }
+  return Math.max(200, premium); // $200 minimum charge, NJLTIRB Manual §4.1
+}
+// Realty Transfer Fee: NJ Division of Taxation published schedule, per $500
+// of consideration rounded up. Which table applies depends on whether total
+// consideration is >$350,000 (a "notch," not a marginal split at $350k).
+const NJ_RTF_OVER_350K = [{upTo:150000,rate:2.90},{upTo:200000,rate:4.25},{upTo:550000,rate:4.80},{upTo:850000,rate:5.30},{upTo:1000000,rate:5.80},{upTo:Infinity,rate:6.05}];
+const NJ_RTF_UNDER_350K = [{upTo:150000,rate:2.00},{upTo:200000,rate:3.35},{upTo:Infinity,rate:3.90}];
+function njRtf(price){
+  const rounded = Math.ceil(price/500)*500;
+  const tiers = price > 350000 ? NJ_RTF_OVER_350K : NJ_RTF_UNDER_350K;
+  let fee = 0, prev = 0;
+  for (const t of tiers){
+    if (rounded <= prev) break;
+    const capHere = Math.min(rounded, t.upTo);
+    fee += ((capHere - prev)/500) * t.rate;
+    prev = capHere;
+  }
+  return fee;
+}
+// Graduated Percent Fee (mansion-tax successor, eff. 7/10/2025) — cliff rate
+// on the full consideration once a tier is crossed, SELLER-paid.
+const NJ_GPF_TIERS = [{upTo:2000000,rate:0.01},{upTo:2500000,rate:0.02},{upTo:3000000,rate:0.025},{upTo:3500000,rate:0.03},{upTo:Infinity,rate:0.035}];
+
 const STATE_DATA = {
 
   NY: {
@@ -2838,9 +2966,19 @@ const STATE_DATA = {
       'Westchester': { mctd:true, nyc:false, zone:2 },
       'Putnam': { mctd:true, nyc:false, zone:2 },
       'Dutchess': { mctd:true, nyc:false, zone:2 },
+      // Non-MCTD counties that TIRSA's own Zone 2 county list nonetheless
+      // includes ({0.14} pass finding, FIX #3) — title insurance is Zone 2,
+      // but mortgage tax still follows the ordinary non-MCTD formula since
+      // the MCTD "additional tax" is a separate, unrelated statute.
+      'Albany': { mctd:false, nyc:false, zone:2 },
+      'Columbia': { mctd:false, nyc:false, zone:2 },
+      'Greene': { mctd:false, nyc:false, zone:2 },
+      'Rensselaer': { mctd:false, nyc:false, zone:2 },
+      'Sullivan': { mctd:false, nyc:false, zone:2 },
+      'Ulster': { mctd:false, nyc:false, zone:2 },
       'Other NY County (non-MCTD)': { mctd:false, nyc:false, zone:1 }
     },
-    mortgageTax(loanAmt, c){
+    mortgageTax(loanAmt, c, price, jul21){
       let rate, label;
       if (c.nyc){
         rate = loanAmt < 500000 ? 0.0205 : 0.02175;
@@ -2848,6 +2986,9 @@ const STATE_DATA = {
       } else if (c.mctd){
         rate = 0.0105;
         label = 'Basic .50% + special add\'l .25% + MCTD add\'l .30%';
+      } else if (jul21){
+        rate = 0.0100;
+        label = 'Basic .50% + additional .25% + special add\'l .25% (updated 7/21 rates — verify any extra local add\'l tax for this county)';
       } else {
         rate = 0.0075;
         label = 'Basic .50% + special add\'l .25% (verify local add\'l tax for this county)';
@@ -2864,9 +3005,16 @@ const STATE_DATA = {
       const tiers = [[2000000,0.01],[3000000,0.0125],[5000000,0.015],[10000000,0.0225],[15000000,0.0325],[20000000,0.035],[25000000,0.0375],[Infinity,0.039]];
       for (const [ceil, rate] of tiers){ if (price < ceil) return { amount: price*rate, note: 'NYC tier: ' + (rate*100)+'% (applies to full price)' }; }
     },
-    transferTax(price, c){
+    transferTax(price, c, jul21){
       const roundedPrice = Math.ceil(price/500)*500; // NYS basic transfer tax is computed on consideration rounded UP to the nearest $500
-      return { amount: roundedPrice*0.004, note: 'NYS RETT 0.4% of consideration rounded up to the nearest $500 — customarily SELLER-paid; include only if contract shifts it to buyer' };
+      const nysRett = roundedPrice*0.004;
+      if (jul21 && c.nyc){
+        const rpttRate = price <= 500000 ? 0.01 : 0.01425;
+        const rptt = price * rpttRate;
+        const total = nysRett + rptt;
+        return { amount: total, note: 'NYS RETT 0.4% (' + fmt(nysRett) + ') + NYC RPTT ' + (rpttRate*100) + '% (' + fmt(rptt) + ', NYC Admin. Code §11-2101) = ' + fmt(total) + ' — customarily SELLER-paid; include only if contract shifts it to buyer. Updated 7/21 rates.' };
+      }
+      return { amount: nysRett, note: 'NYS RETT 0.4% of consideration rounded up to the nearest $500 — customarily SELLER-paid; include only if contract shifts it to buyer' };
     },
     titleInsurance(price, loanAmt, c){
       const zone = c.zone || 2;
@@ -2906,8 +3054,13 @@ const STATE_DATA = {
       // Deed doc stamp tax -- customarily SELLER-paid
       let amount, note;
       if (c.specialDeed){
-        amount = Math.ceil(price/100)*0.60 + Math.ceil(price/100)*0.45; // assume non-SFR-exempt unless told otherwise
-        note = 'Miami-Dade deed stamp $0.60/100 + $0.45/100 surtax (surtax waived if transferring only a single-family residence — adjust manually if so)';
+        if (c.mdPropertyType === 'singleFamily'){
+          amount = Math.ceil(price/100)*0.60;
+          note = 'Miami-Dade deed stamp $0.60/100, single-family residence — surtax waived (Stewart basis; updated 7/21 rates)';
+        } else {
+          amount = Math.ceil(price/100)*0.60 + Math.ceil(price/100)*0.45; // assume non-SFR-exempt unless told otherwise
+          note = 'Miami-Dade deed stamp $0.60/100 + $0.45/100 surtax (surtax waived if transferring only a single-family residence — adjust manually if so)';
+        }
       } else {
         amount = Math.ceil(price/100)*0.70;
         note = 'Statewide deed doc stamp $0.70 per $100 — customarily SELLER-paid';
@@ -2939,14 +3092,36 @@ const STATE_DATA = {
     verified:true,
     get asOf(){ return RATE_CONFIG.NJ.govAsOf; },
     get source(){ return RATE_CONFIG.NJ.govSource; },
+    get titleSource(){ return 'NJLTIRB Manual of Rates and Charges (eff. 11/1/2023), N.J.S.A. §17:46B-42.'; },
+    get titleAsOf(){ return 'July 2026'; },
     counties: null,
-    transferTax(price, c){
+    // Title/RTF/GPF only activate under the 07/21 Updated Rates toggle — see
+    // applyTitleInsurance's NJ exception and this file's jul21 param below.
+    // Verified exact match vs Madison+Stewart at all 5 tested price points.
+    titleInsurance(price, loanAmt, c){
+      const ownerPrem = njTitleBracketPremium(price, NJ_TITLE_TIERS);
+      const loanPrem = loanAmt <= price
+        ? 25
+        : 25 + (njTitleBracketPremium(loanAmt, NJ_TITLE_TIERS) - njTitleBracketPremium(price, NJ_TITLE_TIERS));
+      const owner = Math.round(ownerPrem), loan = Math.round(loanPrem);
+      return {
+        owner, loan, amount: owner+loan,
+        note: 'NJLTIRB Standard Underwriting Rate Schedule (eff. 11/1/2023) — Owner\'s Policy ' + fmt(owner) + ' + Loan Policy (simultaneous-issue, flat $25 when loan ≤ owner\'s amount) ' + fmt(loan) + '. Updated 7/21 rates.'
+      };
+    },
+    transferTax(price, c, jul21){
       // RTF is seller-paid; shown for reference only, not added to buyer totals by default
-      return { amount: 0, note: 'NJ Realty Transfer Fee is SELLER-paid (not a buyer cost) — leave at $0 unless contract specifies otherwise' };
+      if (!jul21) return { amount: 0, note: 'NJ Realty Transfer Fee is SELLER-paid (not a buyer cost) — leave at $0 unless contract specifies otherwise' };
+      const amount = njRtf(price);
+      return { amount, note: 'NJ Realty Transfer Fee (NJ Div. of Taxation schedule) ' + fmt(amount) + ' — SELLER-paid, shown for reference. Updated 7/21 rates. Not typically a buyer cost unless contract specifies otherwise' };
     },
     mortgageTax(loanAmt, c){ return noTax('New Jersey has no mortgage recording tax'); },
-    mansionTax(price, c){
-      return { amount: 0, note: 'As of 7/10/2025 the former "mansion tax" (now the Graduated Percent Fee) is SELLER-paid — not a buyer cost unless contract specifies otherwise' };
+    mansionTax(price, c, jul21){
+      if (!jul21) return { amount: 0, note: 'As of 7/10/2025 the former "mansion tax" (now the Graduated Percent Fee) is SELLER-paid — not a buyer cost unless contract specifies otherwise' };
+      if (price <= 1000000) return { amount: 0, note: 'Below $1M Graduated Percent Fee threshold' };
+      for (const t of NJ_GPF_TIERS){
+        if (price <= t.upTo) return { amount: price*t.rate, note: 'NJ Graduated Percent Fee ' + (t.rate*100) + '% (applies to full consideration) — SELLER-paid as of 7/10/2025. Updated 7/21 rates. Not typically a buyer cost unless contract specifies otherwise' };
+      }
     }
   },
 
@@ -3015,14 +3190,37 @@ const STATE_DATA = {
     verified:true,
     get asOf(){ return RATE_CONFIG.CT.govAsOf; },
     get source(){ return RATE_CONFIG.CT.govSource; },
-    counties: null,
-    transferTax(price, c){
+    // Municipal-rate selector only takes effect under container._useJul21Rates
+    // — see Pending_Solve_0.14.md FIX #6. Targeted Investment Community towns:
+    // Bloomfield, Bridgeport, Bristol, East Hartford, Hamden, Hartford,
+    // Meriden, Middletown, New Britain, New Haven, New London, Norwalk,
+    // Norwich, Southington, Waterbury, Windham. Groton & Thomaston are
+    // eligible but opted out (still Standard). Stamford is its own split rate.
+    pinnedCounties: ['Standard (0.25%)', 'Targeted Investment Community (0.50%)', 'Stamford (0.35%≤$1M / 0.50%>$1M)'],
+    counties: {
+      'Standard (0.25%)': { ctMunicipal: 'standard' },
+      'Targeted Investment Community (0.50%)': { ctMunicipal: 'tic' },
+      'Stamford (0.35%≤$1M / 0.50%>$1M)': { ctMunicipal: 'stamford' }
+    },
+    transferTax(price, c, jul21){
       const r = RATE_CONFIG.CT.rates;
       let state = Math.min(price,800000)*r.stateTier1;
       if (price>800000) state += Math.min(price-800000,1700000)*r.stateTier2;
       if (price>2500000) state += (price-2500000)*r.stateTier3;
-      const municipal = price*r.municipalRate;
-      return { amount: state+municipal, note: 'CT state conveyance tax (tiered ' + (r.stateTier1*100)+'%/'+(r.stateTier2*100)+'%/'+(r.stateTier3*100) + '%) + municipal tax (' + (r.municipalRate*100) + '% default — some towns charge up to 0.50%, Stamford has its own tiers) — customarily SELLER-paid' };
+
+      let municipal, municipalNote;
+      const sel = (jul21 && c) ? c.ctMunicipal : null;
+      if (sel === 'tic'){
+        municipal = price*0.0050;
+        municipalNote = 'Targeted Investment Community rate 0.50% (Bloomfield/Bridgeport/Bristol/East Hartford/Hamden/Hartford/Meriden/Middletown/New Britain/New Haven/New London/Norwalk/Norwich/Southington/Waterbury/Windham) — updated 7/21 rates';
+      } else if (sel === 'stamford'){
+        municipal = Math.min(price,1000000)*0.0035 + Math.max(0,price-1000000)*0.0050;
+        municipalNote = 'Stamford split rate: 0.35% ≤$1M, 0.50% >$1M — updated 7/21 rates';
+      } else {
+        municipal = price*r.municipalRate;
+        municipalNote = (r.municipalRate*100) + '% default (Standard — most CT towns, incl. Groton & Thomaston which are TIC-eligible but opted out) — some towns charge up to 0.50%, Stamford has its own split rate';
+      }
+      return { amount: state+municipal, note: 'CT state conveyance tax (tiered ' + (r.stateTier1*100)+'%/'+(r.stateTier2*100)+'%/'+(r.stateTier3*100) + '%) + municipal tax (' + municipalNote + ') — customarily SELLER-paid' };
     },
     mortgageTax(){ return noTax('Connecticut has no mortgage recording tax'); },
     mansionTax(){ return noTax('Connecticut has no mansion tax'); }
@@ -3059,10 +3257,13 @@ const STATE_DATA = {
     get asOf(){ return RATE_CONFIG.DC.govAsOf; },
     get source(){ return RATE_CONFIG.DC.govSource; },
     counties: null,
-    mortgageTax(loanAmt, c, price){
+    mortgageTax(loanAmt, c, price, jul21){
       const r = RATE_CONFIG.DC.rates;
       const tier = amt => amt < r.threshold ? amt*r.rateLow : amt*r.rateHigh;
       const deedRecordation = tier(price||0);
+      if (jul21){
+        return { amount: deedRecordation, note: 'DC recordation tax on the deed (' + fmt(deedRecordation) + '), tiered ' + (r.rateLow*100) + '% (<$' + r.threshold.toLocaleString() + ') / ' + (r.rateHigh*100) + '% (≥$' + r.threshold.toLocaleString() + ') — BUYER-paid. Purchase-money deed of trust is exempt when recorded simultaneously with the deed (DC Code §42-1102(5)) — updated 7/21 rates. Verify if refinance or non-purchase-money, where this exemption may not apply. First-time DC buyer program can reduce the deed portion to 0.725% — verify eligibility manually' };
+      }
       const trustRecordation = tier(loanAmt);
       return { amount: deedRecordation+trustRecordation, note: 'DC recordation tax on the deed (' + fmt(deedRecordation) + ') + on the deed of trust (' + fmt(trustRecordation) + '), tiered ' + (r.rateLow*100) + '% (<$' + r.threshold.toLocaleString() + ') / ' + (r.rateHigh*100) + '% (≥$' + r.threshold.toLocaleString() + ') — BUYER-paid. First-time DC buyer program can reduce the deed portion to 0.725% — verify eligibility manually' };
     },
@@ -3123,10 +3324,24 @@ const STATE_DATA = {
       const rate = RATE_CONFIG.MD.rates.stateTransferRate;
       return { amount: price*rate, note: 'MD STATE transfer tax only (' + (rate*100) + '%, customarily split 50/50 buyer/seller; 0.25% for first-time MD buyers, paid by seller). Does NOT include county transfer tax (0%-1.5%+, ~19 of 24 jurisdictions) — add manually for your county' };
     },
-    mortgageTax(loanAmt, c){
+    mortgageTax(loanAmt, c, price, jul21){
       if (c.tiered){
         // Montgomery County — tiered recordation tax, $/$500 converted to decimal rate per bracket
         const tiers = [{upTo:500000,rate:0.0089},{upTo:600000,rate:0.0135},{upTo:750000,rate:0.0204},{upTo:1000000,rate:0.02156},{upTo:Infinity,rate:0.0227}];
+        if (jul21){
+          // Price basis + bottom-bracket credit — reproduces Stewart exactly. See Pending_Solve_0.14.md FIX #4.
+          const base = price || loanAmt;
+          let gross = 0, prev = 0;
+          for (const t of tiers){
+            if (base <= prev) break;
+            const cap = Math.min(base, t.upTo);
+            gross += (cap - prev) * t.rate;
+            prev = cap;
+          }
+          const credit = (c.exemption || 0) * tiers[0].rate;
+          const amount = Math.max(0, gross - credit);
+          return { amount, note: 'Montgomery Co. tiered recordation tax ($4.45/$500 up to $500K, rising to $11.35/$500 above $1M) on the purchase price, less the $' + c.exemption.toLocaleString() + ' owner-occupied principal-residence exemption ($' + credit.toLocaleString() + ' credit) — BORROWER-paid. Updated 7/21 rates (price basis). Assumes owner-occupied; remove exemption manually for investment property' };
+        }
         const taxable = Math.max(0, loanAmt - (c.exemption||0));
         let amount = 0, prev = 0;
         for (const t of tiers){
@@ -3179,14 +3394,20 @@ const STATE_DATA = {
     verified:true,
     get asOf(){ return RATE_CONFIG.MN.govAsOf; },
     get source(){ return RATE_CONFIG.MN.govSource; },
-    counties: null,
-    transferTax(price, c){
-      const rate = RATE_CONFIG.MN.rates.deedTaxRate;
-      return { amount: Math.max(price*rate, 1.65), note: 'MN Deed Tax ' + (rate*100) + '% (min $1.65) — SELLER-liable. Hennepin & Ramsey counties add an extra 0.01% Environmental Response Fund tax — verify if property is in one of those' };
+    // ECRF surcharge only applied under container._useJul21Rates — see FIX #7.
+    pinnedCounties: ['Hennepin', 'Ramsey'],
+    counties: {
+      'Hennepin': { ecrf: true },
+      'Ramsey': { ecrf: true },
+      'Other MN County (no ECRF)': { ecrf: false }
     },
-    mortgageTax(loanAmt, c){
-      const rate = RATE_CONFIG.MN.rates.mortgageRegistryRate;
-      return { amount: loanAmt*rate, note: 'MN Mortgage Registry Tax ' + (rate*100) + '% of loan amount — BORROWER-liable. Hennepin & Ramsey counties add an extra 0.01% Environmental Response Fund tax — verify if property is in one of those' };
+    transferTax(price, c, jul21){
+      const rate = RATE_CONFIG.MN.rates.deedTaxRate + (jul21 && c && c.ecrf ? 0.0001 : 0);
+      return { amount: Math.max(price*rate, 1.65), note: 'MN Deed Tax ' + (rate*100).toFixed(2) + '%' + (jul21 && c && c.ecrf ? ' (incl. Hennepin/Ramsey 0.01% ECRF surcharge, updated 7/21 rates)' : '') + ' (min $1.65) — SELLER-liable.' + (jul21 ? '' : ' Hennepin & Ramsey counties add an extra 0.01% Environmental Response Fund tax — verify if property is in one of those') };
+    },
+    mortgageTax(loanAmt, c, price, jul21){
+      const rate = RATE_CONFIG.MN.rates.mortgageRegistryRate + (jul21 && c && c.ecrf ? 0.0001 : 0);
+      return { amount: loanAmt*rate, note: 'MN Mortgage Registry Tax ' + (rate*100).toFixed(2) + '%' + (jul21 && c && c.ecrf ? ' (incl. Hennepin/Ramsey 0.01% ECRF surcharge, updated 7/21 rates)' : '') + ' of loan amount — BORROWER-liable.' + (jul21 ? '' : ' Hennepin & Ramsey counties add an extra 0.01% Environmental Response Fund tax — verify if property is in one of those') };
     },
     mansionTax(){ return noTax('Minnesota has no mansion tax'); }
   },
@@ -3195,8 +3416,109 @@ const STATE_DATA = {
     verified:true,
     get asOf(){ return RATE_CONFIG.OH.govAsOf; },
     get source(){ return RATE_CONFIG.OH.govSource; },
-    counties: null,
-    transferTax(price, c){
+    // Per-county permissive conveyance rates ({0.14} pass, FIX #8) — researched
+    // via Ohio Dept. of Taxation Table PC-1 (2019 statewide survey) plus live
+    // primary-source verification for the 9 pinned high-confidence counties.
+    // Only takes effect under container._useJul21Rates — see transferTax()
+    // below. Full sourcing: OH_County_Rates_Research.md (Testing Tax & Gov
+    // Fees/ project folder).
+    pinnedCounties: ['Franklin','Cuyahoga','Hamilton','Summit','Montgomery','Butler','Lucas','Stark','Mahoning'],
+    counties: {
+      'Adams': { permissiveRate: 0.003 },
+      'Allen': { permissiveRate: 0.002 },
+      'Ashland': { permissiveRate: 0.003 },
+      'Ashtabula': { permissiveRate: 0.003 },
+      'Athens': { permissiveRate: 0.003 },
+      'Auglaize': { permissiveRate: 0.002 },
+      'Belmont': { permissiveRate: 0.002 },
+      'Brown': { permissiveRate: 0.003 },
+      'Butler': { permissiveRate: 0.002 },
+      'Carroll': { permissiveRate: 0.003 },
+      'Champaign': { permissiveRate: 0.003 },
+      'Clark': { permissiveRate: 0.003 },
+      'Clermont': { permissiveRate: 0.003 },
+      'Clinton': { permissiveRate: 0.0025 },
+      'Columbiana': { permissiveRate: 0.003 },
+      'Coshocton': { permissiveRate: 0.003 },
+      'Crawford': { permissiveRate: 0.003 },
+      'Cuyahoga': { permissiveRate: 0.003 },
+      'Darke': { permissiveRate: 0.002 },
+      'Defiance': { permissiveRate: 0.003 },
+      'Delaware': { permissiveRate: 0.002 },
+      'Erie': { permissiveRate: 0.003 },
+      'Fairfield': { permissiveRate: 0.003 },
+      'Fayette': { permissiveRate: 0.002 },
+      'Franklin': { permissiveRate: 0.002 },
+      'Fulton': { permissiveRate: 0.003 },
+      'Gallia': { permissiveRate: 0.003 },
+      'Geauga': { permissiveRate: 0.003 },
+      'Greene': { permissiveRate: 0.001 },
+      'Guernsey': { permissiveRate: 0.003 },
+      'Hamilton': { permissiveRate: 0.002 },
+      'Hancock': { permissiveRate: 0.002 },
+      'Hardin': { permissiveRate: 0.003 },
+      'Harrison': { permissiveRate: 0.003 },
+      'Henry': { permissiveRate: 0.003 },
+      'Highland': { permissiveRate: 0.002 },
+      'Hocking': { permissiveRate: 0.003 },
+      'Holmes': { permissiveRate: 0.003 },
+      'Huron': { permissiveRate: 0.001 },
+      'Jackson': { permissiveRate: 0.003 },
+      'Jefferson': { permissiveRate: 0.003 },
+      'Knox': { permissiveRate: 0.002 },
+      'Lake': { permissiveRate: 0.003 },
+      'Lawrence': { permissiveRate: 0.003 },
+      'Licking': { permissiveRate: 0.002 },
+      'Logan': { permissiveRate: 0.003 },
+      'Lorain': { permissiveRate: 0.003 },
+      'Lucas': { permissiveRate: 0.003 },
+      'Madison': { permissiveRate: 0.002 },
+      'Mahoning': { permissiveRate: 0.003 },
+      'Marion': { permissiveRate: 0.003 },
+      'Medina': { permissiveRate: 0.002 },
+      'Meigs': { permissiveRate: 0.003 },
+      'Mercer': { permissiveRate: 0.0025 },
+      'Miami': { permissiveRate: 0.001 },
+      'Monroe': { permissiveRate: 0.002 },
+      'Montgomery': { permissiveRate: 0.002 },
+      'Morgan': { permissiveRate: 0.002 },
+      'Morrow': { permissiveRate: 0.003 },
+      'Muskingum': { permissiveRate: 0.002 },
+      'Noble': { permissiveRate: 0.003 },
+      'Ottawa': { permissiveRate: 0.003 },
+      'Paulding': { permissiveRate: 0.003 },
+      'Perry': { permissiveRate: 0.003 },
+      'Pickaway': { permissiveRate: 0.002 },
+      'Pike': { permissiveRate: 0.003 },
+      'Portage': { permissiveRate: 0.003 },
+      'Preble': { permissiveRate: 0.002 },
+      'Putnam': { permissiveRate: 0.003 },
+      'Richland': { permissiveRate: 0.003 },
+      'Ross': { permissiveRate: 0.003 },
+      'Sandusky': { permissiveRate: 0.003 },
+      'Scioto': { permissiveRate: 0.003 },
+      'Seneca': { permissiveRate: 0.003 },
+      'Shelby': { permissiveRate: 0.003 },
+      'Stark': { permissiveRate: 0.003 },
+      'Summit': { permissiveRate: 0.003 },
+      'Trumbull': { permissiveRate: 0.003 },
+      'Tuscarawas': { permissiveRate: 0.003 },
+      'Union': { permissiveRate: 0.003 },
+      'Van Wert': { permissiveRate: 0.003 },
+      'Vinton': { permissiveRate: 0.003 },
+      'Warren': { permissiveRate: 0.002 },
+      'Washington': { permissiveRate: 0.003 },
+      'Wayne': { permissiveRate: 0.001 },
+      'Williams': { permissiveRate: 0.003 },
+      'Wood': { permissiveRate: 0.002 },
+      'Wyandot': { permissiveRate: 0.003 },
+      'Other/Unverified OH County (statutory max assumed)': { permissiveRate: 0.0030 }
+    },
+    transferTax(price, c, jul21){
+      if (jul21 && c && c.permissiveRate != null){
+        const rate = 0.0010 + c.permissiveRate; // mandatory state $1/$1,000 (ORC §319.54(G)(3)) + county permissive (ORC §322.02)
+        return { amount: price*rate, note: 'Mandatory state $1/$1,000 (0.10%) + county permissive $' + (c.permissiveRate*1000).toFixed(2) + '/$1,000 = ' + (rate*100).toFixed(2) + '% combined — customarily SELLER-paid. Updated 7/21 rates (Ohio Dept. of Taxation Table PC-1 + primary county sources — verify for high-value/recently-changed counties, see OH_County_Rates_Research.md).' };
+      }
       const rate = RATE_CONFIG.OH.rates.transferTaxRate;
       return { amount: price*rate, note: 'Mandatory state $1/$1,000 (0.10%) + typical county permissive $3/$1,000 (0.30%) = ' + (rate*100) + '% combined, the most common rate — customarily SELLER-paid. Actual county rate ranges 0.20%-0.40% (1-4 mills total) — verify for your specific county' };
     },
@@ -3523,6 +3845,32 @@ function onTitleFieldEdit(el){
   calc(container);
 }
 
+// ===========================================================================
+// "07/21 Updated Rates" toggle ({0.14} pass) — per-loan-block flag that
+// switches NY/DC/MD/NJ/MN/CT/OH/FL(Miami-Dade) formulas between legacy
+// behavior (default, unchanged) and the confirmed/spec'd fixes from the
+// Madison Title & Stewart Rate cross-check. See Testing Tax & Gov Fees/
+// Pending_Solve_0.14.md for the full spec of every fix this drives.
+// ===========================================================================
+function toggleJul21Rates(container){
+  container._useJul21Rates = !container._useJul21Rates;
+  const btn = E(container,'btn_jul21');
+  if (btn) btn.setAttribute('data-active', container._useJul21Rates ? 'true' : 'false');
+  calc(container);
+}
+
+// Shows/hides the small FL Miami-Dade property-type selector — the only
+// fix in this pass that needed a bespoke UI element rather than reusing the
+// existing county-picker mechanism (MN/CT reuse it; NY/DC/MD/NJ need no UI
+// at all since they're single-formula swaps).
+function syncJul21RatesUI(container){
+  const jul21 = !!container._useJul21Rates;
+  const stateCode = E(container,'state') ? E(container,'state').value : '';
+  const countyName = E(container,'county') ? E(container,'county').value : '';
+  const row = E(container,'row_flPropertyType');
+  if (row) row.style.display = (jul21 && stateCode === 'FL' && countyName === 'Miami-Dade') ? '' : 'none';
+}
+
 function applyTitleInsurance(container, price, loanAmt){
   const stateCode = E(container,'state').value;
   const countyName = E(container,'county').value;
@@ -3534,12 +3882,16 @@ function applyTitleInsurance(container, price, loanAmt){
   const ownerInput = E(container,'t_titleOwner');
   const loanInput = E(container,'t_titleLoan');
 
-  const hasTitleCalc = data && data.verified && typeof data.titleInsurance === 'function';
+  const jul21 = !!container._useJul21Rates;
+  // NJ's titleInsurance() only exists as of the {0.14} 07/21 Updated Rates
+  // pass — gate it behind the toggle so legacy behavior (manual entry) is
+  // unchanged unless the loan block has opted in.
+  const hasTitleCalc = data && data.verified && typeof data.titleInsurance === 'function' && (stateCode !== 'NJ' || jul21);
   const autoActive = govAuto.checked && hasTitleCalc;
 
   if (autoActive){
     const countyInfo = (data.counties && data.counties[countyName]) ? data.counties[countyName] : {};
-    const result = data.titleInsurance(price, loanAmt, countyInfo);
+    const result = data.titleInsurance(price, loanAmt, countyInfo, jul21);
     ownerInput.value = result.owner.toFixed(2);
     loanInput.value = result.loan.toFixed(2);
     ownerInput.disabled = true;
@@ -3588,12 +3940,21 @@ function applyGovernmentFees(container, price, loanAmt){
   }
 
   container._sourceNotes.govFees = (STATE_NAMES[stateCode]||stateCode) + ' mortgage/mansion/transfer tax — source: ' + data.source + ' Verified as of ' + data.asOf + '.';
-  const countyInfo = (data.counties && data.counties[countyName]) ? data.counties[countyName] : {};
+  const jul21 = !!container._useJul21Rates;
+  const countyInfo = Object.assign({}, (data.counties && data.counties[countyName]) ? data.counties[countyName] : {});
+
+  // FL Miami-Dade property-type selector (07/21 Updated Rates only) — see
+  // Pending_Solve_0.14.md FIX #5. The row/select is injected by
+  // syncJul21RatesUI() and only shown for FL + Miami-Dade + jul21 on.
+  if (jul21 && stateCode === 'FL' && countyName === 'Miami-Dade'){
+    const ptEl = E(container,'flPropertyType');
+    countyInfo.mdPropertyType = ptEl ? ptEl.value : 'other';
+  }
 
   const results = {
-    mortgagetax: data.mortgageTax ? data.mortgageTax(loanAmt, countyInfo, price) : noTax(''),
-    mansiontax: data.mansionTax ? data.mansionTax(price, countyInfo) : noTax(''),
-    transfertax: data.transferTax ? data.transferTax(price, countyInfo) : noTax('')
+    mortgagetax: data.mortgageTax ? data.mortgageTax(loanAmt, countyInfo, price, jul21) : noTax(''),
+    mansiontax: data.mansionTax ? data.mansionTax(price, countyInfo, jul21) : noTax(''),
+    transfertax: data.transferTax ? data.transferTax(price, countyInfo, jul21) : noTax('')
   };
 
   ['mortgagetax','mansiontax','transfertax'].forEach(key=>{
@@ -4320,6 +4681,7 @@ function calc(container){
   E(container,'g2bTotal').textContent = 'Total: ' + fmt(g2b);
 
   // Title Insurance auto-calc, then government fee auto-calc (Mortgage/Mansion/Transfer tax)
+  syncJul21RatesUI(container);
   applyTitleInsurance(container, price, loanAmt);
   applyGovernmentFees(container, price, loanAmt);
   const showMansion = E(container,'chk_show_mansiontax').checked;
@@ -5769,6 +6131,7 @@ function getAllLoanBlocks(){
 
 function initLoanBlock(container){
   container._sourceNotes = { govFees:'', title:'' };
+  container._useJul21Rates = false;
   seedBlockDealInfo(container);
   E(container,'chk_show_mansiontax').checked = (parseFloat(E(container,'price').value) || 0) >= 1000000;
   calc(container);
