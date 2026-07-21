@@ -73,6 +73,7 @@
   }
   .dc-cell-input:focus{ outline:1px solid var(--gold); background:#fff; }
   .dc-col-purpose{ width:150px; } .dc-col-name{ width:170px; } .dc-col-number{ width:130px; }
+  .dc-col-notes{ width:160px; }
   .dc-col-actions{ width:96px; }
   .dc-row-actions{ display:flex; flex-wrap:wrap; gap:3px; }
   .dc-mini-btn{ font-size:11px; line-height:1; padding:3px 5px; border:1px solid var(--line); background:#fff; border-radius:4px; cursor:pointer; color:var(--slate); }
@@ -314,6 +315,12 @@
           </div>
         </div>
 
+        <div class="dc-card">
+          <h4 style="margin:0 0 6px 0;">Notes</h4>
+          <p class="dc-hint" style="margin-top:0;">General notes for this day — saved with the day, not included in any export.</p>
+          <textarea id="dcDayNotes" rows="3" placeholder="e.g. Skip Naomi this week, she's out of office…" style="width:100%; box-sizing:border-box; font-size:12px; padding:8px; border:1px solid var(--line); border-radius:6px; font-family:Calibri, Arial, sans-serif;" oninput="onDayNotesInput()"></textarea>
+        </div>
+
         <div class="dc-card" style="padding:0;">
           <div class="dc-grid-wrap">
             <table class="dc-grid">
@@ -323,6 +330,7 @@
                   <th class="dc-col-name">Full Name</th>
                   <th class="dc-col-number">Number</th>
                   <th>Description</th>
+                  <th class="dc-col-notes">Notes</th>
                   <th class="dc-col-actions">Order / Edit</th>
                 </tr>
               </thead>
@@ -638,8 +646,8 @@ function startOfWeekMonday_(ref){
 <script>
 // ===========================================================================
 // UNIFIED ROW MODEL + STATE
-// { rowId, purpose, fullName, number, description, sourceType, identityKey,
-//   priority, manuallyEdited, missingPhone, sortIndex, raw }
+// { rowId, purpose, fullName, number, description, notes, sourceType,
+//   identityKey, priority, manuallyEdited, missingPhone, sortIndex, raw }
 // ===========================================================================
 let dcRows = [];            // the "List for Today"
 let dcPreApp = [];          // Pre-App rows (separate PDF only)
@@ -648,12 +656,13 @@ let currentDateOf = todayIso();
 let wantToCallSet = {};     // identityKey -> displayName
 let manualContactsByName = {}; // normalized name -> {phone}
 let sourceBatches = [];     // [{fileName, format, count}]
+let dayNotes = '';          // freeform notes for the whole day, saved with the record
 
 const PURPOSES = ['Birthday','Home Anniversary','Closed Last 30 Days','CD Sent This Week','Referred Last 7 Days','Pre-Approved','Realtor Call','Closing Realtor','Pre-App','PhoneBurner Group','Other'];
 
 function makeRow(fields){
   const r = Object.assign({
-    rowId: uid(), purpose:'Other', fullName:'', number:'', description:'',
+    rowId: uid(), purpose:'Other', fullName:'', number:'', description:'', notes:'',
     sourceType:'', identityKey:'', priority:false, manuallyEdited:false,
     missingPhone:false, sortIndex:0, raw:null
   }, fields);
@@ -667,7 +676,7 @@ function persistDraft(){
   try {
     localStorage.setItem(DRAFT_KEY, JSON.stringify({
       recordId: currentRecordId, dateOf: currentDateOf, rows: dcRows,
-      preApp: dcPreApp, sourceBatches: sourceBatches
+      preApp: dcPreApp, sourceBatches: sourceBatches, dayNotes: dayNotes
     }));
   } catch (e) {}
 }
@@ -688,7 +697,9 @@ async function initTool(){
     sourceBatches = draft.sourceBatches || [];
     currentRecordId = draft.recordId || null;
     currentDateOf = draft.dateOf || todayIso();
+    dayNotes = draft.dayNotes || '';
     document.getElementById('dcDateOf').value = currentDateOf;
+    document.getElementById('dcDayNotes').value = dayNotes;
   }
   addManualEntryRow();
   renderList();
@@ -1207,6 +1218,7 @@ function renderList(){
       '<td class="dc-col-number dc-number-cell"><textarea rows="1" class="dc-cell-input" data-idx="' + i + '" data-field="number">' + escapeHtml(r.number) + '</textarea>' +
         (r.missingPhone ? '<button class="dc-mini-btn" style="margin-top:2px;" onclick="addToManualFromRow(' + i + ')">+ Manual Contact</button>' : '') + '</td>' +
       '<td><textarea rows="1" class="dc-cell-input" data-idx="' + i + '" data-field="description">' + escapeHtml(r.description) + '</textarea></td>' +
+      '<td class="dc-col-notes"><textarea rows="1" class="dc-cell-input" data-idx="' + i + '" data-field="notes" placeholder="note…">' + escapeHtml(r.notes) + '</textarea></td>' +
       '<td class="dc-col-actions"><div class="dc-row-actions">' +
         '<button class="dc-mini-btn" title="Move up" onclick="moveRow(' + i + ',-1)">↑</button>' +
         '<button class="dc-mini-btn" title="Move down" onclick="moveRow(' + i + ',1)">↓</button>' +
@@ -1253,10 +1265,15 @@ function addBlankRow(){
   dcRows.push(makeRow({ purpose:'Other', manuallyEdited:true, sortIndex:dcRows.length }));
   renderList(); persistDraft();
 }
+function onDayNotesInput(){
+  dayNotes = document.getElementById('dcDayNotes').value;
+  persistDraft();
+}
 function clearListConfirm(){
-  if (!dcRows.length) return;
-  if (!confirm('Clear the whole List for Today? (Saved days are not affected.)')) return;
-  dcRows = []; dcPreApp = []; sourceBatches = []; currentRecordId = null;
+  if (!dcRows.length && !dayNotes) return;
+  if (!confirm('Clear the whole List for Today, including its Notes? (Saved days are not affected.)')) return;
+  dcRows = []; dcPreApp = []; sourceBatches = []; currentRecordId = null; dayNotes = '';
+  document.getElementById('dcDayNotes').value = '';
   renderList(); renderPreApp(); persistDraft();
 }
 
@@ -1593,7 +1610,7 @@ function closeMapperModal(){ document.getElementById('mapperModalOverlay').class
 // SAVE / LOAD / DELETE (cloud) + EXPORTS (CSV / XLSX / PDF)
 // ===========================================================================
 function currentPayloadData_(){
-  return { rows:dcRows, preApp:dcPreApp, sourceBatches:sourceBatches };
+  return { rows:dcRows, preApp:dcPreApp, sourceBatches:sourceBatches, dayNotes:dayNotes };
 }
 async function saveDay(){
   const status = document.getElementById('dcSaveStatus');
@@ -1633,8 +1650,10 @@ async function loadSavedRecord(recordId){
     const data = await DC_API.getDailyCallsRecord(recordId);
     const d = data.data || {};
     dcRows = d.rows || []; dcPreApp = d.preApp || []; sourceBatches = d.sourceBatches || [];
+    dayNotes = d.dayNotes || '';
     currentRecordId = recordId; currentDateOf = data.record.DateOf || todayIso();
     document.getElementById('dcDateOf').value = currentDateOf;
+    document.getElementById('dcDayNotes').value = dayNotes;
     renderList(); renderPreApp(); persistDraft(); closeSavedModal();
   } catch (err){ alert(err.message); }
 }
