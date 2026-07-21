@@ -1111,6 +1111,24 @@
           <input type="text" id="borrowerLastName" placeholder="Last" oninput="syncBorrowerNameFromParts()">
           <input type="text" id="borrowerName" placeholder="e.g. John & Jane Smith">
         </div>
+        <!-- Property Type — general Purchase/Refi infrastructure, NOT the
+             Miami-Dade-only flPropertyType selector. Per Ann's decision #3 this
+             lives in Deal Setup (shared across every loan estimate = same
+             property). Deal Info (property attributes) would also be defensible
+             since it's a property attribute, but Ann specified Deal Setup so
+             the Consolidation co-op CEMA gate can read one shared value.
+             "Co-op" is the CEMA-ineligibility gate read by calc(). -->
+        <div class="field-row">
+          <label>Property Type <span class="hint">Shared across every loan estimate below — same property</span></label>
+          <select id="propertyType">
+            <option value="Single Family">Single Family</option>
+            <option value="Condo">Condo</option>
+            <option value="Co-op">Co-op</option>
+            <option value="2-4 Family">2-4 Family</option>
+            <option value="Multi-Family">Multi-Family</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
       </div>
     </div>
 
@@ -1144,6 +1162,19 @@
     <button id="accountToggleBtn" class="export-btn" style="margin-left:auto;" onclick="toggleSidePanel('right')">&#128100; Account</button>
   </div>
   <div id="saveClientStatus" style="display:none; padding:8px 28px; font-size:12px;"></div>
+
+  <!-- Shared, page-level datalists for the Consolidation "Month/Year of Current
+       Mortgage" custom editable comboboxes. Kept out of the loan-block template
+       (a <template>'s contents don't render, and cloning would duplicate ids);
+       every block's <input list="cmMonthList"/"cmYearList"> resolves to these.
+       Free-typeable — these only suggest, they never constrain the value. -->
+  <datalist id="cmMonthList">
+    <option value="January"></option><option value="February"></option><option value="March"></option>
+    <option value="April"></option><option value="May"></option><option value="June"></option>
+    <option value="July"></option><option value="August"></option><option value="September"></option>
+    <option value="October"></option><option value="November"></option><option value="December"></option>
+  </datalist>
+  <datalist id="cmYearList"></datalist>
 
   <div id="loanBlocksContainer"></div>
   </div>
@@ -1432,7 +1463,8 @@
           <p style="font-size:13px; color:var(--slate); line-height:1.5;">What type of loan is this?</p>
           <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
             <button class="export-btn" onclick="selectLoanType('Purchase')">Purchase</button>
-            <button class="export-btn" onclick="selectLoanType('Refinance')">Refinance</button>
+            <button class="export-btn" onclick="selectLoanType('Refinance with Payoff')">Refinance with Payoff</button>
+            <button class="export-btn" onclick="selectLoanType('Refinance with Consolidation')">Refinance with Consolidation</button>
             <button class="export-btn" onclick="selectLoanType('HELOC')">HELOC</button>
             <button class="export-btn" onclick="selectLoanType('Construction')">Construction</button>
             <button class="export-btn" onclick="selectLoanType('Reverse Mortgage')">Reverse Mortgage</button>
@@ -1464,7 +1496,8 @@
               <label style="font-size:12px; color:var(--slate); display:block; margin-bottom:6px;">New loan estimate's type:</label>
               <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
                 <button class="export-btn" onclick="tafCreateTargetBlock('Purchase')">Purchase</button>
-                <button class="export-btn" onclick="tafCreateTargetBlock('Refinance')">Refinance</button>
+                <button class="export-btn" onclick="tafCreateTargetBlock('Refinance with Payoff')">Refinance with Payoff</button>
+                <button class="export-btn" onclick="tafCreateTargetBlock('Refinance with Consolidation')">Refinance with Consolidation</button>
                 <button class="export-btn" onclick="tafCreateTargetBlock('HELOC')">HELOC</button>
                 <button class="export-btn" onclick="tafCreateTargetBlock('Construction')">Construction</button>
                 <button class="export-btn" onclick="tafCreateTargetBlock('Reverse Mortgage')">Reverse Mortgage</button>
@@ -1810,7 +1843,7 @@ function closeLegalModal(kind){
             </select>
           </div>
           <div class="field-row">
-            <label>Purchase Price <span class="manual-badge">Manual</span></label>
+            <label><span data-fld="priceLabel">Purchase Price</span> <span class="manual-badge">Manual</span></label>
             <input type="text" inputmode="decimal" data-fld="price" value="0" oninput="onPriceChange(this.closest('.loan-block'))">
           </div>
 
@@ -1835,6 +1868,50 @@ function closeLegalModal(kind){
             <label>Base Loan Amount ($)</label>
             <input type="text" inputmode="decimal" data-fld="loanAmt" value="0" oninput="onEdit(this.closest('.loan-block'), 'loan')">
           </div>
+
+          <!-- REFINANCE WITH CONSOLIDATION (NY CEMA) — fields shown only when
+               isConsolidation(container) is true (gated in calc(), same pattern
+               as row_dpModeGroup). Placed AFTER the down-payment rows so the
+               dpMode radio group stays first-in-DOM (extractFieldValues reads
+               the first checked radio for __dpMode); the origBalSrc radios below
+               are captured separately by name. Only "Unpaid Principal Balance"
+               feeds the MRT math (newMoney = Mortgage Amount − Unpaid Principal);
+               everything else here is display/export/eligibility reference. -->
+          <div data-fld="row_consol_header" style="display:none; margin:10px 0 4px 0; font-size:12px; font-weight:700; color:var(--slate); border-top:1px solid var(--line); padding-top:8px;">
+            Consolidation (CEMA) details — New York only
+          </div>
+          <div class="field-row" data-fld="row_consol_unpaid" style="display:none;">
+            <label>Unpaid Principal Balance <span class="manual-badge">Manual</span> <span class="hint">Current payoff balance on the existing mortgage — this is what drives the CEMA new-money mortgage tax</span></label>
+            <input type="text" inputmode="decimal" data-fld="unpaidPrincipal" value="0" oninput="calc(this.closest('.loan-block'))">
+          </div>
+          <div class="field-row" data-fld="row_consol_face" style="display:none;">
+            <label>Face Amt of Existing Mortgage / Vesting (Hi Credit) <span class="manual-badge">Manual</span> <span class="hint">Original balance from the credit report's "Hi Credit" line — reference/eligibility only, NOT used in the tax math</span></label>
+            <input type="text" inputmode="decimal" data-fld="faceAmt" value="0" oninput="calc(this.closest('.loan-block'))">
+          </div>
+          <div class="field-row" data-fld="row_consol_payoffStmt" style="display:none;">
+            <label>Payoff Statement Amount <span class="manual-badge">Manual</span> <span class="hint">Optional — an alternative original-balance figure; select which one is authoritative below</span></label>
+            <input type="text" inputmode="decimal" data-fld="payoffStmtAmt" value="0" oninput="calc(this.closest('.loan-block'))">
+          </div>
+          <div class="field-row" data-fld="row_consol_origSrc" style="display:none; justify-content:flex-start; gap:10px; flex-wrap:wrap; align-items:center;">
+            <label style="font-size:11px; font-weight:700; color:var(--slate);">Authoritative original-balance figure (display/export only — does NOT change the tax math):</label>
+            <label class="radio-opt" style="font-size:11px;"><input type="radio" name="origBalSrc" value="hiCredit" checked onchange="calc(this.closest('.loan-block'))"> Face Amt / Hi-Credit</label>
+            <label class="radio-opt" style="font-size:11px;"><input type="radio" name="origBalSrc" value="payoffStmt" onchange="calc(this.closest('.loan-block'))"> Payoff Statement Amount</label>
+          </div>
+          <div class="field-row" data-fld="row_consol_sameBorrower" style="display:none; justify-content:flex-start; gap:6px;">
+            <label class="radio-opt" style="font-size:12px; font-weight:700; color:var(--navy);"><input type="checkbox" data-fld="chk_sameBorrower" onchange="calc(this.closest('.loan-block'))"> Same Borrower (Primary Residence)?</label>
+          </div>
+          <div class="field-row" data-fld="row_consol_sameLender" style="display:none; justify-content:flex-start; gap:6px;">
+            <label class="radio-opt" style="font-size:12px; font-weight:700; color:var(--navy);"><input type="checkbox" data-fld="chk_sameLender" onchange="calc(this.closest('.loan-block'))"> Same Lender?</label>
+          </div>
+          <div class="field-row" data-fld="row_consol_month" style="display:none;">
+            <label>Month of Current Mortgage <span class="hint">Type freely or pick from the list</span></label>
+            <input type="text" list="cmMonthList" data-fld="curMortMonth" placeholder="e.g. January" oninput="calc(this.closest('.loan-block'))">
+          </div>
+          <div class="field-row" data-fld="row_consol_year" style="display:none;">
+            <label>Year of Current Mortgage <span class="hint">Type freely or pick from the list</span></label>
+            <input type="text" list="cmYearList" data-fld="curMortYear" placeholder="e.g. 2018" oninput="calc(this.closest('.loan-block'))">
+          </div>
+          <div class="hint" data-fld="consolNote" style="display:none; color:#B3261E; line-height:1.4; margin:2px 0 6px 0;"></div>
 
           <div class="field-row">
             <label>Loan Term (years) <span class="manual-badge">Manual</span></label>
@@ -1918,6 +1995,11 @@ function closeLegalModal(kind){
           <div class="field-row"><label>Buyer's Attorney</label><input type="text" inputmode="decimal" data-fld="f_buyersAttorney" value="0" oninput="calc(this.closest('.loan-block'))"></div>
           <div class="field-row"><label>Appraisal</label><input type="text" inputmode="decimal" data-fld="f_appraisal" value="650" oninput="calc(this.closest('.loan-block'))"></div>
           <div class="field-row"><label>Co-Op Condo Fee</label><input type="text" inputmode="decimal" data-fld="f_coopCondoFee" value="0" oninput="calc(this.closest('.loan-block'))"></div>
+          <!-- CEMA / Assignment / Processing Fee — Consolidation only (decision
+               #7). $0 manual default; no formula exists (research: "a few
+               hundred to ~$2,000"). Folds into the g2b (3rd-Party) total like
+               every other fee here. Row shown only when isConsolidation. -->
+          <div class="field-row" data-fld="row_cemaFee" style="display:none;"><label>CEMA / Assignment / Processing Fee <span class="manual-badge">Manual</span> <span class="hint">Existing-lender assignment + attorney/processing to draft the CEMA</span></label><input type="text" inputmode="decimal" data-fld="f_cemaFee" value="0" oninput="calc(this.closest('.loan-block'))"></div>
           <div data-fld="customFieldsList_g2b"></div>
         </div>
       </div>
@@ -1949,6 +2031,10 @@ function closeLegalModal(kind){
             <button class="export-btn" data-fld="exportDiscrepanciesBtn" style="padding:5px 10px; font-size:11px; background:#B3261E; color:#fff; display:none;" onclick="openDiscrepancyModal(this.closest('.loan-block'))">⚠ Export Discrepancies</button>
           </div>
           <div class="hint" data-fld="madisonNote" style="margin-bottom:6px;"></div>
+          <!-- Refi: no owner's policy is purchased on a refinance (decision #4).
+               applyTitleInsurance() greys the Owner's Policy row and sets this
+               note to "Inapplicable on Refi". Blank/hidden for Purchase. -->
+          <div class="hint" data-fld="titleRefiNote" style="display:none; margin-bottom:6px; color:#8A6A1F; font-weight:700;"></div>
 
           <div class="field-row" data-fld="row_title">
             <label>Title Insurance
@@ -3261,10 +3347,19 @@ const STATE_DATA = {
       const r = RATE_CONFIG.DC.rates;
       const tier = amt => amt < r.threshold ? amt*r.rateLow : amt*r.rateHigh;
       const deedRecordation = tier(price||0);
-      if (jul21){
+      // The purchase-money deed-of-trust exemption (DC Code §42-1102(5)) applies
+      // ONLY to a purchase recorded simultaneously with the deed. A refinance
+      // deed of trust is by definition NOT purchase-money, so on a refi we must
+      // NOT apply the exemption — charge the trust recordation the same as the
+      // pre-jul21 formula. (See title_gov_fees_refi_research.md §5, DC.) Non-
+      // refi jul21 behavior is unchanged.
+      if (jul21 && !(c && c.isRefi)){
         return { amount: deedRecordation, note: 'DC recordation tax on the deed (' + fmt(deedRecordation) + '), tiered ' + (r.rateLow*100) + '% (<$' + r.threshold.toLocaleString() + ') / ' + (r.rateHigh*100) + '% (≥$' + r.threshold.toLocaleString() + ') — BUYER-paid. Purchase-money deed of trust is exempt when recorded simultaneously with the deed (DC Code §42-1102(5)) — updated 7/21 rates. Verify if refinance or non-purchase-money, where this exemption may not apply. First-time DC buyer program can reduce the deed portion to 0.725% — verify eligibility manually' };
       }
       const trustRecordation = tier(loanAmt);
+      if (jul21 && c && c.isRefi){
+        return { amount: deedRecordation+trustRecordation, note: 'DC recordation tax on the deed (' + fmt(deedRecordation) + ') + on the deed of trust (' + fmt(trustRecordation) + '), tiered ' + (r.rateLow*100) + '% / ' + (r.rateHigh*100) + '% — BUYER-paid. Refinance: the purchase-money deed-of-trust exemption does NOT apply (a refi deed of trust is not purchase-money), so the trust recordation tax is charged. Updated 7/21 rates' };
+      }
       return { amount: deedRecordation+trustRecordation, note: 'DC recordation tax on the deed (' + fmt(deedRecordation) + ') + on the deed of trust (' + fmt(trustRecordation) + '), tiered ' + (r.rateLow*100) + '% (<$' + r.threshold.toLocaleString() + ') / ' + (r.rateHigh*100) + '% (≥$' + r.threshold.toLocaleString() + ') — BUYER-paid. First-time DC buyer program can reduce the deed portion to 0.725% — verify eligibility manually' };
     },
     mansionTax(){ return noTax('District of Columbia has no mansion tax'); },
@@ -3325,6 +3420,11 @@ const STATE_DATA = {
       return { amount: price*rate, note: 'MD STATE transfer tax only (' + (rate*100) + '%, customarily split 50/50 buyer/seller; 0.25% for first-time MD buyers, paid by seller). Does NOT include county transfer tax (0%-1.5%+, ~19 of 24 jurisdictions) — add manually for your county' };
     },
     mortgageTax(loanAmt, c, price, jul21){
+      // UNCONFIRMED for refi — see title_gov_fees_refi_research.md §5. This
+      // function's jul21 price-basis and the owner-occupied principal-residence
+      // county exemptions were verified for PURCHASE only; whether they carry to
+      // a refinance loan-amount basis is not confirmed. Kept as Purchase
+      // behavior as a stopgap (for a refi price==loanAmt here since down=0).
       if (c.tiered){
         // Montgomery County — tiered recordation tax, $/$500 converted to decimal rate per bracket
         const tiers = [{upTo:500000,rate:0.0089},{upTo:600000,rate:0.0135},{upTo:750000,rate:0.0204},{upTo:1000000,rate:0.02156},{upTo:Infinity,rate:0.0227}];
@@ -3406,6 +3506,9 @@ const STATE_DATA = {
       return { amount: Math.max(price*rate, 1.65), note: 'MN Deed Tax ' + (rate*100).toFixed(2) + '%' + (jul21 && c && c.ecrf ? ' (incl. Hennepin/Ramsey 0.01% ECRF surcharge, updated 7/21 rates)' : '') + ' (min $1.65) — SELLER-liable.' + (jul21 ? '' : ' Hennepin & Ramsey counties add an extra 0.01% Environmental Response Fund tax — verify if property is in one of those') };
     },
     mortgageTax(loanAmt, c, price, jul21){
+      // UNCONFIRMED for refi — see title_gov_fees_refi_research.md §5. Basis is
+      // loanAmt (correct for a refi), but the Hennepin/Ramsey ECRF surcharge's
+      // applicability to a refinance isn't confirmed. Kept as-is (Purchase).
       const rate = RATE_CONFIG.MN.rates.mortgageRegistryRate + (jul21 && c && c.ecrf ? 0.0001 : 0);
       return { amount: loanAmt*rate, note: 'MN Mortgage Registry Tax ' + (rate*100).toFixed(2) + '%' + (jul21 && c && c.ecrf ? ' (incl. Hennepin/Ramsey 0.01% ECRF surcharge, updated 7/21 rates)' : '') + ' of loan amount — BORROWER-liable.' + (jul21 ? '' : ' Hennepin & Ramsey counties add an extra 0.01% Environmental Response Fund tax — verify if property is in one of those') };
     },
@@ -3883,6 +3986,13 @@ function applyTitleInsurance(container, price, loanAmt){
   const loanInput = E(container,'t_titleLoan');
 
   const jul21 = !!container._useJul21Rates;
+  // Refi: no owner's policy is purchased on a refinance (only a loan/mortgagee
+  // policy) — decision #4. For BOTH refi kinds we grey/blank the Owner's Policy
+  // field, drop it from the title total (loan policy only), and surface an
+  // "Inapplicable on Refi" note. No manual-override toggle for this one.
+  const anyRefi = isAnyRefi(container);
+  const refiNoteEl = E(container,'titleRefiNote');
+  const ownerRow = E(container,'row_titleOwner');
   // NJ's titleInsurance() only exists as of the {0.14} 07/21 Updated Rates
   // pass — gate it behind the toggle so legacy behavior (manual entry) is
   // unchanged unless the loan block has opted in.
@@ -3891,26 +4001,32 @@ function applyTitleInsurance(container, price, loanAmt){
 
   if (autoActive){
     const countyInfo = (data.counties && data.counties[countyName]) ? data.counties[countyName] : {};
+    // NOTE: refi loan-policy 'reissue rate' discount is UNCONFIRMED for refi
+    // (see title_gov_fees_refi_research.md §Loan Policy) — keeping Purchase-
+    // based premium as a stopgap. Only the Owner's Policy is suppressed below.
     const result = data.titleInsurance(price, loanAmt, countyInfo, jul21);
-    ownerInput.value = result.owner.toFixed(2);
+    ownerInput.value = anyRefi ? '' : result.owner.toFixed(2);
     loanInput.value = result.loan.toFixed(2);
     ownerInput.disabled = true;
     loanInput.disabled = true;
-    totalInput.value = result.amount.toFixed(2);
+    // Refi total = loan policy only; Purchase = owner + loan (result.amount).
+    totalInput.value = (anyRefi ? result.loan : result.amount).toFixed(2);
     badge.textContent = 'Auto';
     badge.className = 'calc-badge';
     hint.textContent = result.note;
     container._sourceNotes.title = (STATE_NAMES[stateCode]||stateCode) + ' Title Insurance — source: ' + data.titleSource + ' Verified as of ' + data.titleAsOf + '.';
   } else {
-    ownerInput.disabled = false;
     loanInput.disabled = false;
     const owner = numVal(container,'t_titleOwner');
     const loan = numVal(container,'t_titleLoan');
     // Only resync Total from Owner+Loan when one of THOSE was just edited —
     // if the user is typing directly into Total itself, leave it alone.
     if (container.dataset.titleActiveFld !== 't_title'){
-      totalInput.value = (owner + loan).toFixed(2);
+      totalInput.value = (anyRefi ? loan : owner + loan).toFixed(2);
     }
+    // Owner's field stays editable for Purchase; forced blank/disabled on refi.
+    ownerInput.disabled = anyRefi;
+    if (anyRefi) ownerInput.value = '';
     badge.textContent = 'Manual';
     badge.className = 'manual-badge';
     hint.textContent = '';
@@ -3918,9 +4034,22 @@ function applyTitleInsurance(container, price, loanAmt){
       ? (STATE_NAMES[stateCode]||stateCode) + ' Title Insurance — auto-calculate is off, so Owner\'s/Loan Policy Premiums were entered manually.'
       : 'Title Insurance is not rate-regulated in ' + (STATE_NAMES[stateCode]||stateCode) + ' (a competitive market — no single correct premium exists) — enter Owner\'s/Loan Policy Premiums from the title company\'s calculator (e.g. MadisonTitle.com) manually.';
   }
+
+  // Owner's Policy row greyout + "Inapplicable on Refi" note (both refi kinds).
+  if (ownerRow) ownerRow.style.opacity = anyRefi ? '0.5' : '';
+  ownerInput.style.opacity = anyRefi ? '0.5' : '';
+  if (refiNoteEl){
+    refiNoteEl.textContent = anyRefi ? 'Inapplicable on Refi' : '';
+    refiNoteEl.style.display = anyRefi ? '' : 'none';
+  }
 }
 
-function applyGovernmentFees(container, price, loanAmt){
+// mrtBasisAmt (optional 4th param, defaults to loanAmt) is the amount the
+// MORTGAGE/RECORDATION tax line is computed on — CEMA feeds it max(0, loanAmt −
+// unpaid principal) so NY MRT applies to new money only (decision #3). Every
+// other tax line (mansion/transfer) still uses price/loanAmt as before.
+function applyGovernmentFees(container, price, loanAmt, mrtBasisAmt){
+  if (mrtBasisAmt === undefined) mrtBasisAmt = loanAmt;
   const stateCode = E(container,'state').value;
   const countyName = E(container,'county').value;
   const data = STATE_DATA[stateCode];
@@ -3942,6 +4071,10 @@ function applyGovernmentFees(container, price, loanAmt){
   container._sourceNotes.govFees = (STATE_NAMES[stateCode]||stateCode) + ' mortgage/mansion/transfer tax — source: ' + data.source + ' Verified as of ' + data.asOf + '.';
   const jul21 = !!container._useJul21Rates;
   const countyInfo = Object.assign({}, (data.counties && data.counties[countyName]) ? data.counties[countyName] : {});
+  // Thread refi status through the cloned countyInfo (same pattern as
+  // mdPropertyType below) so state mortgageTax fns can branch on it — used by
+  // DC to withhold the purchase-money deed-of-trust exemption on a refi (#8).
+  countyInfo.isRefi = isAnyRefi(container);
 
   // FL Miami-Dade property-type selector (07/21 Updated Rates only) — see
   // Pending_Solve_0.14.md FIX #5. The row/select is injected by
@@ -3952,7 +4085,7 @@ function applyGovernmentFees(container, price, loanAmt){
   }
 
   const results = {
-    mortgagetax: data.mortgageTax ? data.mortgageTax(loanAmt, countyInfo, price, jul21) : noTax(''),
+    mortgagetax: data.mortgageTax ? data.mortgageTax(mrtBasisAmt, countyInfo, price, jul21) : noTax(''),
     mansiontax: data.mansionTax ? data.mansionTax(price, countyInfo, jul21) : noTax(''),
     transfertax: data.transferTax ? data.transferTax(price, countyInfo, jul21) : noTax('')
   };
@@ -4376,7 +4509,11 @@ function renderDataSourcesNote(container){
 
 function onPriceChange(container){
   const price = numVal(container,'price') || 0;
-  E(container,'chk_show_mansiontax').checked = price >= 1000000;
+  // Mansion tax doesn't apply to a refinance (no conveyance) — never auto-tick
+  // Show Mansion Tax for a refi block, even at a ≥$1M loan amount (decision #4).
+  if (!isAnyRefi(container)){
+    E(container,'chk_show_mansiontax').checked = price >= 1000000;
+  }
   calc(container);
 }
 
@@ -4555,9 +4692,28 @@ function submitCustomField(permanent){
   calc(container);
 }
 
+// ===========================================================================
+// REFINANCE / CEMA loan-type helpers (decisions #1–#8). Centralized here so
+// all refi-specific branching reads from one place (MYTURN rule 19). NEVER use
+// a bare .includes('refinance') anywhere — the two refi kinds must be told
+// apart. A bare legacy "Refinance" (old saved records) aliases to Payoff.
+function refiKind(container){
+  const t = (container.dataset.loanType || '').trim().toLowerCase();
+  if (t === 'refinance with payoff' || t === 'refinance') return 'payoff';
+  if (t === 'refinance with consolidation') return 'consolidation';
+  return null;
+}
+function isAnyRefi(container){ return refiKind(container) !== null; }
+function isRefiPayoff(container){ return refiKind(container) === 'payoff'; }
+function isConsolidation(container){ return refiKind(container) === 'consolidation'; }
+// Shared, page-level Property Type (Deal Setup) — read by the co-op CEMA gate.
+function dealPropertyType(){ const el = document.getElementById('propertyType'); return el ? el.value : ''; }
+
 function calc(container){
   const price = numVal(container,'price');
-  const isRefi = (container.dataset.loanType || '').trim().toLowerCase() === 'refinance';
+  const isRefi = isAnyRefi(container);
+  const consol = isConsolidation(container);
+  const propType = dealPropertyType();
   let mode = container.querySelector('input[type="radio"]:checked').value;
 
   let downAmt = numVal(container,'downAmt');
@@ -4576,6 +4732,43 @@ function calc(container){
   E(container,'row_dpModeRadios').style.display = isRefi ? 'none' : '';
   E(container,'row_downAmt').style.display = isRefi ? 'none' : '';
   E(container,'row_downPct').style.display = isRefi ? 'none' : '';
+
+  // Dynamic label on the loan-amount source field (same approach as
+  // updateLoanBlockTitle): Purchase → "Purchase Price"; Payoff → "Refinance
+  // Loan Amount"; Consolidation → "Mortgage Amount (new loan)". The field
+  // stays the loan-amount source for every refi (down payment forced 0 above).
+  const priceLabelEl = E(container,'priceLabel');
+  if (priceLabelEl){
+    priceLabelEl.textContent = consol ? 'Mortgage Amount (new loan)'
+      : (isRefi ? 'Refinance Loan Amount' : 'Purchase Price');
+  }
+
+  // Consolidation-only (CEMA) rows — gated exactly like row_dpModeGroup.
+  ['row_consol_header','row_consol_unpaid','row_consol_face','row_consol_payoffStmt',
+   'row_consol_origSrc','row_consol_sameBorrower','row_consol_sameLender',
+   'row_consol_month','row_consol_year'].forEach(fld => {
+    const el = E(container, fld);
+    if (el) el.style.display = consol ? '' : 'none';
+  });
+  E(container,'row_cemaFee').style.display = consol ? '' : 'none';
+  // Buyer's Attorney doesn't apply to a refinance (research: defaults $0) —
+  // hide the row for any refi. Value stays 0 so exports/totals are unaffected.
+  const buyersAttyRow = E(container,'f_buyersAttorney') ? E(container,'f_buyersAttorney').closest('.field-row') : null;
+  if (buyersAttyRow) buyersAttyRow.style.display = isRefi ? 'none' : '';
+
+  // Consolidation note: NY-only mechanism + co-op ineligibility warnings.
+  const consolNoteEl = E(container,'consolNote');
+  if (consolNoteEl){
+    const stateNow = E(container,'state').value;
+    let msg = '';
+    if (consol && propType === 'Co-op'){
+      msg = 'CEMA / Consolidation does not apply to co-ops (a co-op loan is personal property, not real property — there is no mortgage recording tax to reduce). Full-loan mortgage tax is being applied.';
+    } else if (consol && stateNow !== 'NY'){
+      msg = 'CEMA is a New York-only mechanism — full-loan mortgage tax applied (no new-money reduction).';
+    }
+    consolNoteEl.textContent = msg;
+    consolNoteEl.style.display = (consol && msg) ? '' : 'none';
+  }
 
   if (mode === 'amount'){
     downPct = price ? (downAmt/price*100) : 0;
@@ -4616,6 +4809,10 @@ function calc(container){
     E(container,'badge_ufmip').className = 'manual-badge';
     E(container,'ufmipHint').textContent = '(n/a for ' + program + ' — see PMI in Monthly Payment)';
   } else if (mipAuto){
+    // UNCONFIRMED for refi — the flat 1.75% UFMIP is the FHA purchase/full
+    // refinance factor; VA IRRRL, USDA-streamline, and FHA-streamline refis can
+    // carry different (often lower) upfront fees. Kept as-is (Purchase) as a
+    // stopgap — see title_gov_fees_refi_research.md / loan_basics_refi_research.md.
     ufmip = loanAmt * 0.0175;
     E(container,'ufmip').value = ufmip.toFixed(2);
     E(container,'ufmip').disabled = true;
@@ -4674,16 +4871,35 @@ function calc(container){
   g2 += customFieldGroupSum_(container, 'g2', 'own');
   E(container,'g2total').textContent = 'Total: ' + fmt(g2);
 
-  // 3rd-Party Fees
-  let g2b = ['f_attorney','f_buyersAttorney','f_appraisal','f_coopCondoFee']
+  // 3rd-Party Fees (f_cemaFee is $0 and its row is hidden unless Consolidation,
+  // so it's a harmless no-op for every other loan type)
+  let g2b = ['f_attorney','f_buyersAttorney','f_appraisal','f_coopCondoFee','f_cemaFee']
     .reduce((s,id)=> s + numVal(container,id), 0);
   g2b += customFieldGroupSum_(container, 'g2b', 'own');
   E(container,'g2bTotal').textContent = 'Total: ' + fmt(g2b);
 
+  // Mansion tax & transfer tax are conveyance taxes — no sale happens on a
+  // refinance, so both are hidden by default for BOTH refi kinds (decision #4).
+  // The chk_show_* checkboxes remain as a manual override (never auto-forced
+  // off here — if the user deliberately ticks one, respect it).
+  if (isRefi){
+    E(container,'chk_show_mansiontax').closest('.field-row').style.display = '';
+    E(container,'chk_show_transfertax').closest('.field-row').style.display = '';
+  }
+
+  // CEMA new-money mortgage tax (decision #3): NY Consolidation on real
+  // property taxes MRT only on new money = max(0, mortgage − unpaid principal).
+  // Non-NY consolidation, co-ops, and every non-consolidation loan use the full
+  // loan amount (mrtBasis = loanAmt). See applyGovernmentFees's 4th param.
+  const stateNow = E(container,'state').value;
+  const mrtBasis = (consol && stateNow === 'NY' && propType !== 'Co-op')
+    ? Math.max(0, loanAmt - numVal(container,'unpaidPrincipal'))
+    : loanAmt;
+
   // Title Insurance auto-calc, then government fee auto-calc (Mortgage/Mansion/Transfer tax)
   syncJul21RatesUI(container);
   applyTitleInsurance(container, price, loanAmt);
-  applyGovernmentFees(container, price, loanAmt);
+  applyGovernmentFees(container, price, loanAmt, mrtBasis);
   const showMansion = E(container,'chk_show_mansiontax').checked;
   const showTransfer = E(container,'chk_show_transfertax').checked;
   let g3 = numVal(container,'t_title')
@@ -4872,8 +5088,25 @@ function calc(container){
       buyersAttorney: numVal(container,'f_buyersAttorney'),
       appraisal: numVal(container,'f_appraisal'),
       coopCondoFee: numVal(container,'f_coopCondoFee'),
+      cemaFee: numVal(container,'f_cemaFee'),
       g2bTotal: g2b
     },
+    // Refi/CEMA export context — lets export builders emit the CEMA fee line
+    // and Consolidation reference fields only when relevant.
+    isConsolidation: consol,
+    isRefi,
+    propertyType: propType,
+    consolidation: consol ? {
+      unpaidPrincipal: numVal(container,'unpaidPrincipal'),
+      faceAmt: numVal(container,'faceAmt'),
+      payoffStmtAmt: numVal(container,'payoffStmtAmt'),
+      origBalSource: (container.querySelector('input[name^="origBalSrc"]:checked') || {}).value || 'hiCredit',
+      sameBorrower: E(container,'chk_sameBorrower') ? E(container,'chk_sameBorrower').checked : false,
+      sameLender: E(container,'chk_sameLender') ? E(container,'chk_sameLender').checked : false,
+      curMortMonth: E(container,'curMortMonth') ? E(container,'curMortMonth').value : '',
+      curMortYear: E(container,'curMortYear') ? E(container,'curMortYear').value : '',
+      newMoney: mrtBasis
+    } : null,
     title: {
       title: numVal(container,'t_title'),
       recording: numVal(container,'t_recording'),
@@ -5048,6 +5281,7 @@ function renderPdfLoanPage(doc, d, navy, gold, slate, pageW, logoDataUrl){
   row("Buyer's Attorney", fmt(+d.fees3rdParty.buyersAttorney));
   row('Appraisal', fmt(+d.fees3rdParty.appraisal));
   row('Co-Op Condo Fee', fmt(+d.fees3rdParty.coopCondoFee));
+  if (d.isConsolidation) row('CEMA / Assignment / Processing Fee', fmt(+d.fees3rdParty.cemaFee));
   row('Total', fmt(d.fees3rdParty.g2bTotal), {bold:true, rule:true});
   leftY = curY;
 
@@ -5311,6 +5545,10 @@ async function buildXlsxEstimateData_(container, dpMode, mathTabName, colOffset)
   R.buyersAttorney = push("Buyer's Attorney", +d.fees3rdParty.buyersAttorney);
   R.appraisal = push('Appraisal', +d.fees3rdParty.appraisal);
   R.coopCondoFee = push('Co-Op Condo Fee', +d.fees3rdParty.coopCondoFee);
+  // CEMA fee row is ALWAYS pushed (value 0 for non-Consolidation) so the shared
+  // two-estimate front sheet stays row-aligned; the front-tab fref below is
+  // hideIfZero, so it renders fully blank unless there's a real CEMA fee.
+  R.cemaFee = push('CEMA / Assignment / Processing Fee', +d.fees3rdParty.cemaFee);
   R.g2bTotal = push('3rd-Party Fees Total', d.fees3rdParty.g2bTotal);
   blank();
 
@@ -5579,7 +5817,7 @@ async function buildXlsxEstimateData_(container, dpMode, mathTabName, colOffset)
   F[R.feePoints] = 'B' + R.loanAmt + '*B' + R.pointsPct;
 
   F[R.g2total] = 'SUM(B' + R.application + ':B' + R.feePoints + ')';
-  F[R.g2bTotal] = 'SUM(B' + R.attorney + ':B' + R.coopCondoFee + ')';
+  F[R.g2bTotal] = 'SUM(B' + R.attorney + ':B' + R.cemaFee + ')';
   F[R.g3total] = 'SUM(B' + R.recording + ':B' + R.transferTax + ')';
 
   F[R.perdiem] = 'B' + R.loanAmt + '*B' + R.rate + '/365*B' + R.perdiemDays;
@@ -5739,6 +5977,9 @@ async function buildXlsxEstimateData_(container, dpMode, mathTabName, colOffset)
   fsection('3RD-PARTY FEES');
   fref('Bank Attorney', R.attorney); fref("Buyer's Attorney", R.buyersAttorney);
   fref('Appraisal', R.appraisal); fref('Co-Op Condo Fee', R.coopCondoFee);
+  // Always fref'd (hideIfZero) so the two-estimate front sheet stays aligned —
+  // renders as a fully blank row unless there's a real CEMA fee.
+  fref('CEMA / Assignment / Processing Fee', R.cemaFee);
   fref('Total', R.g2bTotal, { alwaysShow:true, bold:true });
   fblank();
 
@@ -5992,7 +6233,7 @@ function buildDocxLoanSection(d){
     ["Buyer's Attorney", fmt(+d.fees3rdParty.buyersAttorney)],
     ['Appraisal', fmt(+d.fees3rdParty.appraisal)],
     ['Co-Op Condo Fee', fmt(+d.fees3rdParty.coopCondoFee)]
-  ], 'Total', fmt(d.fees3rdParty.g2bTotal));
+  ].concat(d.isConsolidation ? [['CEMA / Assignment / Processing Fee', fmt(+d.fees3rdParty.cemaFee)]] : []), 'Total', fmt(d.fees3rdParty.g2bTotal));
 
   body += docxGroupSection('Title & Government Fees', [
     ['Title Insurance', fmt(+d.title.title)],
@@ -6133,7 +6374,8 @@ function initLoanBlock(container){
   container._sourceNotes = { govFees:'', title:'' };
   container._useJul21Rates = false;
   seedBlockDealInfo(container);
-  E(container,'chk_show_mansiontax').checked = (parseFloat(E(container,'price').value) || 0) >= 1000000;
+  // Don't auto-tick Show Mansion Tax for a refi block (decision #4).
+  E(container,'chk_show_mansiontax').checked = !isAnyRefi(container) && (parseFloat(E(container,'price').value) || 0) >= 1000000;
   calc(container);
 }
 
@@ -6166,8 +6408,12 @@ function extractFieldValues(container){
     if (tag !== 'INPUT' && tag !== 'SELECT' && tag !== 'TEXTAREA') return;
     values[el.dataset.fld] = el.type === 'checkbox' ? el.checked : el.value;
   });
-  const checkedRadio = container.querySelector('input[type="radio"]:checked');
+  const checkedRadio = container.querySelector('input[name^="dpMode"]:checked');
   if (checkedRadio) values.__dpMode = checkedRadio.value;
+  // Consolidation original-balance source toggle (no data-fld — captured by
+  // name like __dpMode, since two radios sharing a data-fld would collide).
+  const obsRadio = container.querySelector('input[name^="origBalSrc"]:checked');
+  if (obsRadio) values.__origBalSrc = obsRadio.value;
   return values;
 }
 
@@ -6184,7 +6430,7 @@ function applyFieldValues(dest, values){
   }
 
   Object.keys(values).forEach(fld => {
-    if (fld === 'state' || fld === '__dpMode') return;
+    if (fld === 'state' || fld === '__dpMode' || fld === '__origBalSrc') return;
     const destEl = E(dest, fld);
     if (!destEl) return;
     const tag = destEl.tagName;
@@ -6194,7 +6440,10 @@ function applyFieldValues(dest, values){
   });
 
   if (values.__dpMode){
-    dest.querySelectorAll('input[type="radio"]').forEach(r => { r.checked = (r.value === values.__dpMode); });
+    dest.querySelectorAll('input[name^="dpMode"]').forEach(r => { r.checked = (r.value === values.__dpMode); });
+  }
+  if (values.__origBalSrc){
+    dest.querySelectorAll('input[name^="origBalSrc"]').forEach(r => { r.checked = (r.value === values.__origBalSrc); });
   }
 
   calc(dest);
@@ -6239,6 +6488,9 @@ function createLoanBlock(loanType, skipDuplicate, targetContainerId){
   // container), so without this, selecting a Down Payment mode in one block
   // would uncheck the equivalent radio in every other block.
   insertedRoot.querySelectorAll('input[name="dpMode"]').forEach(r => { r.name = 'dpMode_' + id; });
+  // Same doc-scoped radio-name problem for the Consolidation original-balance
+  // source toggle — give it a per-block name so blocks don't cross-uncheck.
+  insertedRoot.querySelectorAll('input[name="origBalSrc"]').forEach(r => { r.name = 'origBalSrc_' + id; });
   initLoanBlock(insertedRoot);
 
   // New estimates start as an editable duplicate of the last-added block
@@ -6586,6 +6838,7 @@ function serializeCurrentPage(){
       borrowerName: document.getElementById('borrowerName').value,
       borrowerFirstName: document.getElementById('borrowerFirstName').value,
       borrowerLastName: document.getElementById('borrowerLastName').value,
+      propertyType: document.getElementById('propertyType').value,
     },
     loanBlocks: getAllLoanBlocks().map(b => ({
       loanType: b.dataset.loanType || 'Loan',
@@ -6606,6 +6859,8 @@ function loadPageFromData(data){
   document.getElementById('borrowerName').value = (data.dealSetup && data.dealSetup.borrowerName) || '';
   document.getElementById('borrowerFirstName').value = (data.dealSetup && data.dealSetup.borrowerFirstName) || '';
   document.getElementById('borrowerLastName').value = (data.dealSetup && data.dealSetup.borrowerLastName) || '';
+  // Older saved records predate the Property Type field — default to Single Family.
+  document.getElementById('propertyType').value = (data.dealSetup && data.dealSetup.propertyType) || 'Single Family';
 
   document.getElementById('loanBlocksContainer').innerHTML = '';
   (data.loanBlocks || []).forEach(b => {
@@ -6673,6 +6928,7 @@ function clearCurrentPage(){
   document.getElementById('borrowerName').value = '';
   document.getElementById('borrowerFirstName').value = '';
   document.getElementById('borrowerLastName').value = '';
+  document.getElementById('propertyType').value = 'Single Family';
   document.getElementById('loanBlocksContainer').innerHTML = '';
   document.getElementById('sharedPropertyAddress').value = '';
   document.getElementById('sharedAddressDetectNote').textContent = '';
@@ -7935,6 +8191,17 @@ async function loadPmiTableGlobal_(){
     if (table) _pmiTable = table;
   } catch (err) { /* stays manual */ }
 }
+
+// Populate the Consolidation "Year of Current Mortgage" datalist with the last
+// ~40 years (current year down to ~1986) as free-typeable suggestions.
+(function populateCurMortYearList_(){
+  const dl = document.getElementById('cmYearList');
+  if (!dl) return;
+  const now = new Date().getFullYear();
+  let html = '';
+  for (let y = now; y >= now - 40; y--) html += '<option value="' + y + '"></option>';
+  dl.innerHTML = html;
+})();
 
 populateDateBar();
 initSharedDealInfo();
