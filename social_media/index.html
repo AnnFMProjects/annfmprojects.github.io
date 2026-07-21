@@ -5,6 +5,7 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="../assets/api.js"></script>
 <script src="../assets/broadcast.js"></script>
+<script src="../assets/legal.js"></script>
 <link rel="stylesheet" href="../assets/style.css">
 <style>
   :root{
@@ -189,6 +190,7 @@
     <div id="loginGateForm" style="background:#fff; border:1px solid var(--line); border-radius:10px; max-width:400px; width:100%; padding:28px; font-family:Calibri, Arial, sans-serif; box-shadow:0 6px 24px rgba(16,27,51,0.12);">
       <h3 style="margin-top:0; color:var(--navy);">Social Media Tool</h3>
       <div style="font-size:10px; color:#8A6A1F; background:rgba(201,162,75,0.16); border:1px solid rgba(201,162,75,0.45); padding:5px 9px; border-radius:4px; margin-bottom:14px;">Internal tool for FM Home Loans. Not a public FM Home Loans website or login.</div>
+      <div style="text-align:center; font-size:10.5px; color:var(--slate); margin-bottom:12px;">By continuing, you agree to our <a href="#" onclick="openLegalModal('tos'); return false;">Terms of Service</a> and <a href="#" onclick="openLegalModal('privacy'); return false;">Privacy Policy</a>.</div>
       <div class="field-row" style="align-items:flex-start; flex-direction:column; gap:4px;">
         <label>Email</label>
         <input type="email" id="loginEmail" style="width:100%; box-sizing:border-box; text-align:left;" autocomplete="username">
@@ -207,6 +209,37 @@
       </div>
     </div>
   </div>
+
+  <!-- TERMS OF SERVICE / PRIVACY POLICY MODALS (shared content, fetched from
+       /legal/ via assets/legal.js — same source every tool in the suite uses) -->
+  <div id="legalTosOverlay" class="sm-modal-overlay" style="z-index:3100;">
+    <div class="sm-modal" style="max-width:640px;">
+      <h3>Terms of Service</h3>
+      <div id="legalTosBody" style="font-size:13px; color:var(--slate); line-height:1.55;"></div>
+      <button class="export-btn" style="margin-top:16px;" onclick="closeLegalModal('tos')">Close</button>
+    </div>
+  </div>
+  <div id="legalPrivacyOverlay" class="sm-modal-overlay" style="z-index:3100;">
+    <div class="sm-modal" style="max-width:640px;">
+      <h3>Privacy Policy</h3>
+      <div id="legalPrivacyBody" style="font-size:13px; color:var(--slate); line-height:1.55;"></div>
+      <button class="export-btn" style="margin-top:16px;" onclick="closeLegalModal('privacy')">Close</button>
+    </div>
+  </div>
+  <script>
+  const LEGAL_DOCS_ = {
+    tos: ['../legal/terms-of-service.md', 'legalTosOverlay', 'legalTosBody'],
+    privacy: ['../legal/privacy-policy.md', 'legalPrivacyOverlay', 'legalPrivacyBody']
+  };
+  function openLegalModal(kind){
+    const d = LEGAL_DOCS_[kind];
+    if (d) FM_LEGAL.show(d[0], d[1], d[2]);
+  }
+  function closeLegalModal(kind){
+    const d = LEGAL_DOCS_[kind];
+    if (d) document.getElementById(d[1]).classList.remove('open');
+  }
+  </script>
   <script>
   (function(){
     try {
