@@ -200,7 +200,7 @@
   </div>
 
   <!-- LOGIN MODAL -->
-  <div id="hubLoginModalOverlay" class="hub-modal-overlay">
+  <div id="hubLoginModalOverlay" class="hub-modal-overlay" onclick="if(event.target===this) closeHubLoginModal();">
     <div class="hub-modal" style="max-width:400px;">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <h3>Log In</h3>
@@ -224,7 +224,7 @@
   </div>
 
   <!-- REQUEST LOGIN MODAL -->
-  <div id="hubRequestLoginModalOverlay" class="hub-modal-overlay" style="z-index:2001;">
+  <div id="hubRequestLoginModalOverlay" class="hub-modal-overlay" style="z-index:2001;" onclick="if(event.target===this) closeHubRequestLoginModal();">
     <div class="hub-modal" style="max-width:420px;">
       <h3>Request Login</h3>
       <p style="font-size:12.5px; color:var(--slate); line-height:1.5;">Choose your name, email, and a password. This sends a request for approval — you won't be able to log in until it's approved. (Same account works across all FM Home Loans tools.)</p>
@@ -242,7 +242,7 @@
   </div>
 
   <!-- NEW APP WIZARD -->
-  <div id="appWizardModalOverlay" class="hub-modal-overlay">
+  <div id="appWizardModalOverlay" class="hub-modal-overlay" onclick="if(event.target===this) closeAppWizard();">
     <div class="hub-modal" style="max-width:560px;">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <h3>Request an App</h3>

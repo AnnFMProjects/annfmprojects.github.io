@@ -193,14 +193,14 @@
 
   <!-- TERMS OF SERVICE / PRIVACY POLICY MODALS (shared content, fetched from
        /legal/ via assets/legal.js — same source every tool in the suite uses) -->
-  <div id="legalTosOverlay" class="gt-modal-overlay" style="z-index:3100;">
+  <div id="legalTosOverlay" class="gt-modal-overlay" style="z-index:3100;" onclick="if(event.target===this) closeLegalModal('tos');">
     <div class="gt-modal" style="max-width:640px;">
       <h3>Terms of Service</h3>
       <div id="legalTosBody" style="font-size:13px; color:var(--slate); line-height:1.55;"></div>
       <button class="export-btn" style="margin-top:16px;" onclick="closeLegalModal('tos')">Close</button>
     </div>
   </div>
-  <div id="legalPrivacyOverlay" class="gt-modal-overlay" style="z-index:3100;">
+  <div id="legalPrivacyOverlay" class="gt-modal-overlay" style="z-index:3100;" onclick="if(event.target===this) closeLegalModal('privacy');">
     <div class="gt-modal" style="max-width:640px;">
       <h3>Privacy Policy</h3>
       <div id="legalPrivacyBody" style="font-size:13px; color:var(--slate); line-height:1.55;"></div>
@@ -233,7 +233,7 @@
   </script>
 
   <!-- REQUEST LOGIN MODAL -->
-  <div id="requestLoginModalOverlay" class="gt-modal-overlay" style="z-index:3001;">
+  <div id="requestLoginModalOverlay" class="gt-modal-overlay" style="z-index:3001;" onclick="if(event.target===this) closeRequestLoginModal();">
     <div class="gt-modal" style="max-width:420px;">
       <h3 style="margin-top:0; color:var(--navy);">Request Login</h3>
       <p style="font-size:12.5px; color:var(--slate); line-height:1.5;">Choose your name, email, and a password. This sends a request for approval — you won't be able to log in until it's approved. (Same account works across all FM Home Loans internal tools.)</p>
@@ -351,7 +351,7 @@
        free copy-prompt/open-claude.ai/paste-reply bridge (no API key, no
        server call) — same mechanism as before, now feeding into the shared
        review list instead of applying directly. -->
-  <div id="tafModalOverlay" class="gt-modal-overlay">
+  <div id="tafModalOverlay" class="gt-modal-overlay" onclick="if(event.target===this) tafClose();">
     <div class="gt-modal" style="max-width:560px;">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <h3 style="margin:0; color:var(--navy);">Talk and Fill</h3>
@@ -389,7 +389,7 @@
   </div>
 
   <!-- SAVED WEEKS MODAL -->
-  <div id="savedModalOverlay" class="gt-modal-overlay">
+  <div id="savedModalOverlay" class="gt-modal-overlay" onclick="if(event.target===this) closeSavedModal();">
     <div class="gt-modal">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <h3 style="margin:0; color:var(--navy);">Saved Weeks</h3>
@@ -400,7 +400,7 @@
   </div>
 
   <!-- IMPORT JSON MODAL -->
-  <div id="importJsonModalOverlay" class="gt-modal-overlay">
+  <div id="importJsonModalOverlay" class="gt-modal-overlay" onclick="if(event.target===this) closeImportJsonModal();">
     <div class="gt-modal" style="max-width:520px;">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <h3 style="margin:0; color:var(--navy);">Import JSON</h3>
@@ -422,7 +422,7 @@
   </div>
 
   <!-- QUICK LOG MODAL (the "+" next to Logged Activity History) -->
-  <div id="quickLogModalOverlay" class="gt-modal-overlay">
+  <div id="quickLogModalOverlay" class="gt-modal-overlay" onclick="if(event.target===this) closeQuickLogModal();">
     <div class="gt-modal" style="max-width:420px;">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <h3 style="margin:0; color:var(--navy);">Quick Log</h3>
@@ -438,7 +438,7 @@
   </div>
 
   <!-- WEEK ROLLOVER MODAL -->
-  <div id="rolloverModalOverlay" class="gt-modal-overlay">
+  <div id="rolloverModalOverlay" class="gt-modal-overlay" onclick="if(event.target===this) closeWeekRolloverPrompt();">
     <div class="gt-modal" style="max-width:420px;">
       <h3 style="margin-top:0; color:var(--navy);">New week started</h3>
       <p style="font-size:12.5px; color:var(--slate); line-height:1.5;">Week of <span id="rolloverWeekLabel"></span> looked complete, so it was auto-saved and a fresh week has started. Want to export the finished week now?</p>

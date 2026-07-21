@@ -212,14 +212,14 @@
 
   <!-- TERMS OF SERVICE / PRIVACY POLICY MODALS (shared content, fetched from
        /legal/ via assets/legal.js — same source every tool in the suite uses) -->
-  <div id="legalTosOverlay" class="sm-modal-overlay" style="z-index:3100;">
+  <div id="legalTosOverlay" class="sm-modal-overlay" style="z-index:3100;" onclick="if(event.target===this) closeLegalModal('tos');">
     <div class="sm-modal" style="max-width:640px;">
       <h3>Terms of Service</h3>
       <div id="legalTosBody" style="font-size:13px; color:var(--slate); line-height:1.55;"></div>
       <button class="export-btn" style="margin-top:16px;" onclick="closeLegalModal('tos')">Close</button>
     </div>
   </div>
-  <div id="legalPrivacyOverlay" class="sm-modal-overlay" style="z-index:3100;">
+  <div id="legalPrivacyOverlay" class="sm-modal-overlay" style="z-index:3100;" onclick="if(event.target===this) closeLegalModal('privacy');">
     <div class="sm-modal" style="max-width:640px;">
       <h3>Privacy Policy</h3>
       <div id="legalPrivacyBody" style="font-size:13px; color:var(--slate); line-height:1.55;"></div>
@@ -252,7 +252,7 @@
   </script>
 
   <!-- REQUEST LOGIN MODAL -->
-  <div id="requestLoginModalOverlay" class="sm-modal-overlay" style="z-index:3001;">
+  <div id="requestLoginModalOverlay" class="sm-modal-overlay" style="z-index:3001;" onclick="if(event.target===this) closeRequestLoginModal();">
     <div class="sm-modal" style="max-width:420px;">
       <h3 style="margin-top:0; color:var(--navy);">Request Login</h3>
       <p style="font-size:12.5px; color:var(--slate); line-height:1.5;">Choose your name, email, and a password. This sends a request for approval — you won't be able to log in until it's approved. (Same account works across all FM Home Loans internal tools.)</p>
@@ -414,7 +414,7 @@
   </div>
 
   <!-- SAVED RECORDS MODAL -->
-  <div id="savedRecordsModalOverlay" class="sm-modal-overlay">
+  <div id="savedRecordsModalOverlay" class="sm-modal-overlay" onclick="if(event.target===this) closeSavedModal();">
     <div class="sm-modal">
       <h3 style="margin-top:0; color:var(--navy);">Saved Records</h3>
       <div id="savedRecordsList"></div>
