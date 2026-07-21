@@ -1681,6 +1681,8 @@
       <div class="footer-note">
         MIP/MI rule (FHA): Upfront MIP = 1.75% of base loan amount, financed into total loan.
         Monthly MI = 0.55%/12 of base loan amount when LTV &gt; 90%, or 0.50%/12 when LTV ≤ 90%.
+        USDA: 1% upfront guarantee fee (not UFMIP), financed into total loan.
+        VA: VA Funding Fee (not UFMIP) — 0.5% flat for IRRRL/streamline refis; 2.15%/3.3% (first-/subsequent-use) for cash-out/standard refis and &lt;5%-down purchases; 1.5% (5%-&lt;10% down) or 1.25% (≥10% down) for purchases, financed into total loan. Disabled-veteran/exempt status is not modeled — verify manually.
         Title Insurance auto-calculates in states with a single promulgated/regulated rate (currently NY, FL, TX) — everywhere else is a competitive market with no single correct number, so it stays manual.
         Mortgage/Mansion/Transfer tax auto-calculate from the State/County selected above for verified states (uncheck "Auto-calculate" to override for special cases like co-ops, CEMAs, or contract-shifted taxes).
       </div>
@@ -1869,19 +1871,27 @@ function closeLegalModal(kind){
             <input type="text" inputmode="decimal" data-fld="loanAmt" value="0" oninput="onEdit(this.closest('.loan-block'), 'loan')">
           </div>
 
-          <!-- REFINANCE WITH CONSOLIDATION (NY CEMA) — fields shown only when
-               isConsolidation(container) is true (gated in calc(), same pattern
-               as row_dpModeGroup). Placed AFTER the down-payment rows so the
-               dpMode radio group stays first-in-DOM (extractFieldValues reads
-               the first checked radio for __dpMode); the origBalSrc radios below
-               are captured separately by name. Only "Unpaid Principal Balance"
-               feeds the MRT math (newMoney = Mortgage Amount − Unpaid Principal);
-               everything else here is display/export/eligibility reference. -->
+          <!-- REFINANCE WITH CONSOLIDATION (NY CEMA) — most of these fields
+               (all but row_consol_unpaid) are shown only when
+               isConsolidation(container) is true (gated in calc(), same
+               pattern as row_dpModeGroup). Placed AFTER the down-payment rows
+               so the dpMode radio group stays first-in-DOM (extractFieldValues
+               reads the first checked radio for __dpMode); the origBalSrc
+               radios below are captured separately by name. Only "Unpaid
+               Principal Balance" feeds the MRT math (newMoney = Mortgage
+               Amount − Unpaid Principal); everything else here is
+               display/export/eligibility reference.
+               row_consol_unpaid ALSO shows for any MD/MN refi (Payoff or
+               Consolidation) — see mdMnRefi in calc() — because MD/MN have
+               their own "new money" refi mortgage/recordation-tax exemption
+               (Md. Code Tax-Property §12-108(g); MN DOR MRT guidance), a
+               separate state-law mechanism that happens to work the same way
+               as NY's CEMA, not a NY-specific one. -->
           <div data-fld="row_consol_header" style="display:none; margin:10px 0 4px 0; font-size:12px; font-weight:700; color:var(--slate); border-top:1px solid var(--line); padding-top:8px;">
             Consolidation (CEMA) details — New York only
           </div>
           <div class="field-row" data-fld="row_consol_unpaid" style="display:none;">
-            <label>Unpaid Principal Balance <span class="manual-badge">Manual</span> <span class="hint">Current payoff balance on the existing mortgage — this is what drives the CEMA new-money mortgage tax</span></label>
+            <label>Unpaid Principal Balance <span class="manual-badge">Manual</span> <span class="hint">Current payoff balance on the existing mortgage — drives the "new money" mortgage/recordation tax basis (NY CEMA, and MD/MN refis under Md. Code Tax-Property §12-108(g) / MN DOR MRT guidance)</span></label>
             <input type="text" inputmode="decimal" data-fld="unpaidPrincipal" value="0" oninput="calc(this.closest('.loan-block'))">
           </div>
           <div class="field-row" data-fld="row_consol_face" style="display:none;">
@@ -1921,8 +1931,19 @@ function closeLegalModal(kind){
             <label>Rate (%) <span class="manual-badge">Manual</span></label>
             <input type="number" step="0.001" data-fld="rate" value="0" oninput="calc(this.closest('.loan-block'))">
           </div>
+          <!-- VA Funding Fee options — VA is architecturally separate from
+               FHA/USDA's UFMIP (see the VA math comment in calc()), so it
+               needs its own inputs to pick the right rate off the VA table.
+               Both rows are hidden for every non-VA program; row_va_irrrl is
+               ALSO hidden for VA Purchase (IRRRL only exists for refis). -->
+          <div class="field-row" data-fld="row_va_firstuse" style="display:none; justify-content:flex-start; gap:6px;">
+            <label class="radio-opt" style="font-size:12px; font-weight:700; color:var(--navy);"><input type="checkbox" data-fld="chk_vaFirstUse" checked onchange="calc(this.closest('.loan-block'))"> First Use of VA Loan Entitlement <span class="hint">Unchecked = subsequent use — changes the VA Funding Fee rate below</span></label>
+          </div>
+          <div class="field-row" data-fld="row_va_irrrl" style="display:none; justify-content:flex-start; gap:6px;">
+            <label class="radio-opt" style="font-size:12px; font-weight:700; color:var(--navy);"><input type="checkbox" data-fld="chk_vaIrrrl" onchange="calc(this.closest('.loan-block'))"> IRRRL / Streamline Refinance <span class="hint">Flat 0.5% VA Funding Fee instead of the standard purchase/cash-out-refi table</span></label>
+          </div>
           <div class="field-row" data-fld="row_ufmip">
-            <label>Upfront MIP <span class="calc-badge" data-fld="badge_ufmip">Auto</span> <span class="hint" data-fld="ufmipHint"></span></label>
+            <label><span data-fld="ufmipLabel">Upfront MIP</span> <span class="calc-badge" data-fld="badge_ufmip">Auto</span> <span class="hint" data-fld="ufmipHint"></span></label>
             <input type="text" inputmode="decimal" data-fld="ufmip" value="0" oninput="calc(this.closest('.loan-block'))">
           </div>
           <div class="field-row"><label>Total Loan Amount <span class="calc-badge">Auto</span></label><span class="summary-value" data-fld="out_totalLoan"></span></div>
@@ -3420,17 +3441,35 @@ const STATE_DATA = {
       return { amount: price*rate, note: 'MD STATE transfer tax only (' + (rate*100) + '%, customarily split 50/50 buyer/seller; 0.25% for first-time MD buyers, paid by seller). Does NOT include county transfer tax (0%-1.5%+, ~19 of 24 jurisdictions) — add manually for your county' };
     },
     mortgageTax(loanAmt, c, price, jul21){
-      // UNCONFIRMED for refi — see title_gov_fees_refi_research.md §5. This
-      // function's jul21 price-basis and the owner-occupied principal-residence
-      // county exemptions were verified for PURCHASE only; whether they carry to
-      // a refinance loan-amount basis is not confirmed. Kept as Purchase
-      // behavior as a stopgap (for a refi price==loanAmt here since down=0).
+      // REFI "new money" basis (confirmed, multiple sources — see
+      // md_mn_ufmip_refi_research.md): Md. Code, Tax-Property §12-108(g)
+      // exempts a refinance from recordation tax except to the extent the NEW
+      // loan exceeds the UNPAID PRINCIPAL BALANCE being paid off. The `loanAmt`
+      // param passed in here IS ALREADY that net new-money figure for a refi —
+      // see the mrtBasis calc in calc() — so every branch below that uses
+      // `loanAmt` already gets the correct refi basis with NO further change
+      // needed. The one exception is the jul21 Montgomery County tiered branch,
+      // which (for Purchase only) intentionally prices off `price` instead of
+      // `loanAmt` to reproduce Stewart Title's calculator exactly; for a refi
+      // `price` still holds the FULL new loan amount (not net), so that branch
+      // must explicitly fall back to `loanAmt` (net) via c.isRefi below.
+      // Purchase-path behavior (jul21 price-basis + owner-occupied exemption)
+      // is completely unchanged by this fix.
+      // OPEN QUESTION (unconfirmed, single source — Federal Title commentary):
+      // investment/non-owner-occupied MD refis might be taxed on the FULL loan
+      // amount instead of new-money, but the statute's plain text conditions
+      // the exemption only on "original mortgagor," not occupancy, and no
+      // second source confirmed the occupancy carve-out — NOT implemented as
+      // special-case logic here; flagging for a future look if it matters.
       if (c.tiered){
         // Montgomery County — tiered recordation tax, $/$500 converted to decimal rate per bracket
         const tiers = [{upTo:500000,rate:0.0089},{upTo:600000,rate:0.0135},{upTo:750000,rate:0.0204},{upTo:1000000,rate:0.02156},{upTo:Infinity,rate:0.0227}];
         if (jul21){
-          // Price basis + bottom-bracket credit — reproduces Stewart exactly. See Pending_Solve_0.14.md FIX #4.
-          const base = price || loanAmt;
+          // Price basis + bottom-bracket credit — reproduces Stewart exactly
+          // for PURCHASE (see Pending_Solve_0.14.md FIX #4). For a refi, use
+          // the already-netted new-money `loanAmt` param instead of `price`
+          // (which holds the full new loan amount, not net, on a refi).
+          const base = c.isRefi ? loanAmt : (price || loanAmt);
           let gross = 0, prev = 0;
           for (const t of tiers){
             if (base <= prev) break;
@@ -3440,7 +3479,8 @@ const STATE_DATA = {
           }
           const credit = (c.exemption || 0) * tiers[0].rate;
           const amount = Math.max(0, gross - credit);
-          return { amount, note: 'Montgomery Co. tiered recordation tax ($4.45/$500 up to $500K, rising to $11.35/$500 above $1M) on the purchase price, less the $' + c.exemption.toLocaleString() + ' owner-occupied principal-residence exemption ($' + credit.toLocaleString() + ' credit) — BORROWER-paid. Updated 7/21 rates (price basis). Assumes owner-occupied; remove exemption manually for investment property' };
+          const basisNote = c.isRefi ? ' on new money over the existing unpaid principal balance (Md. Code Tax-Property §12-108(g))' : ' on the purchase price';
+          return { amount, note: 'Montgomery Co. tiered recordation tax ($4.45/$500 up to $500K, rising to $11.35/$500 above $1M)' + basisNote + ', less the $' + c.exemption.toLocaleString() + ' owner-occupied principal-residence exemption ($' + credit.toLocaleString() + ' credit) — BORROWER-paid. Updated 7/21 rates. Assumes owner-occupied; remove exemption manually for investment property' };
         }
         const taxable = Math.max(0, loanAmt - (c.exemption||0));
         let amount = 0, prev = 0;
@@ -3450,7 +3490,8 @@ const STATE_DATA = {
           amount += (capHere - prev) * t.rate;
           prev = capHere;
         }
-        return { amount, note: 'Montgomery Co. tiered recordation tax ($4.45/$500 up to $500K, rising to $11.35/$500 above $1M) after the $' + c.exemption.toLocaleString() + ' owner-occupied principal-residence exemption — BORROWER-paid. Assumes owner-occupied; remove exemption manually for investment property' };
+        const basisNote2 = c.isRefi ? ' (already on new money over the existing unpaid principal balance per Md. Code Tax-Property §12-108(g))' : '';
+        return { amount, note: 'Montgomery Co. tiered recordation tax ($4.45/$500 up to $500K, rising to $11.35/$500 above $1M) after the $' + c.exemption.toLocaleString() + ' owner-occupied principal-residence exemption' + basisNote2 + ' — BORROWER-paid. Assumes owner-occupied; remove exemption manually for investment property' };
       }
       if (c.recRate == null){
         return { amount: 0, manualOnly:true, note: 'No rate on file for this county — MD recordation tax is set per jurisdiction (roughly 0.5%-1.4% of loan amount, plus a per-county owner-occupied exemption in some counties). Enter your county\'s actual rate manually.' };
@@ -3458,7 +3499,8 @@ const STATE_DATA = {
       const taxable = Math.max(0, loanAmt - (c.exemption||0));
       const amount = taxable * c.recRate;
       const exemptionNote = c.exemption ? (' after the $' + c.exemption.toLocaleString() + ' owner-occupied principal-residence exemption') : '';
-      return { amount, note: 'County recordation tax ' + (c.recRate*100).toFixed(2) + '% of loan amount' + exemptionNote + ' — BORROWER-paid. Source: Gordon Feinblatt LLC MD recordation/transfer tax summary, eff. 10/1/2025. Assumes owner-occupied where an exemption applies; remove manually for investment property.' };
+      const basisNote3 = c.isRefi ? ' (on new money over the existing unpaid principal balance per Md. Code Tax-Property §12-108(g))' : '';
+      return { amount, note: 'County recordation tax ' + (c.recRate*100).toFixed(2) + '% of loan amount' + basisNote3 + exemptionNote + ' — BORROWER-paid. Source: Gordon Feinblatt LLC MD recordation/transfer tax summary, eff. 10/1/2025. Assumes owner-occupied where an exemption applies; remove manually for investment property.' };
     },
     mansionTax(){ return noTax('Maryland has no mansion tax. Baltimore City has a "yield tax" surcharge (15% of recordation + 40% of city transfer tax) on transactions over $1M — verify manually if applicable'); }
   },
@@ -3506,11 +3548,24 @@ const STATE_DATA = {
       return { amount: Math.max(price*rate, 1.65), note: 'MN Deed Tax ' + (rate*100).toFixed(2) + '%' + (jul21 && c && c.ecrf ? ' (incl. Hennepin/Ramsey 0.01% ECRF surcharge, updated 7/21 rates)' : '') + ' (min $1.65) — SELLER-liable.' + (jul21 ? '' : ' Hennepin & Ramsey counties add an extra 0.01% Environmental Response Fund tax — verify if property is in one of those') };
     },
     mortgageTax(loanAmt, c, price, jul21){
-      // UNCONFIRMED for refi — see title_gov_fees_refi_research.md §5. Basis is
-      // loanAmt (correct for a refi), but the Hennepin/Ramsey ECRF surcharge's
-      // applicability to a refinance isn't confirmed. Kept as-is (Purchase).
+      // Both prior "UNCONFIRMED for refi" questions are now resolved (see
+      // md_mn_ufmip_refi_research.md):
+      // (1) ECRF applies identically to refi and purchase mortgages — Minn.
+      //     Stat. §383A.80 (Ramsey) / §383B.80 (Hennepin) tax "the same base"
+      //     as the state MRT under Ch. 287, no refi carve-out. Confirmed,
+      //     multiple sources (statute text + MN DOR guidance).
+      // (2) MRT (and therefore the ECRF add-on riding on the same base) is
+      //     ALSO "new money" only for a refi — MN DOR's own published example
+      //     nets a refinance against the existing unpaid principal balance,
+      //     same structural mechanism as MD's. The `loanAmt` param passed in
+      //     here IS ALREADY that net new-money figure for any MN refi (Payoff
+      //     or Consolidation) — see the mrtBasis calc in calc() — so no
+      //     further change is needed in this function; `loanAmt*rate` below
+      //     is correct for both Purchase (full loan amount) and refi (net
+      //     new money) as-is.
       const rate = RATE_CONFIG.MN.rates.mortgageRegistryRate + (jul21 && c && c.ecrf ? 0.0001 : 0);
-      return { amount: loanAmt*rate, note: 'MN Mortgage Registry Tax ' + (rate*100).toFixed(2) + '%' + (jul21 && c && c.ecrf ? ' (incl. Hennepin/Ramsey 0.01% ECRF surcharge, updated 7/21 rates)' : '') + ' of loan amount — BORROWER-liable.' + (jul21 ? '' : ' Hennepin & Ramsey counties add an extra 0.01% Environmental Response Fund tax — verify if property is in one of those') };
+      const basisNote = (c && c.isRefi) ? ' of new money over the existing unpaid principal balance (MN DOR MRT "new debt" guidance)' : ' of loan amount';
+      return { amount: loanAmt*rate, note: 'MN Mortgage Registry Tax ' + (rate*100).toFixed(2) + '%' + (jul21 && c && c.ecrf ? ' (incl. Hennepin/Ramsey 0.01% ECRF surcharge, updated 7/21 rates)' : '') + basisNote + ' — BORROWER-liable.' + (jul21 ? '' : ' Hennepin & Ramsey counties add an extra 0.01% Environmental Response Fund tax — verify if property is in one of those') };
     },
     mansionTax(){ return noTax('Minnesota has no mansion tax'); }
   },
@@ -4709,11 +4764,52 @@ function isConsolidation(container){ return refiKind(container) === 'consolidati
 // Shared, page-level Property Type (Deal Setup) — read by the co-op CEMA gate.
 function dealPropertyType(){ const el = document.getElementById('propertyType'); return el ? el.value : ''; }
 
+// ===========================================================================
+// VA loan-type helpers — the VA Funding Fee (MYTURN rule 19: kept in its own
+// clearly-named section, separate from FHA/USDA math). Confirmed via VA.gov
+// (see md_mn_ufmip_refi_research.md §3): VA loans do NOT use UFMIP/MIP
+// terminology or mechanics at all — applying FHA's flat 1.75% "UFMIP" to a VA
+// loan was a mislabeling bug, not just a wrong rate. The correct charge is the
+// VA Funding Fee, an entirely separate rate table:
+//   IRRRL / streamline refi:          0.5% flat (no first/subsequent split)
+//   Cash-out / standard (non-IRRRL) refi: 2.15% first-use, 3.3% subsequent-use
+//   Purchase, <5% down:               2.15% first-use, 3.3% subsequent-use
+//   Purchase, >=5% and <10% down:     1.5% (first- or subsequent-use, same)
+//   Purchase, >=10% down:             1.25% (first- or subsequent-use, same)
+// KNOWN GAP (flagged, not built): disabled veterans (service-connected
+// compensation), qualifying surviving spouses, and a few other categories are
+// VA-Funding-Fee-EXEMPT entirely (VA.gov). This tool has no existing
+// disability/exemption flag anywhere, and none is added here — the standard
+// table below always applies, which means a genuinely exempt veteran would
+// still be shown a nonzero fee. Real gap, likely out of scope for this pass —
+// revisit if Ann wants an explicit exemption input.
+function vaFundingFeeRate(isRefi, isIrrrl, firstUse, downPct){
+  if (isRefi && isIrrrl) return 0.005;
+  if (isRefi) return firstUse ? 0.0215 : 0.033; // cash-out/standard (non-IRRRL) refi
+  if (downPct >= 10) return 0.0125;
+  if (downPct >= 5) return 0.015;
+  return firstUse ? 0.0215 : 0.033; // purchase, <5% down
+}
+
+// ===========================================================================
+// USDA loan-type helper (MYTURN rule 19). USDA Rural Development's current
+// upfront guarantee fee is 1% of loan amount (confirmed, multiple sources —
+// see md_mn_ufmip_refi_research.md §3), the same rate for purchase and refi.
+// Previously the code applied the generic FHA 1.75% UFMIP rate to USDA loans
+// too — that was simply the wrong number, not a refi-specific nuance.
+const USDA_GUARANTEE_FEE_RATE = 0.01;
+
 function calc(container){
   const price = numVal(container,'price');
   const isRefi = isAnyRefi(container);
   const consol = isConsolidation(container);
   const propType = dealPropertyType();
+  const stateNow = E(container,'state').value;
+  // MD/MN refi "new money" mortgage/recordation-tax basis (Md. Code
+  // Tax-Property §12-108(g); MN DOR MRT guidance) — applies to ANY refi
+  // (Payoff or Consolidation), unlike the NY-only CEMA mechanism below. See
+  // mrtBasis and the Unpaid Principal Balance row-visibility logic further down.
+  const mdMnRefi = isRefi && (stateNow === 'MD' || stateNow === 'MN');
   let mode = container.querySelector('input[type="radio"]:checked').value;
 
   let downAmt = numVal(container,'downAmt');
@@ -4744,12 +4840,20 @@ function calc(container){
   }
 
   // Consolidation-only (CEMA) rows — gated exactly like row_dpModeGroup.
-  ['row_consol_header','row_consol_unpaid','row_consol_face','row_consol_payoffStmt',
+  // row_consol_unpaid (Unpaid Principal Balance) is handled separately just
+  // below — it's ALSO needed for MD/MN refis regardless of Consolidation vs.
+  // Payoff, so it can't be lumped in with the NY-CEMA-only rows here.
+  ['row_consol_header','row_consol_face','row_consol_payoffStmt',
    'row_consol_origSrc','row_consol_sameBorrower','row_consol_sameLender',
    'row_consol_month','row_consol_year'].forEach(fld => {
     const el = E(container, fld);
     if (el) el.style.display = consol ? '' : 'none';
   });
+  // Unpaid Principal Balance row: shown for NY Consolidation (CEMA, existing
+  // mechanism) OR any MD/MN refi (Payoff or Consolidation) — see mdMnRefi
+  // above and the mrtBasis comment further down for why MD/MN need this too.
+  const unpaidRow = E(container,'row_consol_unpaid');
+  if (unpaidRow) unpaidRow.style.display = (consol || mdMnRefi) ? '' : 'none';
   E(container,'row_cemaFee').style.display = consol ? '' : 'none';
   // Buyer's Attorney doesn't apply to a refinance (research: defaults $0) —
   // hide the row for any refi. Value stays 0 so exports/totals are unaffected.
@@ -4759,7 +4863,6 @@ function calc(container){
   // Consolidation note: NY-only mechanism + co-op ineligibility warnings.
   const consolNoteEl = E(container,'consolNote');
   if (consolNoteEl){
-    const stateNow = E(container,'state').value;
     let msg = '';
     if (consol && propType === 'Co-op'){
       msg = 'CEMA / Consolidation does not apply to co-ops (a co-op loan is personal property, not real property — there is no mortgage recording tax to reduce). Full-loan mortgage tax is being applied.';
@@ -4792,13 +4895,27 @@ function calc(container){
   const rate = (parseFloat(E(container,'rate').value) || 0) / 100;
   const program = E(container,'loanProgram').value;
 
-  // Upfront MIP (FHA/USDA/VA financed fee) and MI (their monthly equivalent)
-  // apply to these three programs only; Conventional uses PMI instead
-  // (manual only — no universal formula exists for it).
+  // Upfront government-loan financed fee (FHA UFMIP / USDA guarantee fee /
+  // VA Funding Fee) and MI (their monthly equivalent) apply to these three
+  // programs only; Conventional uses PMI instead (manual only — no universal
+  // formula exists for it). Confirmed (see md_mn_ufmip_refi_research.md §3):
+  // Conventional correctly gets $0/no line here — hasMipMi's boolean already
+  // excludes it, nothing to fix.
   const hasMipMi = program === 'FHA' || program === 'USDA' || program === 'VA';
   const mipAuto = E(container,'chk_mipauto').checked;
   E(container,'row_mipautochk').style.display = hasMipMi ? '' : 'none';
   E(container,'row_ufmip').style.display = hasMipMi ? '' : 'none';
+
+  // VA-only option rows (First Use / IRRRL) — see the VA Funding Fee helper
+  // section above (vaFundingFeeRate) for the math these feed.
+  const isVA = program === 'VA';
+  E(container,'row_va_firstuse').style.display = (hasMipMi && isVA) ? '' : 'none';
+  E(container,'row_va_irrrl').style.display = (isVA && isRefi) ? '' : 'none';
+  const vaFirstUse = E(container,'chk_vaFirstUse').checked;
+  const vaIrrrl = isVA && isRefi && E(container,'chk_vaIrrrl').checked;
+
+  const ufmipLabelEl = E(container,'ufmipLabel');
+  if (ufmipLabelEl) ufmipLabelEl.textContent = isVA ? 'VA Funding Fee' : 'Upfront MIP';
 
   let ufmip;
   if (!hasMipMi){
@@ -4809,16 +4926,37 @@ function calc(container){
     E(container,'badge_ufmip').className = 'manual-badge';
     E(container,'ufmipHint').textContent = '(n/a for ' + program + ' — see PMI in Monthly Payment)';
   } else if (mipAuto){
-    // UNCONFIRMED for refi — the flat 1.75% UFMIP is the FHA purchase/full
-    // refinance factor; VA IRRRL, USDA-streamline, and FHA-streamline refis can
-    // carry different (often lower) upfront fees. Kept as-is (Purchase) as a
-    // stopgap — see title_gov_fees_refi_research.md / loan_basics_refi_research.md.
-    ufmip = loanAmt * 0.0175;
+    let rate, hintTxt;
+    if (isVA){
+      // VA Funding Fee — see vaFundingFeeRate() above for the full table and
+      // sourcing; this is NOT the same mechanism as FHA/USDA's UFMIP/guarantee
+      // fee (different structure entirely), it just shares the same UI row.
+      rate = vaFundingFeeRate(isRefi, vaIrrrl, vaFirstUse, downPct);
+      hintTxt = '(' + (rate*100).toFixed(2) + '% VA Funding Fee — ' +
+        (vaIrrrl ? 'IRRRL/streamline' : (isRefi ? 'cash-out/standard refi' : ('purchase, ' + downPct.toFixed(1) + '% down'))) +
+        ', ' + (vaFirstUse ? 'first' : 'subsequent') + ' use)';
+    } else if (program === 'USDA'){
+      // USDA guarantee fee — confirmed 1% flat, purchase and refi alike (see
+      // the USDA loan-type helper section above / md_mn_ufmip_refi_research.md §3).
+      rate = USDA_GUARANTEE_FEE_RATE;
+      hintTxt = '(1% USDA guarantee fee of base loan)';
+    } else {
+      // FHA — confirmed correct at flat 1.75% for the overwhelming majority of
+      // real 2026 FHA transactions, purchase and refi alike (see
+      // md_mn_ufmip_refi_research.md §3). A narrow HUD carve-out (0.01% UFMIP)
+      // exists ONLY for Streamline/Simple Refinances of an FHA loan originally
+      // endorsed on or before 5/31/2009 (Mortgagee Letter 2012-04) — near-
+      // obsolete in 2026 (16+ years out) and not modeled here; flag to Ann if
+      // that rare case ever needs handling.
+      rate = 0.0175;
+      hintTxt = '(1.75% of base loan)';
+    }
+    ufmip = loanAmt * rate;
     E(container,'ufmip').value = ufmip.toFixed(2);
     E(container,'ufmip').disabled = true;
     E(container,'badge_ufmip').textContent = 'Auto';
     E(container,'badge_ufmip').className = 'calc-badge';
-    E(container,'ufmipHint').textContent = '(1.75% of base loan)';
+    E(container,'ufmipHint').textContent = hintTxt;
   } else {
     ufmip = numVal(container,'ufmip');
     E(container,'ufmip').disabled = false;
@@ -4887,12 +5025,22 @@ function calc(container){
     E(container,'chk_show_transfertax').closest('.field-row').style.display = '';
   }
 
-  // CEMA new-money mortgage tax (decision #3): NY Consolidation on real
-  // property taxes MRT only on new money = max(0, mortgage − unpaid principal).
-  // Non-NY consolidation, co-ops, and every non-consolidation loan use the full
-  // loan amount (mrtBasis = loanAmt). See applyGovernmentFees's 4th param.
-  const stateNow = E(container,'state').value;
-  const mrtBasis = (consol && stateNow === 'NY' && propType !== 'Co-op')
+  // New-money mortgage/recordation-tax basis (decision #3, extended). Two
+  // separate state-law mechanisms both net the new loan against the existing
+  // Unpaid Principal Balance:
+  //   - NY Consolidation (CEMA) on real property (not co-ops) — decision #3.
+  //   - ANY MD/MN refi (Payoff or Consolidation) — Md. Code Tax-Property
+  //     §12-108(g); MN DOR MRT guidance (confirmed by multiple sources, see
+  //     md_mn_ufmip_refi_research.md). This is NOT a NY-CEMA-specific
+  //     mechanism — it's separate state law that happens to net the same way.
+  //     OPEN QUESTION (unconfirmed, single source — Federal Title): MD
+  //     investment/non-owner-occupied refis MIGHT be taxed on the full loan
+  //     amount instead of new-money, but the statute's plain text doesn't
+  //     condition the exemption on occupancy and a second source wasn't
+  //     found — NOT special-cased here; applying new-money basis uniformly.
+  // Every other case (Purchase, non-NY/MD/MN consolidation, co-ops) uses the
+  // full loan amount (mrtBasis = loanAmt). See applyGovernmentFees's 4th param.
+  const mrtBasis = (consol && stateNow === 'NY' && propType !== 'Co-op') || mdMnRefi
     ? Math.max(0, loanAmt - numVal(container,'unpaidPrincipal'))
     : loanAmt;
 
@@ -5096,6 +5244,14 @@ function calc(container){
     isConsolidation: consol,
     isRefi,
     propertyType: propType,
+    // VA Funding Fee export context (see vaFundingFeeRate() above) — lets the
+    // XLSX live-formula recompute pick the right VA rate instead of the
+    // generic FHA/USDA 1.75%/1% figures.
+    va: (program === 'VA') ? { firstUse: vaFirstUse, irrrl: vaIrrrl } : null,
+    // Correct export label everywhere the fee line appears — "UFMIP" is an
+    // FHA-specific term; applying it to a VA loan was the mislabeling bug
+    // this fix addresses (see vaFundingFeeRate() above).
+    ufmipLabel: isVA ? 'VA Funding Fee' : 'Upfront MIP',
     consolidation: consol ? {
       unpaidPrincipal: numVal(container,'unpaidPrincipal'),
       faceAmt: numVal(container,'faceAmt'),
@@ -5261,7 +5417,7 @@ function renderPdfLoanPage(doc, d, navy, gold, slate, pageW, logoDataUrl){
   row('Down Payment', fmt(d.downAmt) + ' (' + d.downPct.toFixed(2) + '%)');
   row('Base Loan Amount', fmt(d.loanAmt));
   row('Rate / Term', d.rate.toFixed(3) + '% / ' + d.term + ' yrs');
-  if (d.monthly.hasMipMi) row('Upfront MIP', fmt(d.ufmip));
+  if (d.monthly.hasMipMi) row(d.ufmipLabel || 'Upfront MIP', fmt(d.ufmip));
   row('Total Loan Amount', fmt(d.totalLoan), {bold:true, rule:true});
   if (d.pointsPct) row('Discount Points (' + d.pointsPct + ')', (d.pointsCost >= 0 ? '+' + fmt(d.pointsCost) : '-' + fmt(Math.abs(d.pointsCost))) + ' to CTC');
   row("Seller's Concession", '-' + fmt(d.sellerConcession));
@@ -5526,7 +5682,7 @@ async function buildXlsxEstimateData_(container, dpMode, mathTabName, colOffset)
   // free accuracy upgrade for the real file (no more stale-0-until-recalc)
   // AND is what makes the Alt View export preview table possible: it reads
   // this same `rows` array (returned below) instead of re-deriving values.
-  R.ufmip = push('Upfront MIP', d.ufmip);
+  R.ufmip = push(d.ufmipLabel || 'Upfront MIP', d.ufmip);
   R.totalLoan = push('Total Loan Amount', d.totalLoan);
   R.pointsPct = push('Discount Points', d.pointsPct/100);
   blank();
@@ -5652,6 +5808,16 @@ async function buildXlsxEstimateData_(container, dpMode, mathTabName, colOffset)
     case 'IL':
       setGov(P+'*'+rpRef('transferTaxRate'), '0', '0');
       break;
+    // NOTE (MD/MN): this "live formula" XLSX recompute is already a
+    // simplified approximation (e.g. it doesn't model Montgomery Co.'s tiered
+    // brackets either) and, same as NY's CEMA new-money netting above, does
+    // NOT reflect the refi "new money" mortgage-tax basis fix in calc()/
+    // mortgageTax() — L here is the raw loan amount cell, not netted against
+    // Unpaid Principal Balance. The actual snapshot value pushed into this row
+    // (from d.title.mortgagetax, set via push() above) DOES already reflect
+    // the correct netted figure; only a user editing cells live in the
+    // exported sheet afterward would fall back to this unnetted formula. Same
+    // pre-existing limitation as NY, not something newly introduced here.
     case 'MD':
       setGov(P+'*'+rpRef('stateTransferRate'), L+'*'+rpRef('recordationPlaceholderRate'), '0');
       break;
@@ -5805,13 +5971,37 @@ async function buildXlsxEstimateData_(container, dpMode, mathTabName, colOffset)
     F[R.downAmt] = 'B' + R.price + '-B' + R.loanAmt;
     F[R.downPct] = 'B' + R.downAmt + '/B' + R.price;
   }
-  // Upfront MIP: live formula for FHA/USDA/VA, unless the web tool had it
-  // manually overridden at export time (auto-calculate MIP/MI unchecked),
-  // in which case the manual figure is exported as-is instead.
+  // Upfront government-loan financed fee: live formula for FHA/USDA/VA,
+  // unless the web tool had it manually overridden at export time
+  // (auto-calculate MIP/MI unchecked), in which case the manual figure is
+  // exported as-is instead. Per-program rate matches the web tool's
+  // calc()/vaFundingFeeRate() logic (see comments there): FHA 1.75%, USDA 1%,
+  // VA on its own table. VA's IRRRL/First-Use/refi-vs-purchase flags aren't
+  // editable cells in this exported sheet (same as Loan Type generally isn't),
+  // so — consistent with how isConsolidation/isRefi are already baked into
+  // other export decisions at build time elsewhere in this file — they're
+  // baked into the formula as constants reflecting the web tool's state at
+  // export time; only the Down Payment (%) cell stays live/editable for the
+  // VA purchase down-payment tier.
   if (d.monthly.hasMipMi && !d.mipAuto){
     // leave as the raw manual value already placed by push() above — no formula
   } else {
-    F[R.ufmip] = 'IF(OR(B' + R.program + '="FHA",B' + R.program + '="USDA",B' + R.program + '="VA"),B' + R.loanAmt + '*0.0175,0)';
+    let rateExpr;
+    if (d.program === 'VA' && d.va){
+      if (d.va.irrrl){
+        rateExpr = '0.005';
+      } else if (d.isRefi){
+        rateExpr = d.va.firstUse ? '0.0215' : '0.033';
+      } else {
+        const dpCell = 'B' + R.downPct;
+        rateExpr = 'IF(' + dpCell + '>=0.1,0.0125,IF(' + dpCell + '>=0.05,0.015,' + (d.va.firstUse ? '0.0215' : '0.033') + '))';
+      }
+    } else if (d.program === 'USDA'){
+      rateExpr = '0.01';
+    } else {
+      rateExpr = '0.0175'; // FHA (and any unrecognized program falling through — matches web tool default)
+    }
+    F[R.ufmip] = 'IF(OR(B' + R.program + '="FHA",B' + R.program + '="USDA",B' + R.program + '="VA"),B' + R.loanAmt + '*' + rateExpr + ',0)';
   }
   F[R.totalLoan] = 'B' + R.loanAmt + '+B' + R.ufmip;
   F[R.feePoints] = 'B' + R.loanAmt + '*B' + R.pointsPct;
@@ -5963,7 +6153,7 @@ async function buildXlsxEstimateData_(container, dpMode, mathTabName, colOffset)
     fref('Down Payment ($)', R.downAmt);
     fref('Base Loan Amount', R.loanAmt);
   }
-  fref('Upfront MIP', R.ufmip);
+  fref(d.ufmipLabel || 'Upfront MIP', R.ufmip);
   fref('Total Loan Amount', R.totalLoan, { alwaysShow:true, bold:true });
   fr = fref('Discount Points', R.pointsPct); pctFrontRowsSet.add(fr);
   fblank();
@@ -6215,7 +6405,7 @@ function buildDocxLoanSection(d){
     ['Down Payment', fmt(d.downAmt) + ' (' + d.downPct.toFixed(2) + '%)'],
     ['Base Loan Amount', fmt(d.loanAmt)],
     ['Rate / Term', d.rate.toFixed(3) + '% / ' + d.term + ' yrs']
-  ].concat(d.monthly.hasMipMi ? [['Upfront MIP', fmt(d.ufmip)]] : []),
+  ].concat(d.monthly.hasMipMi ? [[d.ufmipLabel || 'Upfront MIP', fmt(d.ufmip)]] : []),
    'Total Loan Amount', fmt(d.totalLoan),
    [["Seller's Concession", '-' + fmt(d.sellerConcession)]]
    .concat(d.pointsPct ? [['Discount Points (' + d.pointsPct + ')', (d.pointsCost >= 0 ? '+' + fmt(d.pointsCost) : '-' + fmt(Math.abs(d.pointsCost))) + ' to CTC']] : []));
