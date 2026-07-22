@@ -72,6 +72,7 @@
     font-family:inherit; line-height:1.35;
   }
   .dc-cell-input:focus{ outline:1px solid var(--gold); background:#fff; }
+  .dc-col-check{ width:30px; text-align:center; }
   .dc-col-purpose{ width:150px; } .dc-col-name{ width:170px; } .dc-col-number{ width:130px; }
   .dc-col-notes{ width:160px; }
   .dc-col-actions{ width:118px; }
@@ -302,8 +303,11 @@
 
         <div class="dc-card">
           <h4>Want to Call &amp; Do Not Call</h4>
-          <p class="dc-hint">★ pins someone to the top of every list they appear on. 🚫 removes them today and skips them automatically from now on. Both persist.</p>
-          <button class="export-btn export-btn-outline" style="font-size:11px;" onclick="openWantToCallModal()">Manage persistent lists</button>
+          <p class="dc-hint">★ pins someone to the top of every list they appear on. 🚫 removes them today and skips them automatically from now on. Both persist — use the ★/🚫 buttons on a row, remove from either list here.</p>
+          <div style="font-size:11.5px; font-weight:700; color:var(--navy); margin:8px 0 2px;">Want to Call</div>
+          <div id="wtcPersistentList" style="max-height:22vh; overflow-y:auto;"></div>
+          <div style="font-size:11.5px; font-weight:700; color:var(--navy); margin:10px 0 2px;">Do Not Call</div>
+          <div id="dncPersistentList" style="max-height:22vh; overflow-y:auto;"></div>
         </div>
 
       </div>
@@ -339,6 +343,7 @@
             <table class="dc-grid">
               <thead>
                 <tr>
+                  <th class="dc-col-check"><input type="checkbox" id="dcSelectAll" title="Select all (for CSV export)" onchange="toggleSelectAll(this.checked)"></th>
                   <th class="dc-col-purpose">Purpose of Call</th>
                   <th class="dc-col-name">Full Name</th>
                   <th class="dc-col-number">Number</th>
@@ -368,12 +373,13 @@
                 </select>
               </label>
               <button class="export-btn" style="font-size:11px;" onclick="exportPreAppPdf()">Export Pre-App PDF</button>
+              <button class="export-btn" style="font-size:11px;" onclick="exportPreAppCsv()">Export Pre-App CSV</button>
               <button class="export-btn export-btn-outline" style="font-size:11px;" onclick="clearPreAppConfirm()">Clear Pre-App</button>
             </div>
           </div>
           <div class="dc-grid-wrap" style="margin-top:8px;">
             <table class="dc-grid" style="min-width:600px;">
-              <thead><tr><th>Full Name</th><th>Mobile</th><th>Pre-Approved</th><th>Last Touch</th><th>Stage</th></tr></thead>
+              <thead><tr><th class="dc-col-check"><input type="checkbox" id="preAppSelectAll" title="Select all (for CSV export)" onchange="togglePreAppSelectAll(this.checked)"></th><th>Full Name</th><th>Mobile</th><th>Pre-Approved</th><th>Last Touch</th><th>Stage</th></tr></thead>
               <tbody id="preAppBody"></tbody>
             </table>
           </div>
@@ -415,23 +421,15 @@
     </div>
   </div>
 
-  <!-- WANT-TO-CALL / DNC MODAL -->
-  <div id="wantToCallModalOverlay" class="dc-modal-overlay" onclick="if(event.target===this) closeWantToCallModal();">
-    <div class="dc-modal" style="max-width:560px;">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <h3 style="margin:0;">Want to Call &amp; Do Not Call</h3>
-        <button class="export-btn export-btn-outline" style="padding:4px 8px; font-size:11px;" onclick="closeWantToCallModal()">&times; Close</button>
+  <!-- NO-SELECTION CSV EXPORT MODAL -->
+  <div id="noSelectionModalOverlay" class="dc-modal-overlay" onclick="if(event.target===this) closeNoSelectionModal();">
+    <div class="dc-modal" style="max-width:380px;">
+      <h3 style="margin:0 0 8px;">You have not selected any contacts</h3>
+      <p style="font-size:12.5px; color:var(--slate); margin:0 0 16px;">Tick the contacts you want in the CSV, or export everyone.</p>
+      <div style="display:flex; gap:8px; justify-content:flex-end;">
+        <button class="export-btn export-btn-outline" onclick="closeNoSelectionModal()">Cancel</button>
+        <button class="export-btn" style="background:var(--navy); color:#fff;" onclick="confirmExportAll_()">Export All</button>
       </div>
-      <p style="font-size:12px; color:var(--slate); margin:8px 0;">Tick anyone on today's list you want pushed to the top. Saved immediately.</p>
-      <div id="wantToCallList" style="max-height:26vh; overflow-y:auto;"></div>
-
-      <h4 style="margin:14px 0 4px 0; color:var(--navy);">Persistent Want-to-Call list</h4>
-      <p style="font-size:11.5px; color:var(--slate); margin:0 0 4px 0;">Everyone ever flagged — stays flagged whenever they reappear, even on a day they're not currently uploaded.</p>
-      <div id="wtcPersistentList" style="max-height:18vh; overflow-y:auto;"></div>
-
-      <h4 style="margin:14px 0 4px 0; color:var(--navy);">Persistent Do Not Call list</h4>
-      <p style="font-size:11.5px; color:var(--slate); margin:0 0 4px 0;">Anyone marked 🚫 is skipped automatically from every future upload until removed here.</p>
-      <div id="dncPersistentList" style="max-height:18vh; overflow-y:auto;"></div>
     </div>
   </div>
 
@@ -702,7 +700,7 @@ function makeRow(fields){
   const r = Object.assign({
     rowId: uid(), purpose:'Other', fullName:'', number:'', description:'', notes:'',
     sourceType:'', identityKey:'', priority:false, manuallyEdited:false,
-    missingPhone:false, sortIndex:0, sortDate:null, raw:null
+    missingPhone:false, sortIndex:0, sortDate:null, selected:false, raw:null
   }, fields);
   if (!r.identityKey) r.identityKey = identityKeyFor(r.fullName, r.number);
   if (!r.number) r.missingPhone = true;
@@ -743,6 +741,7 @@ async function initTool(){
   addManualEntryRow();
   renderList();
   renderPreApp();
+  renderPersistentLists_();
   try { const flags = await DC_API.listDailyCallsWantToCall(); applyWantToCallFlags_(flags); } catch(e){}
   try { const flags = await DC_API.listDailyCallsDnc(); applyDncFlags_(flags); } catch(e){}
   try { const contacts = await DC_API.listDailyCallsManualContacts(); indexManualContacts_(contacts); } catch(e){}
@@ -761,6 +760,7 @@ function applyWantToCallFlags_(flags){
   dcRows.forEach(r => { r.priority = !!wantToCallSet[r.identityKey]; });
   arrangeRows_();
   renderList();
+  renderPersistentLists_();
 }
 function applyDncFlags_(flags){
   dncSet = {};
@@ -770,6 +770,7 @@ function applyDncFlags_(flags){
   dcRows = dcRows.filter(r => !dncSet[r.identityKey]);
   dcDncSkippedTotal += (before - dcRows.length);
   renderList();
+  renderPersistentLists_();
 }
 </script>
 
@@ -1319,7 +1320,8 @@ function renderList(){
   empty.style.display = 'none';
   const prio = dcRows.filter(r => r.priority).length;
   const missing = dcRows.filter(r => r.missingPhone).length;
-  summary.textContent = dcRows.length + ' row(s)' + (prio ? ' · ' + prio + ' priority' : '') + (missing ? ' · ' + missing + ' missing phone' : '') + (dcDncSkippedTotal ? ' · ' + dcDncSkippedTotal + ' skipped (DNC)' : '');
+  const selCount = dcRows.filter(r => r.selected).length;
+  summary.textContent = dcRows.length + ' row(s)' + (prio ? ' · ' + prio + ' priority' : '') + (missing ? ' · ' + missing + ' missing phone' : '') + (dcDncSkippedTotal ? ' · ' + dcDncSkippedTotal + ' skipped (DNC)' : '') + (selCount ? ' · ' + selCount + ' selected' : '');
 
   let html = '';
   let lastKey = null;
@@ -1330,7 +1332,7 @@ function renderList(){
       const count = dcRows.filter(x => bucketKeyFor_(x) === key).length;
       const collapsed = !isPriority && collapsedGroups.has(key);
       html += '<tr class="dc-group-header' + (isPriority ? ' dc-group-header-priority' : '') + '">' +
-        '<td colspan="6">' +
+        '<td colspan="7">' +
           (isPriority ? '★ ' : '<button class="dc-group-toggle" onclick="toggleGroupCollapse(\'' + escapeHtml(key).replace(/'/g,"\\'") + '\')">' + (collapsed?'▸':'▾') + '</button> ') +
           escapeHtml(groupDisplayName_(key)) + ' <span class="dc-group-count">(' + count + ')</span>' +
         '</td>' +
@@ -1341,6 +1343,7 @@ function renderList(){
     const cls = (r.priority ? 'dc-priority ' : '') + (r.missingPhone ? 'dc-missing-phone' : '');
     const badges = (r.priority ? '<span class="dc-badge prio">WTC</span>' : '') + (r.manuallyEdited ? '<span class="dc-badge edited">edited</span>' : '');
     html += '<tr class="' + cls + '" draggable="true" data-idx="' + i + '"' + (collapsedNow ? ' style="display:none;"' : '') + '>' +
+      '<td class="dc-col-check"><input type="checkbox" class="dc-cell-input" data-idx="' + i + '" data-field="selected"' + (r.selected?' checked':'') + '></td>' +
       '<td class="dc-col-purpose"><textarea rows="1" class="dc-cell-input" data-idx="' + i + '" data-field="purpose">' + escapeHtml(r.purpose) + '</textarea></td>' +
       '<td class="dc-col-name"><textarea rows="1" class="dc-cell-input" data-idx="' + i + '" data-field="fullName">' + escapeHtml(r.fullName) + '</textarea>' + badges + '</td>' +
       '<td class="dc-col-number dc-number-cell"><textarea rows="1" class="dc-cell-input" data-idx="' + i + '" data-field="number">' + escapeHtml(r.number) + '</textarea>' +
@@ -1359,8 +1362,22 @@ function renderList(){
   });
   body.innerHTML = html;
   body.querySelectorAll('.dc-cell-input').forEach(autoSize_);
+  updateSelectAllState_();
 }
 function autoSize_(el){ el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+// Keeps the header "select all" checkbox in sync (checked/indeterminate/off)
+// with the individual row checkboxes below it.
+function updateSelectAllState_(){
+  const all = document.getElementById('dcSelectAll');
+  if (!all) return;
+  const total = dcRows.length, selected = dcRows.filter(r => r.selected).length;
+  all.checked = total > 0 && selected === total;
+  all.indeterminate = selected > 0 && selected < total;
+}
+function toggleSelectAll(checked){
+  dcRows.forEach(r => { r.selected = checked; });
+  renderList();
+}
 
 function onListInput(e){
   const t = e.target;
@@ -1372,6 +1389,7 @@ function onListChange(e){
   if (!t.classList || !t.classList.contains('dc-cell-input')) return;
   const i = +t.dataset.idx, field = t.dataset.field;
   const row = dcRows[i]; if (!row) return;
+  if (field === 'selected'){ row.selected = t.checked; updateSelectAllState_(); persistDraft(); return; }
   row[field] = t.value;
   row.manuallyEdited = true;
   if (field === 'number'){ row.missingPhone = !t.value.trim(); }
@@ -1393,6 +1411,7 @@ function toggleRowPriority(i){
   saveWantToCallFlag_(r.identityKey, r.fullName, r.priority);
   arrangeRows_();
   renderList(); persistDraft();
+  renderPersistentLists_();
 }
 // The "negative star" — removes the row from today's list entirely and
 // remembers the person permanently so future uploads skip them automatically.
@@ -1405,6 +1424,7 @@ function toggleRowDnc(i){
   dcRows.splice(i,1);
   dcRows.forEach((row,k)=>row.sortIndex=k);
   renderList(); persistDraft();
+  renderPersistentLists_();
 }
 function addBlankRow(){
   dcRows.push(makeRow({ purpose:'Other', manuallyEdited:true, sortIndex:dcRows.length }));
@@ -1464,11 +1484,16 @@ function renderPreApp(){
   if (sel) sel.value = (preAppDays === 14 || preAppDays === 30) ? String(preAppDays) : 'other';
   if (!dcPreApp.length){ card.style.display = 'none'; return; }
   card.style.display = 'block';
-  document.getElementById('preAppSummary').textContent = dcPreApp.length + ' unique borrower(s) — exported as its own PDF, not merged into the daily list.';
-  body.innerHTML = dcPreApp.map(p =>
-    '<tr><td>' + escapeHtml(p.fullName) + '</td><td>' + escapeHtml(p.mobile) + '</td><td>' + escapeHtml(p.preApproved) + '</td><td>' + escapeHtml(p.lastTouchDate || p.lastTouch) + '</td><td>' + escapeHtml(p.stage) + '</td></tr>'
+  const selCount = dcPreApp.filter(p => p.selected).length;
+  document.getElementById('preAppSummary').textContent = dcPreApp.length + ' unique borrower(s)' + (selCount ? ' · ' + selCount + ' selected' : '') + ' — PDF/CSV exported separately, not merged into the daily list.';
+  body.innerHTML = dcPreApp.map((p,i) =>
+    '<tr><td class="dc-col-check"><input type="checkbox" onchange="togglePreAppSelected(' + i + ', this.checked)"' + (p.selected?' checked':'') + '></td><td>' + escapeHtml(p.fullName) + '</td><td>' + escapeHtml(p.mobile) + '</td><td>' + escapeHtml(p.preApproved) + '</td><td>' + escapeHtml(p.lastTouchDate || p.lastTouch) + '</td><td>' + escapeHtml(p.stage) + '</td></tr>'
   ).join('');
+  const all = document.getElementById('preAppSelectAll');
+  if (all){ all.checked = dcPreApp.length > 0 && selCount === dcPreApp.length; all.indeterminate = selCount > 0 && selCount < dcPreApp.length; }
 }
+function togglePreAppSelected(i, checked){ if (dcPreApp[i]){ dcPreApp[i].selected = checked; renderPreApp(); persistDraft(); } }
+function togglePreAppSelectAll(checked){ dcPreApp.forEach(p => { p.selected = checked; }); renderPreApp(); persistDraft(); }
 // Jungo's own export already scopes whichever date range Ann ran the report
 // for — this control is purely a display label (card title + PDF title),
 // not an actual row filter, since the app trusts the uploaded file's scope.
@@ -1498,33 +1523,21 @@ async function saveDncFlag_(identityKey, displayName, on){
   if (on) dncSet[identityKey] = displayName; else delete dncSet[identityKey];
   try { await DC_API.saveDailyCallsDnc({ identityKey, displayName, on:!!on }); } catch(e){}
 }
-function openWantToCallModal(){
-  const list = document.getElementById('wantToCallList');
-  if (!dcRows.length){ list.innerHTML = '<div class="dc-empty">No rows on the list yet.</div>'; }
-  else {
-    list.innerHTML = dcRows.map((r,i) =>
-      '<label style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--slate-light); font-size:12.5px;">' +
-        '<input type="checkbox" ' + (r.priority?'checked':'') + ' onchange="toggleRowPriority(' + i + '); renderWantToCallModalLists_()">' +
-        '<span><b>' + escapeHtml(r.fullName) + '</b> — ' + escapeHtml(r.purpose) + '</span>' +
-      '</label>'
-    ).join('');
-  }
-  renderWantToCallModalLists_();
-  document.getElementById('wantToCallModalOverlay').classList.add('open');
-}
+// Inline sidebar block now (no popup — a modal felt "weird" per Ann's ask).
 // The two PERSISTENT lists themselves — everyone ever flagged, whether or
-// not they happen to be on today's uploaded batch right now.
-function renderWantToCallModalLists_(){
+// not they happen to be on today's uploaded batch right now. Re-rendered
+// any time either set changes (flag toggled on a row, or removed here).
+function renderPersistentLists_(){
   const wtcEntries = Object.keys(wantToCallSet).map(k => ({ key:k, name:wantToCallSet[k] || k }));
   const dncEntries = Object.keys(dncSet).map(k => ({ key:k, name:dncSet[k] || k }));
   const wtcBody = document.getElementById('wtcPersistentList');
   const dncBody = document.getElementById('dncPersistentList');
   wtcBody.innerHTML = wtcEntries.length
     ? wtcEntries.map(e => persistentListRow_(e, 'removeWantToCallEntry')).join('')
-    : '<div class="dc-empty" style="padding:8px 0;">Nobody flagged yet.</div>';
+    : '<div class="dc-empty" style="padding:6px 0;">Nobody flagged yet.</div>';
   dncBody.innerHTML = dncEntries.length
     ? dncEntries.map(e => persistentListRow_(e, 'removeDncEntry')).join('')
-    : '<div class="dc-empty" style="padding:8px 0;">Nobody on the DNC list yet.</div>';
+    : '<div class="dc-empty" style="padding:6px 0;">Nobody on the DNC list yet.</div>';
 }
 function persistentListRow_(e, removeFn){
   return '<div style="display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-bottom:1px solid var(--slate-light); font-size:12.5px;">' +
@@ -1537,14 +1550,13 @@ async function removeWantToCallEntry(identityKey){
   saveWantToCallFlag_(identityKey, '', false);
   dcRows.forEach(r => { if (r.identityKey === identityKey) r.priority = false; });
   arrangeRows_(); renderList(); persistDraft();
-  renderWantToCallModalLists_();
+  renderPersistentLists_();
 }
 async function removeDncEntry(identityKey){
   delete dncSet[identityKey];
   saveDncFlag_(identityKey, '', false);
-  renderWantToCallModalLists_();
+  renderPersistentLists_();
 }
-function closeWantToCallModal(){ document.getElementById('wantToCallModalOverlay').classList.remove('open'); }
 </script>
 
 <script>
@@ -1917,16 +1929,49 @@ function exportGroupsFor_(rows){
 // grouped order kept for a sensible default sequence, no header rows since
 // PhoneBurner's own import has no slot for them).
 function csvEscape_(s){ const v = String(s==null?'':s); return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; }
-function buildDailyCsv_(){
+// Description's first line is the Purpose of Call, per Ann's ask — the rest
+// of the description follows on subsequent lines, unchanged.
+function csvDescriptionFor_(r){
+  const lines = [];
+  if (r.purpose) lines.push(r.purpose);
+  if (r.description) lines.push(r.description);
+  return lines.join('\n');
+}
+function buildDailyCsvFromRows_(rows){
   const lines = ['Name,Phone,Description'];
-  exportGroupsFor_(dcRows).forEach(g => g.rows.forEach(r => {
-    lines.push([csvEscape_(r.fullName), csvEscape_(r.number), csvEscape_(r.description)].join(','));
+  exportGroupsFor_(rows).forEach(g => g.rows.forEach(r => {
+    lines.push([csvEscape_(r.fullName), csvEscape_(r.number), csvEscape_(csvDescriptionFor_(r))].join(','));
   }));
   return lines.join('\r\n');
 }
+
+// Shared "nothing ticked" flow for every CSV export in the tool: ticked
+// contacts only if any are ticked, otherwise ask before exporting everyone.
+let pendingCsvExportFn = null;
+function openNoSelectionModal_(onExportAll){
+  pendingCsvExportFn = onExportAll;
+  document.getElementById('noSelectionModalOverlay').classList.add('open');
+}
+function closeNoSelectionModal(){
+  pendingCsvExportFn = null;
+  document.getElementById('noSelectionModalOverlay').classList.remove('open');
+}
+function confirmExportAll_(){
+  const fn = pendingCsvExportFn;
+  closeNoSelectionModal();
+  if (fn) fn();
+}
+
 async function exportCsv(){
-  const blob = new Blob([buildDailyCsv_()], { type:'text/csv' });
-  await saveExportBlob('csv', blob);
+  if (!dcRows.length) return;
+  const selected = dcRows.filter(r => r.selected);
+  if (selected.length){
+    await saveExportBlob('csv', new Blob([buildDailyCsvFromRows_(selected)], { type:'text/csv' }));
+  } else {
+    openNoSelectionModal_(async () => {
+      await saveExportBlob('csv', new Blob([buildDailyCsvFromRows_(dcRows)], { type:'text/csv' }));
+    });
+  }
 }
 
 // XLSX — export/xlsx-helpers.js + JSZip. Grouped like the on-screen view and
@@ -2056,6 +2101,34 @@ function exportPreAppPdf(){
     y += 16;
   });
   saveExportBlob('pdf', doc.output('blob'), 'PreApps_' + sanitizeFilenamePart(currentDateOf) + '.pdf');
+}
+
+// Pre-App CSV — same Name/Phone/Description shape as the main CSV export,
+// Description's first line is "Pre-App" (its Purpose), same ticked-or-ask
+// selection flow as exportCsv().
+function buildPreAppCsvFromRows_(rows){
+  const lines = ['Name,Phone,Description'];
+  rows.forEach(p => {
+    const descLines = ['Pre-App'];
+    if (p.preApproved) descLines.push('Pre-Approved: ' + p.preApproved);
+    const lastTouch = p.lastTouchDate || p.lastTouch;
+    if (lastTouch) descLines.push('Last Touch: ' + lastTouch);
+    if (p.stage) descLines.push('Stage: ' + p.stage);
+    lines.push([csvEscape_(p.fullName), csvEscape_(p.mobile), csvEscape_(descLines.join('\n'))].join(','));
+  });
+  return lines.join('\r\n');
+}
+async function exportPreAppCsv(){
+  if (!dcPreApp.length) return;
+  const filename = 'PreApps_' + sanitizeFilenamePart(currentDateOf) + '.csv';
+  const selected = dcPreApp.filter(p => p.selected);
+  if (selected.length){
+    await saveExportBlob('csv', new Blob([buildPreAppCsvFromRows_(selected)], { type:'text/csv' }), filename);
+  } else {
+    openNoSelectionModal_(async () => {
+      await saveExportBlob('csv', new Blob([buildPreAppCsvFromRows_(dcPreApp)], { type:'text/csv' }), filename);
+    });
+  }
 }
 </script>
 
