@@ -82,6 +82,10 @@
   .dc-drag-handle{ cursor:grab; font-size:14px; line-height:1; padding:3px 4px; color:var(--slate); user-select:none; border:1px solid transparent; }
   .dc-drag-handle:active{ cursor:grabbing; }
   tr.dc-drag-over{ outline:2px dashed var(--gold); outline-offset:-2px; }
+  tr.dc-group-header td{ background:var(--slate-light); font-weight:700; color:var(--navy); font-size:12.5px; padding:6px 8px; border-top:1px solid var(--line); }
+  tr.dc-group-header-priority td{ background:rgba(201,162,75,0.18); color:#8A6A1F; }
+  .dc-group-toggle{ background:none; border:none; cursor:pointer; font-size:11px; color:var(--navy); padding:0 2px; }
+  .dc-group-count{ font-weight:400; color:var(--slate); font-size:11px; }
   .dc-badge{ display:inline-block; font-size:9px; font-weight:700; padding:1px 5px; border-radius:8px; background:var(--slate-light); color:var(--slate); margin-left:4px; vertical-align:middle; }
   .dc-badge.prio{ background:rgba(201,162,75,0.22); color:#8A6A1F; }
   .dc-badge.edited{ background:rgba(47,107,79,0.15); color:var(--good); }
@@ -305,6 +309,15 @@
       </div>
 
       <div class="dc-content">
+        <div class="dc-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <h4 style="margin:0 0 6px 0;">Notes</h4>
+            <button class="export-btn export-btn-outline" style="font-size:11px;" onclick="clearNotesConfirm()">Clear Notes</button>
+          </div>
+          <p class="dc-hint" style="margin-top:0;">General notes for this day — saved with the day, not included in any export.</p>
+          <textarea id="dcDayNotes" rows="3" placeholder="e.g. Skip Naomi this week, she's out of office…" style="width:100%; box-sizing:border-box; font-size:12px; padding:8px; border:1px solid var(--line); border-radius:6px; font-family:Calibri, Arial, sans-serif;" oninput="onDayNotesInput()"></textarea>
+        </div>
+
         <div class="dc-card" style="padding:12px 14px;">
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
             <div>
@@ -312,17 +325,13 @@
               <div class="dc-batch-note" id="listSummary">No rows yet — upload a file or add rows manually.</div>
             </div>
             <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <button class="export-btn export-btn-outline" style="font-size:11px;" onclick="expandAllGroups()">Show All</button>
+              <button class="export-btn export-btn-outline" style="font-size:11px;" onclick="collapseAllGroups()">Hide All</button>
               <button class="export-btn export-btn-outline" style="font-size:11px;" onclick="sortGroupsByDay()" title="Within each Purpose group, sort by month/day only (year ignored)">Sort by Day</button>
               <button class="export-btn export-btn-outline" style="font-size:11px;" onclick="addBlankRow()">+ Add Row</button>
-              <button class="export-btn export-btn-outline" style="font-size:11px;" onclick="clearListConfirm()">Clear</button>
+              <button class="export-btn export-btn-outline" style="font-size:11px;" onclick="clearListConfirm()">Clear List</button>
             </div>
           </div>
-        </div>
-
-        <div class="dc-card">
-          <h4 style="margin:0 0 6px 0;">Notes</h4>
-          <p class="dc-hint" style="margin-top:0;">General notes for this day — saved with the day, not included in any export.</p>
-          <textarea id="dcDayNotes" rows="3" placeholder="e.g. Skip Naomi this week, she's out of office…" style="width:100%; box-sizing:border-box; font-size:12px; padding:8px; border:1px solid var(--line); border-radius:6px; font-family:Calibri, Arial, sans-serif;" oninput="onDayNotesInput()"></textarea>
         </div>
 
         <div class="dc-card" style="padding:0;">
@@ -347,10 +356,20 @@
         <div class="dc-card" id="preAppCard" style="display:none;">
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
             <div>
-              <h4 style="margin:0;">Pre-App Last 14 Days</h4>
+              <h4 style="margin:0;">Pre-App <span id="preAppDaysLabel">Last 14 Days</span></h4>
               <div class="dc-batch-note" id="preAppSummary"></div>
             </div>
-            <button class="export-btn" style="font-size:11px;" onclick="exportPreAppPdf()">Export Pre-App PDF</button>
+            <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+              <label style="font-size:11px; color:var(--slate); display:flex; align-items:center; gap:5px;">Report covers
+                <select id="preAppDaysSelect" onchange="onPreAppDaysChange()" style="padding:4px; border:1px solid var(--line); border-radius:5px; font-size:11px;">
+                  <option value="14">14 days</option>
+                  <option value="30">30 days</option>
+                  <option value="other">Other…</option>
+                </select>
+              </label>
+              <button class="export-btn" style="font-size:11px;" onclick="exportPreAppPdf()">Export Pre-App PDF</button>
+              <button class="export-btn export-btn-outline" style="font-size:11px;" onclick="clearPreAppConfirm()">Clear Pre-App</button>
+            </div>
           </div>
           <div class="dc-grid-wrap" style="margin-top:8px;">
             <table class="dc-grid" style="min-width:600px;">
@@ -674,6 +693,8 @@ let dcDncSkippedTotal = 0;  // rows silently withheld from this session's upload
 let manualContactsByName = {}; // normalized name -> {phone}
 let sourceBatches = [];     // [{fileName, format, count}]
 let dayNotes = '';          // freeform notes for the whole day, saved with the record
+let preAppDays = 14;        // display-only label for the Pre-App card/PDF — Jungo's own report already scopes the actual date range
+let collapsedGroups = new Set(); // Purpose group keys currently collapsed on-screen (session-only, not persisted)
 
 const PURPOSES = ['Birthday','Home Anniversary','Closed Last 30 Days','CD Sent This Week','Referred Last 7 Days','Pre-Approved','Realtor Call','Closing Realtor','Pre-App','PhoneBurner Group','Other'];
 
@@ -693,7 +714,7 @@ function persistDraft(){
   try {
     localStorage.setItem(DRAFT_KEY, JSON.stringify({
       recordId: currentRecordId, dateOf: currentDateOf, rows: dcRows,
-      preApp: dcPreApp, sourceBatches: sourceBatches, dayNotes: dayNotes
+      preApp: dcPreApp, sourceBatches: sourceBatches, dayNotes: dayNotes, preAppDays: preAppDays
     }));
   } catch (e) {}
 }
@@ -715,6 +736,7 @@ async function initTool(){
     currentRecordId = draft.recordId || null;
     currentDateOf = draft.dateOf || todayIso();
     dayNotes = draft.dayNotes || '';
+    preAppDays = draft.preAppDays || 14;
     document.getElementById('dcDateOf').value = currentDateOf;
     document.getElementById('dcDayNotes').value = dayNotes;
   }
@@ -737,7 +759,7 @@ function applyWantToCallFlags_(flags){
   (flags||[]).forEach(f => { if (f.IdentityKey) wantToCallSet[f.IdentityKey] = f.DisplayName || ''; });
   // Re-apply to any rows already on the list.
   dcRows.forEach(r => { r.priority = !!wantToCallSet[r.identityKey]; });
-  pinPriorityToTop_();
+  arrangeRows_();
   renderList();
 }
 function applyDncFlags_(flags){
@@ -1102,11 +1124,16 @@ function parseAppOwnXlsx_(grid){
   const numc = findColIndex_(h, ['number'], []);
   const dc = findColIndex_(h, ['description'], []);
   const out = [];
+  let currentPurpose = 'Other'; // forward-filled from the nearest group header row above (exports leave Purpose blank on data rows — see buildDailyXlsxBlob_)
   for (let r = hdrRow+1; r < grid.length; r++){
     const row = grid[r]||[];
     const name = String(row[nc]||'').trim();
-    if (!name && !String(row[numc]||'').trim()) continue;
-    out.push(makeRow({ purpose:String(row[pc]||'Other').trim()||'Other', fullName:name, number:String(row[numc]||'').trim(), description:String(row[dc]||'').trim(), sourceType:'appOwnExport', manuallyEdited:true }));
+    const purposeCell = String(row[pc]||'').trim();
+    if (!name && !String(row[numc]||'').trim()){
+      if (purposeCell) currentPurpose = purposeCell; // a group header row — just updates the running purpose, emits no row
+      continue;
+    }
+    out.push(makeRow({ purpose: purposeCell || currentPurpose, fullName:name, number:String(row[numc]||'').trim(), description:String(row[dc]||'').trim(), sourceType:'appOwnExport', manuallyEdited:true }));
   }
   return out;
 }
@@ -1211,31 +1238,40 @@ function addUnifiedRows_(rows){
     dcRows.push(r);
   });
   dcDncSkippedTotal += dncSkipped;
-  pinPriorityToTop_();
+  arrangeRows_();
 }
+// Which on-screen group a row belongs to. Want-to-Call rows are pulled OUT
+// of their normal Purpose group entirely and shown only in their own
+// dedicated top section — never duplicated in both places.
+const PRIORITY_GROUP_KEY = '__priority__';
+function bucketKeyFor_(r){ return r.priority ? PRIORITY_GROUP_KEY : (r.purpose || 'Other'); }
+function groupDisplayName_(key){ return key === PRIORITY_GROUP_KEY ? 'Want to Call' : key; }
 // Standing invariant, re-applied after every mutation (add/delete/drag/sort):
-// priority (Want-to-Call) rows always float to the top, stable otherwise.
-function pinPriorityToTop_(){
+// Want-to-Call rows always float to their own group on top; everything else
+// is grouped by Purpose (canonical PURPOSES order, unrecognized purposes
+// appended after), each group's internal order otherwise stable.
+function arrangeRows_(){
   dcRows.forEach((r,i) => { if (r.sortIndex == null) r.sortIndex = i; });
-  dcRows.sort((a,b) => {
-    if (!!b.priority !== !!a.priority) return (b.priority?1:0) - (a.priority?1:0);
-    return (a.sortIndex||0) - (b.sortIndex||0);
-  });
+  const buckets = {};
+  dcRows.forEach(r => { const k = bucketKeyFor_(r); (buckets[k] = buckets[k] || []).push(r); });
+  const order = [PRIORITY_GROUP_KEY].concat(PURPOSES.filter(p => buckets[p]));
+  Object.keys(buckets).forEach(k => { if (order.indexOf(k) === -1) order.push(k); });
+  order.forEach(k => { if (buckets[k]) buckets[k].sort((a,b) => (a.sortIndex||0) - (b.sortIndex||0)); });
+  dcRows = [].concat.apply([], order.map(k => buckets[k] || []));
   dcRows.forEach((r,i) => { r.sortIndex = i; });
 }
-// Groups rows by Purpose (preserving each group's first-seen order), sorts
-// each group chronologically by month+day only (year ignored — e.g. a
-// birthdate range spanning decades still orders Jan before Dec correctly),
-// then re-pins Want-to-Call priority rows to the top as usual.
+// Sorts each Purpose group (the Want-to-Call group is left in its existing
+// order — it's a priority list, not a calendar) chronologically by month+day
+// only (year ignored — e.g. a birthdate range spanning decades still orders
+// Jan before Dec correctly), then re-applies the standing group arrangement.
 function monthDayKey_(d){ return d ? ((d.getMonth()+1)*100 + d.getDate()) : null; }
 function sortGroupsByDay(){
-  const order = [], groups = {};
-  dcRows.forEach(r => {
-    if (!groups[r.purpose]){ groups[r.purpose] = []; order.push(r.purpose); }
-    groups[r.purpose].push(r);
-  });
-  order.forEach(p => {
-    groups[p].sort((a,b) => {
+  arrangeRows_();
+  const byKey = {};
+  dcRows.forEach(r => { const k = bucketKeyFor_(r); (byKey[k] = byKey[k] || []).push(r); });
+  Object.keys(byKey).forEach(k => {
+    if (k === PRIORITY_GROUP_KEY) return;
+    byKey[k].sort((a,b) => {
       const da = monthDayKey_(a.sortDate), db = monthDayKey_(b.sortDate);
       if (da == null && db == null) return 0;
       if (da == null) return 1;   // no date -> sinks to the bottom of its group
@@ -1243,9 +1279,11 @@ function sortGroupsByDay(){
       return da - db;
     });
   });
-  dcRows = [].concat.apply([], order.map(p => groups[p]));
+  const orderedKeys = [];
+  const seen = new Set();
+  dcRows.forEach(r => { const k = bucketKeyFor_(r); if (!seen.has(k)){ seen.add(k); orderedKeys.push(k); } });
+  dcRows = [].concat.apply([], orderedKeys.map(k => byKey[k]));
   dcRows.forEach((r,i) => { r.sortIndex = i; });
-  pinPriorityToTop_();
   renderList(); persistDraft();
 }
 </script>
@@ -1254,6 +1292,20 @@ function sortGroupsByDay(){
 // ===========================================================================
 // LIST FOR TODAY — fully editable grid (inline edit, reorder, delete, add).
 // ===========================================================================
+// Grouped display, per Ann's ask: a "Want to Call" section always on top,
+// then one collapsible section per Purpose group (arrangeRows_ keeps dcRows
+// physically contiguous per group, so we just watch for the group key
+// changing as we walk the flat array and inject a header row there).
+function toggleGroupCollapse(key){
+  if (collapsedGroups.has(key)) collapsedGroups.delete(key); else collapsedGroups.add(key);
+  renderList();
+}
+function expandAllGroups(){ collapsedGroups.clear(); renderList(); }
+function collapseAllGroups(){
+  const keys = new Set(dcRows.filter(r => !r.priority).map(r => r.purpose || 'Other'));
+  collapsedGroups = keys;
+  renderList();
+}
 function renderList(){
   const body = document.getElementById('dcListBody');
   const empty = document.getElementById('dcListEmpty');
@@ -1268,10 +1320,27 @@ function renderList(){
   const prio = dcRows.filter(r => r.priority).length;
   const missing = dcRows.filter(r => r.missingPhone).length;
   summary.textContent = dcRows.length + ' row(s)' + (prio ? ' · ' + prio + ' priority' : '') + (missing ? ' · ' + missing + ' missing phone' : '') + (dcDncSkippedTotal ? ' · ' + dcDncSkippedTotal + ' skipped (DNC)' : '');
-  body.innerHTML = dcRows.map((r, i) => {
+
+  let html = '';
+  let lastKey = null;
+  dcRows.forEach((r, i) => {
+    const key = bucketKeyFor_(r);
+    if (key !== lastKey){
+      const isPriority = key === PRIORITY_GROUP_KEY;
+      const count = dcRows.filter(x => bucketKeyFor_(x) === key).length;
+      const collapsed = !isPriority && collapsedGroups.has(key);
+      html += '<tr class="dc-group-header' + (isPriority ? ' dc-group-header-priority' : '') + '">' +
+        '<td colspan="6">' +
+          (isPriority ? '★ ' : '<button class="dc-group-toggle" onclick="toggleGroupCollapse(\'' + escapeHtml(key).replace(/'/g,"\\'") + '\')">' + (collapsed?'▸':'▾') + '</button> ') +
+          escapeHtml(groupDisplayName_(key)) + ' <span class="dc-group-count">(' + count + ')</span>' +
+        '</td>' +
+      '</tr>';
+      lastKey = key;
+    }
+    const collapsedNow = key !== PRIORITY_GROUP_KEY && collapsedGroups.has(key);
     const cls = (r.priority ? 'dc-priority ' : '') + (r.missingPhone ? 'dc-missing-phone' : '');
     const badges = (r.priority ? '<span class="dc-badge prio">WTC</span>' : '') + (r.manuallyEdited ? '<span class="dc-badge edited">edited</span>' : '');
-    return '<tr class="' + cls + '" draggable="true" data-idx="' + i + '">' +
+    html += '<tr class="' + cls + '" draggable="true" data-idx="' + i + '"' + (collapsedNow ? ' style="display:none;"' : '') + '>' +
       '<td class="dc-col-purpose"><textarea rows="1" class="dc-cell-input" data-idx="' + i + '" data-field="purpose">' + escapeHtml(r.purpose) + '</textarea></td>' +
       '<td class="dc-col-name"><textarea rows="1" class="dc-cell-input" data-idx="' + i + '" data-field="fullName">' + escapeHtml(r.fullName) + '</textarea>' + badges + '</td>' +
       '<td class="dc-col-number dc-number-cell"><textarea rows="1" class="dc-cell-input" data-idx="' + i + '" data-field="number">' + escapeHtml(r.number) + '</textarea>' +
@@ -1287,7 +1356,8 @@ function renderList(){
         '<button class="dc-mini-btn del" title="Delete" onclick="deleteRow(' + i + ')">✕</button>' +
       '</div></td>' +
     '</tr>';
-  }).join('');
+  });
+  body.innerHTML = html;
   body.querySelectorAll('.dc-cell-input').forEach(autoSize_);
 }
 function autoSize_(el){ el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
@@ -1314,14 +1384,14 @@ function moveRow(i, dir){
   if (j < 0 || j >= dcRows.length) return;
   const tmp = dcRows[i]; dcRows[i] = dcRows[j]; dcRows[j] = tmp;
   dcRows.forEach((r,k) => r.sortIndex = k);
-  pinPriorityToTop_();
+  arrangeRows_();
   renderList(); persistDraft();
 }
 function deleteRow(i){ dcRows.splice(i,1); dcRows.forEach((r,k)=>r.sortIndex=k); renderList(); persistDraft(); }
 function toggleRowPriority(i){
   const r = dcRows[i]; r.priority = !r.priority;
   saveWantToCallFlag_(r.identityKey, r.fullName, r.priority);
-  pinPriorityToTop_();
+  arrangeRows_();
   renderList(); persistDraft();
 }
 // The "negative star" — removes the row from today's list entirely and
@@ -1338,29 +1408,43 @@ function toggleRowDnc(i){
 }
 function addBlankRow(){
   dcRows.push(makeRow({ purpose:'Other', manuallyEdited:true, sortIndex:dcRows.length }));
-  pinPriorityToTop_();
+  arrangeRows_();
   renderList(); persistDraft();
 }
 function onDayNotesInput(){
   dayNotes = document.getElementById('dcDayNotes').value;
   persistDraft();
 }
+// Each block now clears independently — Ann didn't want one "Clear" wiping
+// the list, Pre-App, AND her notes all at once.
 function clearListConfirm(){
-  if (!dcRows.length && !dayNotes) return;
-  if (!confirm('Clear the whole List for Today, including its Notes? (Saved days are not affected. Persistent Want-to-Call/DNC lists are not affected.)')) return;
-  dcRows = []; dcPreApp = []; sourceBatches = []; currentRecordId = null; dayNotes = ''; dcDncSkippedTotal = 0;
+  if (!dcRows.length) return;
+  if (!confirm('Clear the List for Today rows? (Notes, Pre-App, saved days, and persistent Want-to-Call/DNC lists are not affected.)')) return;
+  dcRows = []; sourceBatches = []; currentRecordId = null; dcDncSkippedTotal = 0;
+  renderList(); persistDraft();
+}
+function clearNotesConfirm(){
+  if (!dayNotes) return;
+  if (!confirm('Clear this day\'s Notes? (The List for Today and Pre-App are not affected.)')) return;
+  dayNotes = '';
   document.getElementById('dcDayNotes').value = '';
-  renderList(); renderPreApp(); persistDraft();
+  persistDraft();
+}
+function clearPreAppConfirm(){
+  if (!dcPreApp.length) return;
+  if (!confirm('Clear the Pre-App list? (The List for Today and Notes are not affected.)')) return;
+  dcPreApp = [];
+  renderPreApp(); persistDraft();
 }
 
 // Drag-and-drop reorder.
 let dragFromIdx = null;
-function onListDragStart(e){ const tr = e.target.closest('tr'); if (!tr) return; dragFromIdx = +tr.dataset.idx; e.dataTransfer.effectAllowed = 'move'; }
-function onListDragOver(e){ e.preventDefault(); const tr = e.target.closest('tr'); if (tr) tr.classList.add('dc-drag-over'); }
+function onListDragStart(e){ const tr = e.target.closest('tr'); if (!tr || !tr.dataset.idx) return; dragFromIdx = +tr.dataset.idx; e.dataTransfer.effectAllowed = 'move'; }
+function onListDragOver(e){ e.preventDefault(); const tr = e.target.closest('tr'); if (tr && tr.dataset.idx) tr.classList.add('dc-drag-over'); }
 function onListDragLeave(e){ const tr = e.target.closest('tr'); if (tr) tr.classList.remove('dc-drag-over'); }
 function onListDrop(e){
   e.preventDefault();
-  const tr = e.target.closest('tr'); if (!tr) return;
+  const tr = e.target.closest('tr'); if (!tr || !tr.dataset.idx) return; // group header rows aren't valid drop targets
   tr.classList.remove('dc-drag-over');
   const to = +tr.dataset.idx;
   if (dragFromIdx == null || dragFromIdx === to) return;
@@ -1368,19 +1452,37 @@ function onListDrop(e){
   dcRows.splice(to, 0, moved);
   dcRows.forEach((r,k) => r.sortIndex = k);
   dragFromIdx = null;
-  pinPriorityToTop_();
+  arrangeRows_();
   renderList(); persistDraft();
 }
 
 function renderPreApp(){
   const card = document.getElementById('preAppCard');
   const body = document.getElementById('preAppBody');
+  document.getElementById('preAppDaysLabel').textContent = 'Last ' + preAppDays + ' Days';
+  const sel = document.getElementById('preAppDaysSelect');
+  if (sel) sel.value = (preAppDays === 14 || preAppDays === 30) ? String(preAppDays) : 'other';
   if (!dcPreApp.length){ card.style.display = 'none'; return; }
   card.style.display = 'block';
   document.getElementById('preAppSummary').textContent = dcPreApp.length + ' unique borrower(s) — exported as its own PDF, not merged into the daily list.';
   body.innerHTML = dcPreApp.map(p =>
     '<tr><td>' + escapeHtml(p.fullName) + '</td><td>' + escapeHtml(p.mobile) + '</td><td>' + escapeHtml(p.preApproved) + '</td><td>' + escapeHtml(p.lastTouchDate || p.lastTouch) + '</td><td>' + escapeHtml(p.stage) + '</td></tr>'
   ).join('');
+}
+// Jungo's own export already scopes whichever date range Ann ran the report
+// for — this control is purely a display label (card title + PDF title),
+// not an actual row filter, since the app trusts the uploaded file's scope.
+function onPreAppDaysChange(){
+  const sel = document.getElementById('preAppDaysSelect');
+  if (sel.value === 'other'){
+    const n = prompt('How many days does this Pre-App report cover?', String(preAppDays));
+    const parsed = parseInt(n, 10);
+    if (n == null) { renderPreApp(); return; } // cancelled — leave as-is
+    preAppDays = (parsed > 0) ? parsed : preAppDays;
+  } else {
+    preAppDays = parseInt(sel.value, 10);
+  }
+  renderPreApp(); persistDraft();
 }
 </script>
 
@@ -1434,7 +1536,7 @@ async function removeWantToCallEntry(identityKey){
   delete wantToCallSet[identityKey];
   saveWantToCallFlag_(identityKey, '', false);
   dcRows.forEach(r => { if (r.identityKey === identityKey) r.priority = false; });
-  pinPriorityToTop_(); renderList(); persistDraft();
+  arrangeRows_(); renderList(); persistDraft();
   renderWantToCallModalLists_();
 }
 async function removeDncEntry(identityKey){
@@ -1723,7 +1825,7 @@ function closeMapperModal(){ document.getElementById('mapperModalOverlay').class
 // SAVE / LOAD / DELETE (cloud) + EXPORTS (CSV / XLSX / PDF)
 // ===========================================================================
 function currentPayloadData_(){
-  return { rows:dcRows, preApp:dcPreApp, sourceBatches:sourceBatches, dayNotes:dayNotes };
+  return { rows:dcRows, preApp:dcPreApp, sourceBatches:sourceBatches, dayNotes:dayNotes, preAppDays:preAppDays };
 }
 async function saveDay(){
   const status = document.getElementById('dcSaveStatus');
@@ -1763,7 +1865,7 @@ async function loadSavedRecord(recordId){
     const data = await DC_API.getDailyCallsRecord(recordId);
     const d = data.data || {};
     dcRows = d.rows || []; dcPreApp = d.preApp || []; sourceBatches = d.sourceBatches || [];
-    dayNotes = d.dayNotes || '';
+    dayNotes = d.dayNotes || ''; preAppDays = d.preAppDays || 14;
     currentRecordId = recordId; currentDateOf = data.record.DateOf || todayIso();
     document.getElementById('dcDateOf').value = currentDateOf;
     document.getElementById('dcDayNotes').value = dayNotes;
@@ -1797,11 +1899,29 @@ async function saveExportBlob(kind, blob, filename){
   return true;
 }
 
-// CSV — PhoneBurner import shape: Name,Phone,Description (Purpose dropped).
+// Regroups rows for export purposes ONLY, strictly by real Purpose (never
+// by the on-screen Want-to-Call bucket — that's a UI affordance, not a real
+// classification, and a fake "Want to Call" section header in an exported
+// file would corrupt Purpose on re-import). Priority rows still float to
+// the top WITHIN their own real group. Canonical PURPOSES order first,
+// any unrecognized purposes appended after.
+function exportGroupsFor_(rows){
+  const groups = {}, order = [];
+  rows.forEach(r => { const k = r.purpose || 'Other'; if (!groups[k]){ groups[k] = []; order.push(k); } groups[k].push(r); });
+  const canonical = PURPOSES.filter(p => groups[p]).concat(order.filter(k => PURPOSES.indexOf(k) === -1));
+  canonical.forEach(k => groups[k].sort((a,b) => (b.priority?1:0) - (a.priority?1:0)));
+  return canonical.map(k => ({ purpose:k, rows:groups[k] }));
+}
+
+// CSV — PhoneBurner import shape: Name,Phone,Description (Purpose dropped,
+// grouped order kept for a sensible default sequence, no header rows since
+// PhoneBurner's own import has no slot for them).
 function csvEscape_(s){ const v = String(s==null?'':s); return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; }
 function buildDailyCsv_(){
   const lines = ['Name,Phone,Description'];
-  dcRows.forEach(r => { lines.push([csvEscape_(r.fullName), csvEscape_(r.number), csvEscape_(r.description)].join(',')); });
+  exportGroupsFor_(dcRows).forEach(g => g.rows.forEach(r => {
+    lines.push([csvEscape_(r.fullName), csvEscape_(r.number), csvEscape_(r.description)].join(','));
+  }));
   return lines.join('\r\n');
 }
 async function exportCsv(){
@@ -1809,18 +1929,26 @@ async function exportCsv(){
   await saveExportBlob('csv', blob);
 }
 
-// XLSX — export/xlsx-helpers.js + JSZip, 4 on-screen columns, wrapped text.
+// XLSX — export/xlsx-helpers.js + JSZip. Grouped like the on-screen view and
+// Ann's own hand-built layout: one bold header row per Purpose (Column A
+// only, matching her sample file exactly), Purpose left BLANK on every data
+// row below it — parseAppOwnXlsx_ forward-fills Purpose from the nearest
+// header row above on re-import, so nothing is lost round-tripping.
 async function buildDailyXlsxBlob_(){
   const cells = {};
   function setCell(addr, opts){ cells[addr] = Object.assign({ s:0 }, opts); }
   const headers = ['Purpose of Call','Full Name','Number','Description'];
   headers.forEach((h,i) => setCell(colLetter(i+1) + '1', { t:'inlineStr', v:h, s:1 }));
-  dcRows.forEach((r, ri) => {
-    const rr = ri + 2;
-    setCell('A'+rr, { t:'inlineStr', v:r.purpose });
-    setCell('B'+rr, { t:'inlineStr', v:r.fullName });
-    setCell('C'+rr, { t:'inlineStr', v:r.number });
-    setCell('D'+rr, { t:'inlineStr', v:r.description, s:2 });
+  let rr = 2;
+  exportGroupsFor_(dcRows).forEach(g => {
+    setCell('A'+rr, { t:'inlineStr', v:g.purpose, s:1 });
+    rr++;
+    g.rows.forEach(r => {
+      setCell('B'+rr, { t:'inlineStr', v:r.fullName });
+      setCell('C'+rr, { t:'inlineStr', v:r.number });
+      setCell('D'+rr, { t:'inlineStr', v:r.description, s:2 });
+      rr++;
+    });
   });
   const stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
@@ -1856,12 +1984,14 @@ async function buildDailyXlsxBlob_(){
   zip.file('xl/workbook.xml', workbookXml);
   zip.file('xl/_rels/workbook.xml.rels', workbookRelsXml);
   zip.file('xl/styles.xml', stylesXml);
-  zip.file('xl/worksheets/sheet1.xml', sheetXml(cells, [18,22,16,60]));
+  zip.file('xl/worksheets/sheet1.xml', sheetXml(cells, [16,26,16,64]));
   return zip.generateAsync({ type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 }
 async function exportXlsx(){ const blob = await buildDailyXlsxBlob_(); await saveExportBlob('xlsx', blob); }
 
-// PDF — a single readable table (priority rows already at the top).
+// PDF — grouped by Purpose (a bold section line per group, matching the
+// on-screen view and Ann's own sample layout), Name/Description given the
+// Purpose column's freed-up width so long names don't get cut off.
 function buildDailyPdfBlob_(){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit:'pt', format:'letter' });
@@ -1870,27 +2000,34 @@ function buildDailyPdfBlob_(){
   const pageH = doc.internal.pageSize.getHeight();
   let y = 40;
   doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(navy[0],navy[1],navy[2]);
-  doc.text('Daily Calls — ' + currentDateOf, 40, y); y += 20;
-  const cols = [{x:40,w:95,k:'purpose'},{x:135,w:110,k:'fullName'},{x:245,w:85,k:'number'},{x:330,w:pageW-370,k:'description'}];
-  function header(){
+  doc.text('Daily Calls — ' + currentDateOf, 40, y); y += 22;
+  const cols = [{x:40,w:150,k:'fullName'},{x:200,w:100,k:'number'},{x:310,w:pageW-350,k:'description'}];
+  function colHeader(){
     doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(0,0,0);
-    doc.text('Purpose', cols[0].x, y); doc.text('Full Name', cols[1].x, y); doc.text('Number', cols[2].x, y); doc.text('Description', cols[3].x, y);
+    doc.text('Full Name', cols[0].x, y); doc.text('Number', cols[1].x, y); doc.text('Description', cols[2].x, y);
     y += 6; doc.setDrawColor(200,200,200); doc.line(40, y, pageW-40, y); y += 12;
   }
-  header();
+  function ensureRoom(h){ if (y + h > pageH - 40){ doc.addPage(); y = 40; colHeader(); doc.setFont('helvetica','normal'); doc.setFontSize(8.5); } }
+  colHeader();
   doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
-  dcRows.forEach(r => {
-    const descLines = doc.splitTextToSize(String(r.description||''), cols[3].w);
-    const nameLines = doc.splitTextToSize(String(r.fullName||''), cols[1].w);
-    const rowH = Math.max(descLines.length, nameLines.length, 1) * 10 + 6;
-    if (y + rowH > pageH - 40){ doc.addPage(); y = 40; header(); doc.setFont('helvetica','normal'); doc.setFontSize(8.5); }
-    doc.setTextColor(30,30,30);
-    doc.text(String(r.purpose||''), cols[0].x, y);
-    doc.text(nameLines, cols[1].x, y);
-    doc.text(String(r.number||''), cols[2].x, y);
-    doc.text(descLines, cols[3].x, y);
-    y += rowH;
-    doc.setDrawColor(235,235,235); doc.line(40, y-4, pageW-40, y-4);
+  exportGroupsFor_(dcRows).forEach(g => {
+    ensureRoom(20);
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(navy[0],navy[1],navy[2]);
+    doc.text(g.purpose + ' (' + g.rows.length + ')', 40, y); y += 16;
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(30,30,30);
+    g.rows.forEach(r => {
+      const descLines = doc.splitTextToSize(String(r.description||''), cols[2].w);
+      const nameLines = doc.splitTextToSize(String(r.fullName||''), cols[0].w);
+      const rowH = Math.max(descLines.length, nameLines.length, 1) * 10 + 6;
+      ensureRoom(rowH);
+      doc.setTextColor(30,30,30);
+      doc.text(nameLines, cols[0].x, y);
+      doc.text(String(r.number||''), cols[1].x, y);
+      doc.text(descLines, cols[2].x, y);
+      y += rowH;
+      doc.setDrawColor(235,235,235); doc.line(40, y-4, pageW-40, y-4);
+    });
+    y += 6;
   });
   return doc.output('blob');
 }
@@ -1904,7 +2041,7 @@ function exportPreAppPdf(){
   const navy = [27,42,74]; const pageW = doc.internal.pageSize.getWidth(); const pageH = doc.internal.pageSize.getHeight();
   let y = 40;
   doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(navy[0],navy[1],navy[2]);
-  doc.text('Pre-Apps — ' + currentDateOf, 40, y); y += 20;
+  doc.text('Pre-App Last ' + preAppDays + ' Days — ' + currentDateOf, 40, y); y += 20;
   const cols = [{x:40,label:'Full Name'},{x:180,label:'Mobile'},{x:280,label:'Pre-Approved'},{x:400,label:'Last Touch'},{x:490,label:'Stage'}];
   function header(){ doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(0,0,0); cols.forEach(c=>doc.text(c.label,c.x,y)); y+=6; doc.setDrawColor(200,200,200); doc.line(40,y,pageW-40,y); y+=12; }
   header(); doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
