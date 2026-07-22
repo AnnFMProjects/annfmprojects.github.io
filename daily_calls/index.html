@@ -74,11 +74,14 @@
   .dc-cell-input:focus{ outline:1px solid var(--gold); background:#fff; }
   .dc-col-purpose{ width:150px; } .dc-col-name{ width:170px; } .dc-col-number{ width:130px; }
   .dc-col-notes{ width:160px; }
-  .dc-col-actions{ width:96px; }
-  .dc-row-actions{ display:flex; flex-wrap:wrap; gap:3px; }
+  .dc-col-actions{ width:118px; }
+  .dc-row-actions{ display:flex; flex-wrap:wrap; gap:3px; align-items:center; }
   .dc-mini-btn{ font-size:11px; line-height:1; padding:3px 5px; border:1px solid var(--line); background:#fff; border-radius:4px; cursor:pointer; color:var(--slate); }
   .dc-mini-btn:hover{ background:var(--slate-light); color:var(--navy); }
   .dc-mini-btn.del:hover{ background:#f5d9d9; color:var(--bad); border-color:#f0c4c4; }
+  .dc-drag-handle{ cursor:grab; font-size:14px; line-height:1; padding:3px 4px; color:var(--slate); user-select:none; border:1px solid transparent; }
+  .dc-drag-handle:active{ cursor:grabbing; }
+  tr.dc-drag-over{ outline:2px dashed var(--gold); outline-offset:-2px; }
   .dc-badge{ display:inline-block; font-size:9px; font-weight:700; padding:1px 5px; border-radius:8px; background:var(--slate-light); color:var(--slate); margin-left:4px; vertical-align:middle; }
   .dc-badge.prio{ background:rgba(201,162,75,0.22); color:#8A6A1F; }
   .dc-badge.edited{ background:rgba(47,107,79,0.15); color:var(--good); }
@@ -294,9 +297,9 @@
         </div>
 
         <div class="dc-card">
-          <h4>Want to Call (priority)</h4>
-          <p class="dc-hint">Flag people to push to the top of the list. Flags persist and re-apply whenever that person is parsed again.</p>
-          <button class="export-btn export-btn-outline" style="font-size:11px;" onclick="openWantToCallModal()">Review current list &amp; flags</button>
+          <h4>Want to Call &amp; Do Not Call</h4>
+          <p class="dc-hint">★ pins someone to the top of every list they appear on. 🚫 removes them today and skips them automatically from now on. Both persist.</p>
+          <button class="export-btn export-btn-outline" style="font-size:11px;" onclick="openWantToCallModal()">Manage persistent lists</button>
         </div>
 
       </div>
@@ -309,6 +312,7 @@
               <div class="dc-batch-note" id="listSummary">No rows yet — upload a file or add rows manually.</div>
             </div>
             <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <button class="export-btn export-btn-outline" style="font-size:11px;" onclick="sortGroupsByDay()" title="Within each Purpose group, sort by month/day only (year ignored)">Sort by Day</button>
               <button class="export-btn export-btn-outline" style="font-size:11px;" onclick="addBlankRow()">+ Add Row</button>
               <button class="export-btn export-btn-outline" style="font-size:11px;" onclick="clearListConfirm()">Clear</button>
             </div>
@@ -392,15 +396,23 @@
     </div>
   </div>
 
-  <!-- WANT-TO-CALL MODAL -->
+  <!-- WANT-TO-CALL / DNC MODAL -->
   <div id="wantToCallModalOverlay" class="dc-modal-overlay" onclick="if(event.target===this) closeWantToCallModal();">
     <div class="dc-modal" style="max-width:560px;">
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <h3 style="margin:0;">Want to Call</h3>
+        <h3 style="margin:0;">Want to Call &amp; Do Not Call</h3>
         <button class="export-btn export-btn-outline" style="padding:4px 8px; font-size:11px;" onclick="closeWantToCallModal()">&times; Close</button>
       </div>
-      <p style="font-size:12px; color:var(--slate); margin:8px 0;">Tick anyone you want pushed to the top. Saved immediately.</p>
-      <div id="wantToCallList" style="max-height:52vh; overflow-y:auto;"></div>
+      <p style="font-size:12px; color:var(--slate); margin:8px 0;">Tick anyone on today's list you want pushed to the top. Saved immediately.</p>
+      <div id="wantToCallList" style="max-height:26vh; overflow-y:auto;"></div>
+
+      <h4 style="margin:14px 0 4px 0; color:var(--navy);">Persistent Want-to-Call list</h4>
+      <p style="font-size:11.5px; color:var(--slate); margin:0 0 4px 0;">Everyone ever flagged — stays flagged whenever they reappear, even on a day they're not currently uploaded.</p>
+      <div id="wtcPersistentList" style="max-height:18vh; overflow-y:auto;"></div>
+
+      <h4 style="margin:14px 0 4px 0; color:var(--navy);">Persistent Do Not Call list</h4>
+      <p style="font-size:11.5px; color:var(--slate); margin:0 0 4px 0;">Anyone marked 🚫 is skipped automatically from every future upload until removed here.</p>
+      <div id="dncPersistentList" style="max-height:18vh; overflow-y:auto;"></div>
     </div>
   </div>
 
@@ -435,7 +447,7 @@
 // ===========================================================================
 // DC_API — mirrors GT_API/SOCIAL_API. Shares assets/api.js core + the same
 // 'cce_session_token' localStorage key, so a login in any tool carries over.
-// The 12 action strings below MUST match the ACTIONS map in backend Code.gs.
+// The 14 action strings below MUST match the ACTIONS map in backend Code.gs.
 // ===========================================================================
 const DC_API = (function(){
   const core = createFmApiCore();
@@ -456,6 +468,9 @@ const DC_API = (function(){
     // DailyCallsWantToCall (plain sheet)
     saveDailyCallsWantToCall: async function(payload){ const d = await core.call('saveDailyCallsWantToCall', payload); return d.flags; },
     listDailyCallsWantToCall: async function(){ const d = await core.call('listDailyCallsWantToCall', {}); return d.flags; },
+    // DailyCallsDnc (plain sheet — the persistent "negative star" Do Not Call set)
+    saveDailyCallsDnc: async function(payload){ const d = await core.call('saveDailyCallsDnc', payload); return d.flags; },
+    listDailyCallsDnc: async function(){ const d = await core.call('listDailyCallsDnc', {}); return d.flags; },
   });
 })();
 
@@ -654,6 +669,8 @@ let dcPreApp = [];          // Pre-App rows (separate PDF only)
 let currentRecordId = null;
 let currentDateOf = todayIso();
 let wantToCallSet = {};     // identityKey -> displayName
+let dncSet = {};            // identityKey -> displayName ("negative star" — Do Not Call)
+let dcDncSkippedTotal = 0;  // rows silently withheld from this session's uploads because they're on the DNC list
 let manualContactsByName = {}; // normalized name -> {phone}
 let sourceBatches = [];     // [{fileName, format, count}]
 let dayNotes = '';          // freeform notes for the whole day, saved with the record
@@ -664,7 +681,7 @@ function makeRow(fields){
   const r = Object.assign({
     rowId: uid(), purpose:'Other', fullName:'', number:'', description:'', notes:'',
     sourceType:'', identityKey:'', priority:false, manuallyEdited:false,
-    missingPhone:false, sortIndex:0, raw:null
+    missingPhone:false, sortIndex:0, sortDate:null, raw:null
   }, fields);
   if (!r.identityKey) r.identityKey = identityKeyFor(r.fullName, r.number);
   if (!r.number) r.missingPhone = true;
@@ -705,6 +722,7 @@ async function initTool(){
   renderList();
   renderPreApp();
   try { const flags = await DC_API.listDailyCallsWantToCall(); applyWantToCallFlags_(flags); } catch(e){}
+  try { const flags = await DC_API.listDailyCallsDnc(); applyDncFlags_(flags); } catch(e){}
   try { const contacts = await DC_API.listDailyCallsManualContacts(); indexManualContacts_(contacts); } catch(e){}
 }
 function indexManualContacts_(contacts){
@@ -719,7 +737,16 @@ function applyWantToCallFlags_(flags){
   (flags||[]).forEach(f => { if (f.IdentityKey) wantToCallSet[f.IdentityKey] = f.DisplayName || ''; });
   // Re-apply to any rows already on the list.
   dcRows.forEach(r => { r.priority = !!wantToCallSet[r.identityKey]; });
-  sortByPriorityInitial_();
+  pinPriorityToTop_();
+  renderList();
+}
+function applyDncFlags_(flags){
+  dncSet = {};
+  (flags||[]).forEach(f => { if (f.IdentityKey) dncSet[f.IdentityKey] = f.DisplayName || ''; });
+  // Anyone already on the list who's on the DNC set gets removed outright.
+  const before = dcRows.length;
+  dcRows = dcRows.filter(r => !dncSet[r.identityKey]);
+  dcDncSkippedTotal += (before - dcRows.length);
   renderList();
 }
 </script>
@@ -868,7 +895,7 @@ function buildWideRow_(title, headers, row, col, ctx){
     // landed yet), e.g. a 7/17/1981 birthday on a 7/16 list reads "Turning 44".
     const age = ageFrom_(birth, ctx.now);
     const desc = [val(bdCol), age != null ? ('Turning ' + age) : ''].filter(Boolean).join('\n');
-    return makeRow({ purpose:'Birthday', fullName:name, number:val(mobCol), description:desc, sourceType:'dailyUpdateWide' });
+    return makeRow({ purpose:'Birthday', fullName:name, number:val(mobCol), description:desc, sourceType:'dailyUpdateWide', sortDate:birth });
   }
 
   if (title.indexOf('anniversar') !== -1){
@@ -891,7 +918,7 @@ function buildWideRow_(title, headers, row, col, ctx){
     if (proc) lines.push('Processor: ' + proc);
     const coName = val(coNameCol), coMob = val(coMobCol);
     if (coName || coMob){ lines.push(''); lines.push('Co-Borrower:'); lines.push((coName ? coName + ': ' : '') + coMob); }
-    return makeRow({ purpose:'Home Anniversary', fullName:name, number:val(mobCol), description:lines.join('\n'), sourceType:'dailyUpdateWide' });
+    return makeRow({ purpose:'Home Anniversary', fullName:name, number:val(mobCol), description:lines.join('\n'), sourceType:'dailyUpdateWide', sortDate:close });
   }
 
   if (title.indexOf('closed') !== -1 || title.indexOf('cd sent') !== -1){
@@ -910,12 +937,12 @@ function buildWideRow_(title, headers, row, col, ctx){
       const lines = [];
       if (val(closeCol)) lines.push('Closing Date: ' + val(closeCol));
       if (val(leadCol)) lines.push('Lead Specialist: ' + val(leadCol));
-      out.push(makeRow({ purpose:'Closed Last 30 Days', fullName:name, number:val(mobCol), description:lines.join('\n'), sourceType:'dailyUpdateWide' }));
+      out.push(makeRow({ purpose:'Closed Last 30 Days', fullName:name, number:val(mobCol), description:lines.join('\n'), sourceType:'dailyUpdateWide', sortDate:close }));
     }
     // CD Sent This Week — only if CD Sent date falls in the current week.
     const cd = parseLooseDate_(val(cdCol));
     if (val(cdCol) && (!cd || (cd >= ctx.sow && cd <= ctx.eow))){
-      out.push(makeRow({ purpose:'CD Sent This Week', fullName:name, number:val(mobCol), description:'CD Sent: ' + val(cdCol), sourceType:'dailyUpdateWide' }));
+      out.push(makeRow({ purpose:'CD Sent This Week', fullName:name, number:val(mobCol), description:'CD Sent: ' + val(cdCol), sourceType:'dailyUpdateWide', sortDate:cd }));
     }
     // buildWideRow_ returns one row; return the array via a sentinel so the
     // caller can spread it.
@@ -926,9 +953,11 @@ function buildWideRow_(title, headers, row, col, ctx){
     const nameCol = col(['full name'], ['borrower']);
     const mobCol = col(['mobile'], ['borrower']);
     const refByCol = col(['referred by'], []) !== -1 ? col(['referred by'], []) : col(['referred'], []);
+    const createdCol = col(['created date'], []);
     const name = val(nameCol); if (!name) return null;
     const desc = val(refByCol) ? ('Referred By: ' + val(refByCol)) : '';
-    return makeRow({ purpose:'Referred Last 7 Days', fullName:name, number:val(mobCol), description:desc, sourceType:'dailyUpdateWide' });
+    const created = parseLooseDate_(val(createdCol));
+    return makeRow({ purpose:'Referred Last 7 Days', fullName:name, number:val(mobCol), description:desc, sourceType:'dailyUpdateWide', sortDate:created });
   }
 
   if (title.indexOf('pre-approved') !== -1 || title.indexOf('pre approved') !== -1){
@@ -937,7 +966,8 @@ function buildWideRow_(title, headers, row, col, ctx){
     const pmCol = col(['pre-approved last'], []) !== -1 ? col(['pre-approved last'], []) : col(['last modified'], []);
     const name = val(nameCol); if (!name) return null;
     const desc = val(pmCol) ? ('Pre-Approved: ' + val(pmCol)) : '';
-    return makeRow({ purpose:'Pre-Approved', fullName:name, number:val(mobCol), description:desc, sourceType:'dailyUpdateWide' });
+    const pm = parseLooseDate_(val(pmCol));
+    return makeRow({ purpose:'Pre-Approved', fullName:name, number:val(mobCol), description:desc, sourceType:'dailyUpdateWide', sortDate:pm });
   }
 
   return null;
@@ -1163,10 +1193,12 @@ function flattenMulti_(rows){
   return out;
 }
 
-// Add unified rows with dedup (by identityKey+purpose), Want-to-Call priority,
-// and manual-edit protection.
+// Add unified rows with dedup (by identityKey+purpose), DNC filtering,
+// Want-to-Call priority, and manual-edit protection.
 function addUnifiedRows_(rows){
+  let dncSkipped = 0;
   rows.forEach(r => {
+    if (dncSet[r.identityKey]){ dncSkipped++; return; } // never add someone on the DNC list
     const dupKey = r.identityKey + '|' + r.purpose;
     const existing = dcRows.find(x => (x.identityKey + '|' + x.purpose) === dupKey);
     if (existing){
@@ -1178,16 +1210,43 @@ function addUnifiedRows_(rows){
     r.sortIndex = dcRows.length;
     dcRows.push(r);
   });
-  sortByPriorityInitial_();
+  dcDncSkippedTotal += dncSkipped;
+  pinPriorityToTop_();
 }
-// Initial build-time sort only: priority rows to the top, stable otherwise.
-function sortByPriorityInitial_(){
+// Standing invariant, re-applied after every mutation (add/delete/drag/sort):
+// priority (Want-to-Call) rows always float to the top, stable otherwise.
+function pinPriorityToTop_(){
   dcRows.forEach((r,i) => { if (r.sortIndex == null) r.sortIndex = i; });
   dcRows.sort((a,b) => {
     if (!!b.priority !== !!a.priority) return (b.priority?1:0) - (a.priority?1:0);
     return (a.sortIndex||0) - (b.sortIndex||0);
   });
   dcRows.forEach((r,i) => { r.sortIndex = i; });
+}
+// Groups rows by Purpose (preserving each group's first-seen order), sorts
+// each group chronologically by month+day only (year ignored — e.g. a
+// birthdate range spanning decades still orders Jan before Dec correctly),
+// then re-pins Want-to-Call priority rows to the top as usual.
+function monthDayKey_(d){ return d ? ((d.getMonth()+1)*100 + d.getDate()) : null; }
+function sortGroupsByDay(){
+  const order = [], groups = {};
+  dcRows.forEach(r => {
+    if (!groups[r.purpose]){ groups[r.purpose] = []; order.push(r.purpose); }
+    groups[r.purpose].push(r);
+  });
+  order.forEach(p => {
+    groups[p].sort((a,b) => {
+      const da = monthDayKey_(a.sortDate), db = monthDayKey_(b.sortDate);
+      if (da == null && db == null) return 0;
+      if (da == null) return 1;   // no date -> sinks to the bottom of its group
+      if (db == null) return -1;
+      return da - db;
+    });
+  });
+  dcRows = [].concat.apply([], order.map(p => groups[p]));
+  dcRows.forEach((r,i) => { r.sortIndex = i; });
+  pinPriorityToTop_();
+  renderList(); persistDraft();
 }
 </script>
 
@@ -1208,7 +1267,7 @@ function renderList(){
   empty.style.display = 'none';
   const prio = dcRows.filter(r => r.priority).length;
   const missing = dcRows.filter(r => r.missingPhone).length;
-  summary.textContent = dcRows.length + ' row(s)' + (prio ? ' · ' + prio + ' priority' : '') + (missing ? ' · ' + missing + ' missing phone' : '');
+  summary.textContent = dcRows.length + ' row(s)' + (prio ? ' · ' + prio + ' priority' : '') + (missing ? ' · ' + missing + ' missing phone' : '') + (dcDncSkippedTotal ? ' · ' + dcDncSkippedTotal + ' skipped (DNC)' : '');
   body.innerHTML = dcRows.map((r, i) => {
     const cls = (r.priority ? 'dc-priority ' : '') + (r.missingPhone ? 'dc-missing-phone' : '');
     const badges = (r.priority ? '<span class="dc-badge prio">WTC</span>' : '') + (r.manuallyEdited ? '<span class="dc-badge edited">edited</span>' : '');
@@ -1220,9 +1279,11 @@ function renderList(){
       '<td><textarea rows="1" class="dc-cell-input" data-idx="' + i + '" data-field="description">' + escapeHtml(r.description) + '</textarea></td>' +
       '<td class="dc-col-notes"><textarea rows="1" class="dc-cell-input" data-idx="' + i + '" data-field="notes" placeholder="note…">' + escapeHtml(r.notes) + '</textarea></td>' +
       '<td class="dc-col-actions"><div class="dc-row-actions">' +
+        '<span class="dc-drag-handle" title="Drag to reorder">⠿</span>' +
         '<button class="dc-mini-btn" title="Move up" onclick="moveRow(' + i + ',-1)">↑</button>' +
         '<button class="dc-mini-btn" title="Move down" onclick="moveRow(' + i + ',1)">↓</button>' +
         '<button class="dc-mini-btn" title="' + (r.priority?'Unflag':'Want to call') + '" onclick="toggleRowPriority(' + i + ')">' + (r.priority?'★':'☆') + '</button>' +
+        '<button class="dc-mini-btn" title="Do not call — removes from today\'s list and remembers permanently" onclick="toggleRowDnc(' + i + ')">🚫</button>' +
         '<button class="dc-mini-btn del" title="Delete" onclick="deleteRow(' + i + ')">✕</button>' +
       '</div></td>' +
     '</tr>';
@@ -1253,16 +1314,31 @@ function moveRow(i, dir){
   if (j < 0 || j >= dcRows.length) return;
   const tmp = dcRows[i]; dcRows[i] = dcRows[j]; dcRows[j] = tmp;
   dcRows.forEach((r,k) => r.sortIndex = k);
+  pinPriorityToTop_();
   renderList(); persistDraft();
 }
 function deleteRow(i){ dcRows.splice(i,1); dcRows.forEach((r,k)=>r.sortIndex=k); renderList(); persistDraft(); }
 function toggleRowPriority(i){
   const r = dcRows[i]; r.priority = !r.priority;
   saveWantToCallFlag_(r.identityKey, r.fullName, r.priority);
+  pinPriorityToTop_();
+  renderList(); persistDraft();
+}
+// The "negative star" — removes the row from today's list entirely and
+// remembers the person permanently so future uploads skip them automatically.
+function toggleRowDnc(i){
+  const r = dcRows[i]; if (!r) return;
+  if (!confirm('Mark ' + (r.fullName || 'this contact') + ' Do Not Call?\n\nThey\'ll be removed from today\'s list and skipped automatically from now on.')) return;
+  dncSet[r.identityKey] = r.fullName;
+  saveDncFlag_(r.identityKey, r.fullName, true);
+  if (r.priority){ r.priority = false; saveWantToCallFlag_(r.identityKey, r.fullName, false); }
+  dcRows.splice(i,1);
+  dcRows.forEach((row,k)=>row.sortIndex=k);
   renderList(); persistDraft();
 }
 function addBlankRow(){
   dcRows.push(makeRow({ purpose:'Other', manuallyEdited:true, sortIndex:dcRows.length }));
+  pinPriorityToTop_();
   renderList(); persistDraft();
 }
 function onDayNotesInput(){
@@ -1271,8 +1347,8 @@ function onDayNotesInput(){
 }
 function clearListConfirm(){
   if (!dcRows.length && !dayNotes) return;
-  if (!confirm('Clear the whole List for Today, including its Notes? (Saved days are not affected.)')) return;
-  dcRows = []; dcPreApp = []; sourceBatches = []; currentRecordId = null; dayNotes = '';
+  if (!confirm('Clear the whole List for Today, including its Notes? (Saved days are not affected. Persistent Want-to-Call/DNC lists are not affected.)')) return;
+  dcRows = []; dcPreApp = []; sourceBatches = []; currentRecordId = null; dayNotes = ''; dcDncSkippedTotal = 0;
   document.getElementById('dcDayNotes').value = '';
   renderList(); renderPreApp(); persistDraft();
 }
@@ -1292,6 +1368,7 @@ function onListDrop(e){
   dcRows.splice(to, 0, moved);
   dcRows.forEach((r,k) => r.sortIndex = k);
   dragFromIdx = null;
+  pinPriorityToTop_();
   renderList(); persistDraft();
 }
 
@@ -1315,20 +1392,56 @@ async function saveWantToCallFlag_(identityKey, displayName, on){
   if (on) wantToCallSet[identityKey] = displayName; else delete wantToCallSet[identityKey];
   try { await DC_API.saveDailyCallsWantToCall({ identityKey, displayName, on:!!on }); } catch(e){}
 }
+async function saveDncFlag_(identityKey, displayName, on){
+  if (on) dncSet[identityKey] = displayName; else delete dncSet[identityKey];
+  try { await DC_API.saveDailyCallsDnc({ identityKey, displayName, on:!!on }); } catch(e){}
+}
 function openWantToCallModal(){
   const list = document.getElementById('wantToCallList');
   if (!dcRows.length){ list.innerHTML = '<div class="dc-empty">No rows on the list yet.</div>'; }
   else {
     list.innerHTML = dcRows.map((r,i) =>
       '<label style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--slate-light); font-size:12.5px;">' +
-        '<input type="checkbox" ' + (r.priority?'checked':'') + ' onchange="toggleRowPriority(' + i + '); renderWantToCallRefresh(' + i + ', this.checked)">' +
+        '<input type="checkbox" ' + (r.priority?'checked':'') + ' onchange="toggleRowPriority(' + i + '); renderWantToCallModalLists_()">' +
         '<span><b>' + escapeHtml(r.fullName) + '</b> — ' + escapeHtml(r.purpose) + '</span>' +
       '</label>'
     ).join('');
   }
+  renderWantToCallModalLists_();
   document.getElementById('wantToCallModalOverlay').classList.add('open');
 }
-function renderWantToCallRefresh(i, checked){ /* state already updated by toggleRowPriority */ }
+// The two PERSISTENT lists themselves — everyone ever flagged, whether or
+// not they happen to be on today's uploaded batch right now.
+function renderWantToCallModalLists_(){
+  const wtcEntries = Object.keys(wantToCallSet).map(k => ({ key:k, name:wantToCallSet[k] || k }));
+  const dncEntries = Object.keys(dncSet).map(k => ({ key:k, name:dncSet[k] || k }));
+  const wtcBody = document.getElementById('wtcPersistentList');
+  const dncBody = document.getElementById('dncPersistentList');
+  wtcBody.innerHTML = wtcEntries.length
+    ? wtcEntries.map(e => persistentListRow_(e, 'removeWantToCallEntry')).join('')
+    : '<div class="dc-empty" style="padding:8px 0;">Nobody flagged yet.</div>';
+  dncBody.innerHTML = dncEntries.length
+    ? dncEntries.map(e => persistentListRow_(e, 'removeDncEntry')).join('')
+    : '<div class="dc-empty" style="padding:8px 0;">Nobody on the DNC list yet.</div>';
+}
+function persistentListRow_(e, removeFn){
+  return '<div style="display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-bottom:1px solid var(--slate-light); font-size:12.5px;">' +
+    '<span>' + escapeHtml(e.name) + '</span>' +
+    '<button class="dc-mini-btn" onclick="' + removeFn + '(\'' + escapeHtml(e.key).replace(/'/g,"\\'") + '\')">Remove</button>' +
+  '</div>';
+}
+async function removeWantToCallEntry(identityKey){
+  delete wantToCallSet[identityKey];
+  saveWantToCallFlag_(identityKey, '', false);
+  dcRows.forEach(r => { if (r.identityKey === identityKey) r.priority = false; });
+  pinPriorityToTop_(); renderList(); persistDraft();
+  renderWantToCallModalLists_();
+}
+async function removeDncEntry(identityKey){
+  delete dncSet[identityKey];
+  saveDncFlag_(identityKey, '', false);
+  renderWantToCallModalLists_();
+}
 function closeWantToCallModal(){ document.getElementById('wantToCallModalOverlay').classList.remove('open'); }
 </script>
 
